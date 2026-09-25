@@ -1,4 +1,5 @@
 using ArenaMaster.Game.Combat;
+using ArenaMaster.Game.Items;
 using ArenaMaster.Game.Ranger;
 using ArenaMaster.Game.Ui;
 using CEngine.Core;
@@ -10,7 +11,7 @@ namespace ArenaMaster.Game;
 /// <summary>
 /// Arena Master's side of the engine seam. For now: a small test map (rolling hills, some trees and rocks to run around and jump onto) and a full 30-minute run as
 /// the Ranger - an auto-firing bow, a director that grows the ghoul horde over time, elite brutes and the Hollow King with telegraphed attacks, experience gems,
-/// level-ups that pause for a pick of three upgrades, and a win at 30:00 or a restart on death (build-order steps 1 to 4 in DESIGN.md).
+/// level-ups that pause for a pick of three upgrades, items from chests and drops, and a win at 30:00 or a restart on death (build-order steps 1 to 5 in DESIGN.md).
 /// </summary>
 public sealed class ArenaMasterContent : IGameContent
 {
@@ -29,6 +30,9 @@ public sealed class ArenaMasterContent : IGameContent
 
     private const float AnnouncementSeconds = 3f;
 
+    /// <summary>How long each "new item" popup stays up.</summary>
+    private const float ItemToastSeconds = 3f;
+
     private readonly Random _random = new();
     private readonly RangerStats _stats = new();
     private readonly RangerController _ranger = new();
@@ -43,6 +47,14 @@ public sealed class ArenaMasterContent : IGameContent
     private readonly XpGemView _gemView = new();
     private readonly DamageNumbers _numbers = new();
     private readonly LevelUpScreen _levelUp = new();
+    private readonly ItemInventory _items = new();
+    private readonly LootField _loot;
+    private readonly LootView _lootView = new();
+    private readonly Queue<RunItem> _itemToasts = new();
+    private float _itemToastLeft;
+
+    /// <summary>The fraction of an experience point an experience bonus has built up but not yet paid out.</summary>
+    private float _experienceCarry;
     private readonly HashSet<Key> _keysDown = new();
     private EngineWindow? _window;
     private bool _started;
@@ -61,6 +73,7 @@ public sealed class ArenaMasterContent : IGameContent
     {
         _bow = new RangerBow(_random);
         _enemies = new EnemyField(_random);
+        _loot = new LootField(_random);
     }
 
     public string AssetsRoot => Path.Combine(EngineAssets.RepoRoot, "assets");
@@ -132,6 +145,7 @@ public sealed class ArenaMasterContent : IGameContent
         _condition.Update(deltaSeconds);
         _numbers.Update(deltaSeconds);
         _announcementLeft = MathF.Max(0f, _announcementLeft - deltaSeconds);
+        UpdateItemToasts(deltaSeconds);
         window.PlayerPush = _ranger.DashVelocity + _condition.Knockback;
 
         if (_endIn > 0f)
@@ -160,18 +174,24 @@ public sealed class ArenaMasterContent : IGameContent
         var gone = _enemies.Update(deltaSeconds, player, GroundAt);
         foreach (var killed in _enemies.TakeNewlyKilled())
         {
-            _gems.Drop(killed.Position, killed.Kind.Experience);
-            if (killed.Kind.Tier == EnemyTier.Boss)
-            {
-                Announce($"{killed.Kind.Name} has fallen!");
-            }
+            OnKill(killed);
         }
 
         _enemyView.Sync(window, _enemies, gone, deltaSeconds, GroundAt);
 
         var collected = new List<XpGem>();
-        _pendingLevels += _experience.Add(_gems.Update(deltaSeconds, window.PlayerFeet, _stats.PickupRadius, collected));
+        GainExperience(_gems.Update(deltaSeconds, window.PlayerFeet, _stats.PickupRadius, collected));
         _gemView.Sync(window, _gems, collected, deltaSeconds);
+
+        var goneChests = new List<Chest>();
+        var gonePickups = new List<ItemPickup>();
+        foreach (var item in _loot.Update(deltaSeconds, window.PlayerFeet, GroundAt, goneChests, gonePickups))
+        {
+            GainItem(item);
+        }
+
+        _lootView.Sync(window, _loot, goneChests, gonePickups, deltaSeconds);
+        _health.Heal(_items.Bonuses.Regeneration * deltaSeconds);
 
         if (_health.IsDead)
         {
@@ -246,6 +266,23 @@ public sealed class ArenaMasterContent : IGameContent
         hud.Bar(HudAnchor.BottomCenter, new Vector2D<float>(0f, -40f), new Vector2D<float>(160f, 8f), ready, fill, shade);
         hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -54f), "DASH  [Shift]", new Vector4D<float>(1f, 1f, 1f, ready >= 1f ? 0.85f : 0.45f), 0.7f);
 
+        // The items carried, down the right side in their rarity's colour.
+        int row = 0;
+        foreach (var (item, count) in _items.Items)
+        {
+            string label = count > 1 ? $"{item.Name}  x{count}" : item.Name;
+            hud.Text(HudAnchor.TopRight, new Vector2D<float>(-26f, 66f + row * 22f), label, RarityColor(item.Rarity, 0.95f), 0.7f);
+            row++;
+        }
+
+        // The item just found, big, under the top bar.
+        if (_itemToastLeft > 0f && _itemToasts.TryPeek(out var found))
+        {
+            float alpha = MathF.Min(1f, _itemToastLeft * 2f);
+            hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 124f), $"{found.Rarity.ToString().ToUpperInvariant()}:  {found.Name}", RarityColor(found.Rarity, alpha), 1.2f);
+            hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 156f), found.Description, new Vector4D<float>(1f, 1f, 1f, 0.9f * alpha), 0.85f);
+        }
+
         if (_condition.IsStunned)
         {
             hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 60f), "STUNNED", new Vector4D<float>(1f, 0.85f, 0.3f, 1f), 1.2f);
@@ -264,6 +301,83 @@ public sealed class ArenaMasterContent : IGameContent
             hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 44f), $"New run in {MathF.Ceiling(_endIn)}...", white, 0.8f);
         }
     }
+
+    /// <summary>What a kill leaves behind: its experience gem, and loot - an elite's or a boss's chest, or now and then an item from fodder.</summary>
+    private void OnKill(Enemy killed)
+    {
+        _gems.Drop(killed.Position, killed.Kind.Experience);
+        _health.Heal(_items.Bonuses.HealOnKill);
+
+        switch (killed.Kind.Tier)
+        {
+            case EnemyTier.Boss:
+                _loot.DropChest(killed.Position, RarityWeights.Boss);
+                Announce($"{killed.Kind.Name} has fallen!");
+                break;
+            case EnemyTier.Elite:
+                _loot.DropChest(killed.Position, RarityWeights.Elite);
+                break;
+            case EnemyTier.Fodder when _loot.RollFodderDrop():
+                _loot.DropItem(killed.Position);
+                break;
+        }
+    }
+
+    /// <summary>Adds experience (raised by any experience bonus, fractions carried to the next pickup), queueing a level-up screen for each level gained.</summary>
+    private void GainExperience(int amount)
+    {
+        if (amount <= 0)
+        {
+            return;
+        }
+
+        _experienceCarry += amount * (1f + _items.Bonuses.ExperienceGain);
+        int whole = (int)_experienceCarry;
+        _experienceCarry -= whole;
+        _pendingLevels += _experience.Add(whole);
+    }
+
+    /// <summary>Takes an item: into the inventory, its bonuses into the stats (a higher max health heals the difference), and up on screen.</summary>
+    private void GainItem(RunItem item)
+    {
+        _items.Add(item);
+        var bonuses = _items.Bonuses;
+        _stats.Items = bonuses;
+        _health.DamageTaken = bonuses.DamageTaken;
+        if (_stats.MaxHealth > _health.Max)
+        {
+            _health.RaiseMax(_stats.MaxHealth - _health.Max);
+        }
+
+        _itemToasts.Enqueue(item);
+        if (_itemToasts.Count == 1)
+        {
+            _itemToastLeft = ItemToastSeconds;
+        }
+    }
+
+    private void UpdateItemToasts(float deltaSeconds)
+    {
+        if (_itemToasts.Count == 0)
+        {
+            return;
+        }
+
+        _itemToastLeft -= deltaSeconds;
+        if (_itemToastLeft <= 0f)
+        {
+            _itemToasts.Dequeue();
+            _itemToastLeft = _itemToasts.Count > 0 ? ItemToastSeconds : 0f;
+        }
+    }
+
+    private static Vector4D<float> RarityColor(ItemRarity rarity, float alpha) => rarity switch
+    {
+        ItemRarity.Rare => new Vector4D<float>(0.45f, 0.65f, 1f, alpha),
+        ItemRarity.Epic => new Vector4D<float>(0.78f, 0.45f, 1f, alpha),
+        ItemRarity.Legendary => new Vector4D<float>(1f, 0.72f, 0.2f, alpha),
+        _ => new Vector4D<float>(0.92f, 0.92f, 0.9f, alpha),
+    };
 
     /// <summary>Spawns what the director asked for: a wave of elites, a boss.</summary>
     private void FollowOrders(DirectorOrders orders, Vector3D<float> playerFeet, Func<float, float, float?> groundAt)
@@ -376,6 +490,10 @@ public sealed class ArenaMasterContent : IGameContent
         }
 
         _gemView.Sync(window, _gems, _gems.Clear(), 0f);
+        var goneChests = new List<Chest>();
+        var gonePickups = new List<ItemPickup>();
+        _loot.Clear(goneChests, gonePickups);
+        _lootView.Sync(window, _loot, goneChests, gonePickups, 0f);
         _bow.Clear(window);
         _numbers.Clear();
         _levelUp.Close();
@@ -389,6 +507,10 @@ public sealed class ArenaMasterContent : IGameContent
     private void StartRun()
     {
         _stats.Reset();
+        _items.Clear();
+        _itemToasts.Clear();
+        _itemToastLeft = 0f;
+        _experienceCarry = 0f;
         _experience.Reset();
         _health.Reset(_stats.MaxHealth);
         _enemies.ResetKills();

@@ -9,6 +9,9 @@
   telegraph_disc.glb      a flat dark-red disc of radius 1, scaled up inside the ring as an attack winds up
   telegraph_lane.glb      a flat red lane 1.6 m wide and 7.2 m long from the origin along +Z (a lunge's path)
   shockwave_ring.glb      a thin flat ring of radius 1 (width 0.07), scaled as a shockwave spreads
+  chest_placeholder.glb   a wooden treasure chest with gold bands, 1 m wide
+  loot_beam.glb           a thin gold pillar of light, 8 m tall, marking a chest from afar
+  item_<rarity>.glb       an item orb in its rarity's colour (common, rare, epic, legendary), centred on its middle
 
 The engine's model conventions: one mesh, one primitive, colours from one base-colour texture (vertex colours are
 ignored), facing +Z, feet at y = 0, metres. The texture is a strip of flat colour swatches and each face's UVs point
@@ -51,6 +54,17 @@ PALETTE = {
     "warn": (235, 40, 30),
     "warn_dark": (120, 16, 14),
     "shock": (255, 196, 90),
+    "chest_wood": (122, 76, 40),
+    "chest_dark": (70, 42, 22),
+    "beam": (255, 222, 120),
+    "common": (225, 225, 220),
+    "common_light": (255, 255, 250),
+    "rare": (60, 130, 255),
+    "rare_light": (150, 200, 255),
+    "epic": (170, 70, 235),
+    "epic_light": (220, 160, 255),
+    "legendary": (255, 170, 30),
+    "legendary_light": (255, 225, 140),
 }
 COLOURS = list(PALETTE)
 
@@ -307,6 +321,34 @@ def build_lane():
     return m
 
 
+def build_chest():
+    m = Mesh()
+    m.box(-0.50, 0.0, -0.32, 0.50, 0.50, 0.32, "chest_wood")      # body
+    m.box(-0.50, 0.50, -0.32, 0.50, 0.72, 0.32, "chest_dark")     # lid
+    for x in (-0.36, 0.30):                                         # gold bands over body and lid
+        m.box(x, -0.005, -0.335, x + 0.07, 0.725, 0.335, "gold")
+    m.box(-0.08, 0.40, 0.32, 0.08, 0.58, 0.35, "gold")             # lock plate, on the front
+    return m
+
+
+def build_beam():
+    m = Mesh()
+    m.box(-0.07, 0.0, -0.07, 0.07, 8.0, 0.07, "beam")
+    return m
+
+
+def build_item_orb(rarity):
+    """A chunky double pyramid, 0.5 m tall: light facets above, deeper colour below."""
+    m = Mesh()
+    top, bottom = (0.0, 0.26, 0.0), (0.0, -0.24, 0.0)
+    ring = [(0.17, 0.0, 0.0), (0.0, 0.0, 0.17), (-0.17, 0.0, 0.0), (0.0, 0.0, -0.17)]
+    for i in range(4):
+        a, b = ring[i], ring[(i + 1) % 4]
+        m.tri(a, top, b, rarity + "_light")
+        m.tri(b, bottom, a, rarity)
+    return m
+
+
 def png_bytes():
     width, height = SWATCH * len(COLOURS), SWATCH
     row = b"".join(bytes(PALETTE[c]) * SWATCH for c in COLOURS)
@@ -371,7 +413,10 @@ if __name__ == "__main__":
     for name, build in (("ranger_placeholder.glb", build_ranger), ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul), ("xp_gem_placeholder.glb", build_xp_gem),
                         ("brute_placeholder.glb", build_brute), ("hollow_king_placeholder.glb", build_hollow_king),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
-                        ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock"))):
+                        ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),
+                        ("chest_placeholder.glb", build_chest), ("loot_beam.glb", build_beam),
+                        ("item_common.glb", lambda: build_item_orb("common")), ("item_rare.glb", lambda: build_item_orb("rare")),
+                        ("item_epic.glb", lambda: build_item_orb("epic")), ("item_legendary.glb", lambda: build_item_orb("legendary"))):
         mesh = build()
         write_glb(mesh, MODELS / name)
         print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")

@@ -68,7 +68,22 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
 
 - Dropped by monsters (elites and bosses more likely) and found in chests.
 - Give passive bonuses and multipliers for the rest of the run. They stack.
-- Rarity tiers (draft): common, rare, epic, legendary.
+- Rarity tiers: common, rare, epic, legendary.
+
+**What's built** (`src/ArenaMaster.Game/Items/`):
+- **Items last one run and are shared loot: any class can carry any item.** They speak in general terms (damage, attack speed, max health, ...) and each class's stats decide what those mean for it. This is how "classes share nothing" was read: class abilities, upgrade pools and passive trees are per class; the loot is the world's.
+- **Bonuses vs multipliers:** commons and rares give bonuses that add to each other and to the class's upgrades. Epics and legendaries give multipliers that multiply the total.
+- **Sources:**
+  - A chest turns up 18-45 m from the player every 60 s (first at 0:40, at most 3 waiting), marked by a gold beam. Odds: 60% common, 28% rare, 10% epic, 2% legendary.
+  - An elite drops a chest that is rare or better.
+  - A boss drops a chest that is epic or better.
+  - Fodder has a 1-in-200 chance to drop an item orb.
+  - Walk into a chest or orb to take it.
+- **The 16 items:**
+  - *Common:* Whetstone (+8% damage), Feather Charm (+8% attack speed), Worn Boots (+6% move speed), Troll Blood (+0.4 HP/s), Leather Brigandine (6% less damage taken), Lodestone (+20% pickup range), Old Tome (+8% XP).
+  - *Rare:* Hawk Feather (+6% crit), Troll Heart (+25 max HP), Vampire Fang (heal 1 per kill), Serrated Edge (+30% crit damage).
+  - *Epic:* Rune of Might (x1.2 damage), Swiftwind Sigil (x1.15 attack speed), Ironbark Totem (x0.85 damage taken, +20 max HP).
+  - *Legendary:* Dragon Heart (+60 max HP, +1.5 HP/s), Hunter's Moon (x1.35 damage, +10% crit).
 
 ## Meta progression (like Megabonk)
 
@@ -82,8 +97,8 @@ Each step should be playable before the next one starts. **[engine]** means the 
 1. *(Done; the user is happy with the feel.)* **Third-person Ranger movement:** follow camera, WASD, jump, dash, on a test map with a placeholder character. [engine: general follow camera] [game: Ranger controller]
 2. *(Done; the user is happy with the feel.)* **Shooting and killing:** an auto-firing bow, arrow projectiles, one basic chaser enemy, hit detection, damage, death. [engine: general projectile/hitbox/damage helpers] [game: the bow, the enemy]
 3. *(Done; the user is happy with the feel.)* **Levelling up:** XP drops and pickup, the level-up pause with 3 choices, the first handful of stacking upgrades, and a HUD (HP, XP bar, timer, level). [game]
-4. *(Built; waiting for the user to try it.)* **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] (The engine steering turned out not to be needed yet: the game's own separation handles about 80 enemies. Revisit with the swarm renderer in step 7.)
-5. **Items:** drops, chests, bonuses and multipliers. [game]
+4. *(Done; the user is happy with the feel.)* **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] (The engine steering turned out not to be needed yet: the game's own separation handles about 80 enemies. Revisit with the swarm renderer in step 7.)
+5. *(Built; waiting for the user to try it.)* **Items:** drops, chests, bonuses and multipliers. [game]
 6. **Ranger passive tree:** the tree UI and nodes. [game]
 7. **Swarms:** a batched crowd renderer for hundreds of animated enemies. [engine]
 8. **Meta progression:** unlocks, currency, a save file. [game]

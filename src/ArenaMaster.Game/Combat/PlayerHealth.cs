@@ -20,6 +20,9 @@ internal sealed class PlayerHealth
 
     public bool IsDead => Current <= 0f;
 
+    /// <summary>What every hit's damage is multiplied by (armour-like items bring it below 1).</summary>
+    public float DamageTaken { get; set; } = 1f;
+
     /// <summary>1 right after a hit, fading to 0 - for a red flash on the HUD.</summary>
     public float HurtFlash => _grace / HitGrace;
 
@@ -31,7 +34,7 @@ internal sealed class PlayerHealth
             return false;
         }
 
-        Current = MathF.Max(0f, Current - amount);
+        Current = MathF.Max(0f, Current - amount * DamageTaken);
         _grace = HitGrace;
         return true;
     }
@@ -45,13 +48,21 @@ internal sealed class PlayerHealth
         Current += amount;
     }
 
-    public void Heal(float amount) => Current = MathF.Min(Max, Current + amount);
+    /// <summary>Heals up to the maximum. Does nothing for the dead.</summary>
+    public void Heal(float amount)
+    {
+        if (!IsDead)
+        {
+            Current = MathF.Min(Max, Current + amount);
+        }
+    }
 
     /// <summary>Back to full health at <paramref name="max"/> (a new run).</summary>
     public void Reset(float max)
     {
         Max = max;
         Current = max;
+        DamageTaken = 1f;
         _grace = 0f;
     }
 }

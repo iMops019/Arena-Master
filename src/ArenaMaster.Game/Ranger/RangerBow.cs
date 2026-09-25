@@ -39,7 +39,7 @@ internal sealed class RangerBow
             var aim = AimDirection(origin, CrosshairTarget(camera, terrain, enemies, stats.Range), camera.Front, aimFlat);
             foreach (var direction in Fan(aim, stats.ArrowsPerShot, RangerStats.SplitSpreadDegrees))
             {
-                _arrows.Fire(origin, direction, stats.ArrowSpeed, stats.Range, stats.Damage, stats.Pierce, stats.CritChance);
+                _arrows.Fire(origin, direction, stats.ArrowSpeed, stats.Range, stats.Damage, stats.Pierce, stats.CritChance, stats.CritMultiplier);
             }
         }
 

@@ -24,6 +24,9 @@ internal sealed class Arrow
 
     public float CritChance { get; set; }
 
+    /// <summary>How many times normal damage a critical hit does.</summary>
+    public float CritMultiplier { get; set; } = RangerStats.BaseCritMultiplier;
+
     /// <summary>The enemies it has already gone through, so a piercing arrow never hits the same one twice.</summary>
     public HashSet<Enemy> AlreadyHit { get; } = new();
 
@@ -53,7 +56,8 @@ internal sealed class RangerArrows
 
     public IReadOnlyList<Arrow> Arrows => _arrows;
 
-    public Arrow Fire(Vector3D<float> origin, Vector3D<float> direction, float speed, float range, float damage, int pierce = 0, float critChance = 0f)
+    public Arrow Fire(Vector3D<float> origin, Vector3D<float> direction, float speed, float range, float damage, int pierce = 0, float critChance = 0f,
+        float critMultiplier = RangerStats.BaseCritMultiplier)
     {
         var heading = Vector3D.Normalize(direction);
         var arrow = new Arrow
@@ -64,6 +68,7 @@ internal sealed class RangerArrows
             Damage = damage,
             PierceLeft = pierce,
             CritChance = critChance,
+            CritMultiplier = critMultiplier,
             Heading = heading,
         };
         _arrows.Add(arrow);
@@ -132,7 +137,7 @@ internal sealed class RangerArrows
         {
             arrow.AlreadyHit.Add(enemy);
             bool crit = arrow.CritChance > 0f && _random.NextDouble() < arrow.CritChance;
-            float damage = crit ? arrow.Damage * RangerStats.CritMultiplier : arrow.Damage;
+            float damage = crit ? arrow.Damage * arrow.CritMultiplier : arrow.Damage;
             bool killed = enemies.Damage(enemy, damage);
             hits.Add(new ArrowHit(enemy, from + (to - from) * along, damage, killed, crit));
 

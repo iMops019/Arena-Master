@@ -187,7 +187,7 @@ public class RangerShotTests
         var hit = Assert.Single(arrows.Update(0.2f, enemies, FlatGround, new List<Arrow>()));
 
         Assert.True(hit.Crit);
-        Assert.Equal(10f * RangerStats.CritMultiplier, hit.Damage);
+        Assert.Equal(10f * RangerStats.BaseCritMultiplier, hit.Damage);
         Assert.Equal(EnemyKind.Ghoul.MaxHealth - 20f, ghoul.Health);
     }
 
