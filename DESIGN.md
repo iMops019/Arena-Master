@@ -61,8 +61,16 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
 - **Ideas for later levels of the pool (draft):** Rain of Arrows (area), Traps, Poison or Fire Arrows (damage over time), Hawk companion, health regen.
 - **Passive trees:** a class has several trees; the player picks one to be active. The active tree earns the run's experience (its base amount, before item bonuses) and levels during runs, but points are only spent at camp. Respec is free (for now). Cap: tree level 50, one point per level. Levelling is slow on purpose: level n to n+1 takes 200 + 60 x n^1.6 experience.
 - **First tree: Sharpshooter** (`Ranger/SharpshooterTree.cs`, built): 34 nodes in 7 tiers opening at tree levels 1, 3, 6, 10, 15, 21, 28, in three lanes (Precision, Volley, Trickshot). Two starting nodes: Steady Hands and Honed Draw (+10% damage and attack speed per rank, x5). Nine majors (one rank each). Chain Projectiles is a tier 2 major (user's request). A node needs its tier's level and a ranked parent.
-  - Playable now: every minor node except Arrowstorm, plus the majors Chain Projectiles, Twin Shot and Deadeye.
-  - Shown as "coming soon" (can't be taken yet): Rain of Arrows, Arrowstorm, Sniper's Focus, Fork, and the three capstones (One Shot One Kill, Endless Quiver, Storm of Splinters). All are tier 5+, so level 15+.
+  - Every node is playable. How the majors work in the game:
+    - *Chain Projectiles:* an arrow that would stop in an enemy jumps to the nearest other one within 10 m (more with Seeker Fletching), once per chain.
+    - *Twin Shot:* +1 arrow per shot, all arrows x0.85 damage.
+    - *Deadeye:* crits x3 instead of x2, -5% crit chance.
+    - *Rain of Arrows:* every 6 s, 12 arrows (+4 per Arrowstorm rank) fall over a 4 m patch on the ground under the crosshair, arriving over 0.6 s, at full damage each. With the crosshair on the sky, it lands 15 m ahead instead.
+    - *Sniper's Focus:* stand still (no walking, dashing or knock-back) for 1 s and the next shot's middle arrow does x2.5 damage and pierces everything. "FOCUSED" shows on the HUD when it's ready. Firing spends it.
+    - *Fork:* an arrow's first hit splits off two halves 20 degrees apart, carrying what the arrow had left. Halves never split again.
+    - *One Shot, One Kill:* a hit on an enemy still at full health is always a crit.
+    - *Endless Quiver:* every 10th shot also fires a flat ring of 16 arrows around the Ranger.
+    - *Storm of Splinters:* an arrow that kills bursts into 4 small flat splinters at 50% of its damage (12 m range). Splinters never burst again.
   - The mockup: https://claude.ai/artifact/FT8PtJd252AjLdRuyinfvh
 
 ## Items
@@ -109,7 +117,7 @@ Each step should be playable before the next one starts. **[engine]** means the 
 3. *(Done; the user is happy with the feel.)* **Levelling up:** XP drops and pickup, the level-up pause with 3 choices, the first handful of stacking upgrades, and a HUD (HP, XP bar, timer, level). [game]
 4. *(Done; the user is happy with the feel.)* **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] (The engine steering turned out not to be needed yet: the game's own separation handles about 80 enemies. Revisit with the swarm renderer in step 7.)
 5. *(Done; reworked in step 6 so items persist.)* **Items:** drops, chests, bonuses and multipliers. [game]
-6. *(Built; waiting for the user to try it.)* **Camp, save file, persistent items and loadouts, and the Sharpshooter passive tree.** [game] [engine: TeleportPlayer, pause-menu buttons, MapsMenu switch]
+6. *(Done; the "coming soon" majors were then built too, waiting for the user to try them.)* **Camp, save file, persistent items and loadouts, and the Sharpshooter passive tree.** [game] [engine: TeleportPlayer, pause-menu buttons, MapsMenu switch]
 7. **Swarms:** a batched crowd renderer for hundreds of animated enemies. [engine]
 8. **Meta progression:** unlocks, currency. (The save file came in step 6.) [game]
 9. Iterate on the Ranger until it feels right, then design class #2.

@@ -112,6 +112,10 @@ public sealed partial class ArenaMasterContent
         {
             hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 60f), "STUNNED", new Vector4D<float>(1f, 0.85f, 0.3f, 1f), 1.2f);
         }
+        else if (_bow.FocusReady(_stats))
+        {
+            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 34f), "FOCUSED", Teal, 0.8f);   // Sniper's Focus: the next shot is the big one
+        }
 
         if (_announcementLeft > 0f)
         {

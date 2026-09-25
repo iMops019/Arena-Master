@@ -138,13 +138,20 @@ public class TreeProgressTests
     }
 
     [Fact]
-    public void NodesNotInTheGameYet_CantBeTaken()
+    public void EveryNode_IsPlayable()
     {
-        var tree = Fresh(TreeProgress.TotalFor(50));
-        var rain = Node("rain");
+        Assert.All(SharpshooterTree.Tree.Nodes, n => Assert.True(n.Playable, $"{n.Name} is still marked coming soon"));
+    }
 
-        Assert.False(rain.Playable);
-        Assert.Contains("Coming soon", tree.WhyNotTake(rain));
+    [Fact]
+    public void ANodeNotYetInTheGame_CantBeTaken()
+    {
+        var tree = new TreeProgress(SharpshooterTree.Tree with
+        {
+            Nodes = SharpshooterTree.Tree.Nodes.Select(n => n.Id == "honed" ? n with { Playable = false } : n).ToList(),
+        }, new TreeSave());
+
+        Assert.Contains("Coming soon", tree.WhyNotTake(tree.Tree.Node("honed")));
     }
 
     [Fact]

@@ -2,8 +2,12 @@ using ArenaMaster.Game.Items;
 
 namespace ArenaMaster.Game.Ranger;
 
-/// <summary>What an arrow does on a hit beyond its base damage, depending on what it hit. Fractions for percentages.</summary>
-internal readonly record struct HitRules(float EliteDamage, float HealthyDamage, float ExecuteChance, float ChainedDamage, float CascadeDamage)
+/// <summary>
+/// What an arrow does on a hit beyond its base damage, depending on what it hit. Fractions for percentages. <paramref name="Fork"/>: its first hit splits it in two.
+/// <paramref name="Splinters"/>: a kill bursts it into splinters. <paramref name="FirstHitCrits"/>: a hit on an enemy not yet hurt is always critical.
+/// </summary>
+internal readonly record struct HitRules(float EliteDamage, float HealthyDamage, float ExecuteChance, float ChainedDamage, float CascadeDamage,
+    bool Fork = false, bool Splinters = false, bool FirstHitCrits = false)
 {
     public static readonly HitRules None = default;
 }
@@ -35,6 +39,19 @@ internal sealed class RangerStats
     public const float TwinShotDamage = 0.85f;
 
     public const int MaxMomentumStacks = 15;
+
+    /// <summary>Rain of Arrows: how often, how many (before Arrowstorm), and how wide the patch it covers.</summary>
+    public const float RainInterval = 6f;
+    public const int BaseRainArrows = 12;
+    public const float RainRadius = 4f;
+
+    /// <summary>Sniper's Focus: how long to stand still, and what the focused arrow's damage is multiplied by.</summary>
+    public const float FocusTime = 1f;
+    public const float FocusDamage = 2.5f;
+
+    /// <summary>Endless Quiver: every this-many-th shot, a ring of this many arrows.</summary>
+    public const int QuiverEvery = 10;
+    public const int QuiverRing = 16;
 
     private readonly Dictionary<RangerUpgrade, int> _levels = new();
 
@@ -112,5 +129,8 @@ internal sealed class RangerStats
 
     public float DamageTaken => Items.DamageTaken * Tree.DamageTaken;
 
-    public HitRules HitRules => new(Tree.EliteDamage, Tree.HealthyDamage, Tree.ExecuteChance, Tree.ChainedDamage, Tree.CascadeDamage);
+    public int RainArrows => Tree.RainOfArrows ? BaseRainArrows + Tree.RainArrows : 0;
+
+    public HitRules HitRules => new(Tree.EliteDamage, Tree.HealthyDamage, Tree.ExecuteChance, Tree.ChainedDamage, Tree.CascadeDamage,
+        Fork: Tree.Fork, Splinters: Tree.StormOfSplinters, FirstHitCrits: Tree.OneShotOneKill);
 }

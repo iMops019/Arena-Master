@@ -4,8 +4,7 @@ namespace ArenaMaster.Game.Ranger;
 
 /// <summary>
 /// The Ranger's first passive tree. Three lanes - Precision (crits, big hits, elites), Volley (attack speed, more arrows, staying alive) and Trickshot (pierce,
-/// chains, speed) - over seven tiers opening at tree levels 1, 3, 6, 10, 15, 21 and 28. Two starting nodes; nine majors. The majors past tier 4 (Rain of Arrows and
-/// what grows from it, Sniper's Focus, Fork and the capstones) show on the tree but aren't playable yet.
+/// chains, speed) - over seven tiers opening at tree levels 1, 3, 6, 10, 15, 21 and 28. Two starting nodes; nine majors.
 /// </summary>
 internal static class SharpshooterTree
 {
@@ -42,12 +41,18 @@ internal static class SharpshooterTree
     public const string ChainProjectiles = "chain";
     public const string TwinShot = "twin";
     public const string Deadeye = "deadeye";
+    public const string RainOfArrows = "rain";
+    public const string SnipersFocus = "focus";
+    public const string Fork = "fork";
+    public const string OneShotOneKill = "oneshot";
+    public const string EndlessQuiver = "endless";
+    public const string StormOfSplinters = "splinters";
 
     private static TreeNode Minor(string id, string name, int tier, float x, string lane, int max, string[] parents, string text, params (string Stat, float PerRank)[] stats) =>
         new(id, name, tier, x, lane, max, text, parents, stats.ToDictionary(s => s.Stat, s => s.PerRank));
 
-    private static TreeNode Major(string id, string name, int tier, float x, string lane, string[] parents, string text, bool playable = true) =>
-        new(id, name, tier, x, lane, 1, text, parents, new Dictionary<string, float>(), Major: true, Playable: playable);
+    private static TreeNode Major(string id, string name, int tier, float x, string lane, string[] parents, string text) =>
+        new(id, name, tier, x, lane, 1, text, parents, new Dictionary<string, float>(), Major: true);
 
     private const string P = "Precision", V = "Volley", T = "Trickshot";
 
@@ -83,23 +88,23 @@ internal static class SharpshooterTree
         // Tier 5 (level 15)
         Minor("executioner", "Executioner", 5, 160, P, 3, new[] { "patient", Deadeye }, "{Execute chance}% chance for a hit to finish off a non-boss enemy left below 20% health.", (ExecuteChance, 3)),
         Minor("headhunter", "Headhunter", 5, 300, P, 3, new[] { Deadeye }, "Critical hits on elites and bosses heal {Heal on elite crit} health.", (EliteCritHeal, 2)),
-        Major("rain", "Rain of Arrows", 5, 440, V, new[] { "weight", "momentum" }, "Every 6 s, 12 arrows rain down on the ground under the crosshair.", playable: false),
+        Major(RainOfArrows, "Rain of Arrows", 5, 440, V, new[] { "weight", "momentum" }, "Every 6 s, 12 arrows rain down on the ground under the crosshair."),
         Minor("quiver", "Quiver Mastery", 5, 575, V, 3, new[] { "momentum" }, "+{Damage per extra arrow}% damage for each extra arrow you fire per shot.", (DamagePerExtraArrow, 5)),
         Minor("reach", "Chain Reach", 5, 700, T, 2, new[] { "seeker" }, "Arrows chain {Extra chains} extra times.", (ExtraChains, 1)),
         Minor("windrunner", "Wind Runner", 5, 840, T, 3, new[] { "recovery", "seeker" }, "+{Move speed}% move speed and +{Dash distance}% dash distance.", (MoveSpeed, 5), (DashDistance, 10)),
 
         // Tier 6 (level 21)
         Minor("lethal", "Lethal Precision", 6, 160, P, 3, new[] { "executioner", "headhunter" }, "+{Crit chance}% critical chance.", (CritChance, 5)),
-        Major("focus", "Sniper's Focus", 6, 300, P, new[] { "headhunter" }, "Stand still for 1 s and your next arrow deals +150% damage and pierces every enemy in its path.", playable: false),
-        new("storm", "Arrowstorm", 6, 440, V, 3, "Rain of Arrows drops {Rain arrows} more arrows.", new[] { "rain" }, new Dictionary<string, float> { [RainArrows] = 4 }, Playable: false),
+        Major(SnipersFocus, "Sniper's Focus", 6, 300, P, new[] { "headhunter" }, "Stand still for 1 s and your next arrow deals +150% damage and pierces every enemy in its path."),
+        Minor("storm", "Arrowstorm", 6, 440, V, 3, new[] { RainOfArrows }, "Rain of Arrows drops {Rain arrows} more arrows.", (RainArrows, 4)),
         Minor("hardened", "Hardened Leathers", 6, 575, V, 3, new[] { "quiver" }, "+{Max health} max health and {Damage taken cut}% less damage taken.", (MaxHealth, 15), (DamageTakenCut, 5)),
         Minor("cascade", "Cascade", 6, 700, T, 3, new[] { "reach" }, "Each chain after the first deals +{Damage per chain}% more damage than the last.", (CascadeDamage, 10)),
-        Major("fork", "Fork", 6, 840, T, new[] { "reach", "windrunner" }, "The first enemy an arrow hits splits it into two arrows, 20 degrees apart.", playable: false),
+        Major(Fork, "Fork", 6, 840, T, new[] { "reach", "windrunner" }, "The first enemy an arrow hits splits it into two arrows, 20 degrees apart."),
 
         // Tier 7 (level 28): the capstones.
-        Major("oneshot", "One Shot, One Kill", 7, 230, P, new[] { "lethal", "focus" }, "The first arrow to hit each enemy is always a critical hit.", playable: false),
-        Major("endless", "Endless Quiver", 7, 505, V, new[] { "storm", "hardened" }, "Every 10th shot fires a full ring of 16 arrows around you.", playable: false),
-        Major("splinters", "Storm of Splinters", 7, 770, T, new[] { "cascade", "fork" }, "An arrow that kills bursts into 4 splinters, each dealing 50% of its damage.", playable: false),
+        Major(OneShotOneKill, "One Shot, One Kill", 7, 230, P, new[] { "lethal", SnipersFocus }, "The first arrow to hit each enemy is always a critical hit."),
+        Major(EndlessQuiver, "Endless Quiver", 7, 505, V, new[] { "storm", "hardened" }, "Every 10th shot fires a full ring of 16 arrows around you."),
+        Major(StormOfSplinters, "Storm of Splinters", 7, 770, T, new[] { "cascade", Fork }, "An arrow that kills bursts into 4 splinters, each dealing 50% of its damage."),
     }, new[] { 1, 3, 6, 10, 15, 21, 28 });
 }
 
@@ -129,12 +134,21 @@ internal sealed class SharpshooterBonuses
     public float DashDistance;
     public float CascadeDamage;
 
+    /// <summary>Extra arrows in each Rain of Arrows (Arrowstorm).</summary>
+    public int RainArrows;
+
     /// <summary>What damage taken is multiplied by: each rank of Hardened Leathers takes a share off what is left.</summary>
     public float DamageTaken = 1f;
 
     public bool ChainProjectiles;
     public bool TwinShot;
     public bool Deadeye;
+    public bool RainOfArrows;
+    public bool SnipersFocus;
+    public bool Fork;
+    public bool OneShotOneKill;
+    public bool EndlessQuiver;
+    public bool StormOfSplinters;
 
     public static SharpshooterBonuses From(IReadOnlyDictionary<string, int> ranks)
     {
@@ -174,6 +188,7 @@ internal sealed class SharpshooterBonuses
                     case SharpshooterTree.ExtraChains: b.ExtraChains += (int)v; break;
                     case SharpshooterTree.DashDistance: b.DashDistance += v / 100f; break;
                     case SharpshooterTree.CascadeDamage: b.CascadeDamage += v / 100f; break;
+                    case SharpshooterTree.RainArrows: b.RainArrows += (int)v; break;
                     case SharpshooterTree.DamageTakenCut: b.DamageTaken *= MathF.Pow(1f - perRank / 100f, r); break;
                 }
             }
@@ -182,6 +197,12 @@ internal sealed class SharpshooterBonuses
         b.ChainProjectiles = ranks.GetValueOrDefault(SharpshooterTree.ChainProjectiles) > 0;
         b.TwinShot = ranks.GetValueOrDefault(SharpshooterTree.TwinShot) > 0;
         b.Deadeye = ranks.GetValueOrDefault(SharpshooterTree.Deadeye) > 0;
+        b.RainOfArrows = ranks.GetValueOrDefault(SharpshooterTree.RainOfArrows) > 0;
+        b.SnipersFocus = ranks.GetValueOrDefault(SharpshooterTree.SnipersFocus) > 0;
+        b.Fork = ranks.GetValueOrDefault(SharpshooterTree.Fork) > 0;
+        b.OneShotOneKill = ranks.GetValueOrDefault(SharpshooterTree.OneShotOneKill) > 0;
+        b.EndlessQuiver = ranks.GetValueOrDefault(SharpshooterTree.EndlessQuiver) > 0;
+        b.StormOfSplinters = ranks.GetValueOrDefault(SharpshooterTree.StormOfSplinters) > 0;
         return b;
     }
 }

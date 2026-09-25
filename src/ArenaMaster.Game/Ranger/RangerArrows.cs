@@ -43,6 +43,15 @@ internal sealed class Arrow
 
     /// <summary>Which way it points - kept when it sticks, so it stays at the angle it landed.</summary>
     public Vector3D<float> Heading { get; set; }
+
+    /// <summary>How big it is drawn (splinters are small).</summary>
+    public float Scale { get; set; } = 1f;
+
+    /// <summary>Whether it has already split (Fork) - or is itself one of the halves, which never split again.</summary>
+    public bool Forked { get; set; }
+
+    /// <summary>A splinter from a kill (Storm of Splinters). Splinters never burst into more splinters.</summary>
+    public bool IsSplinter { get; set; }
 }
 
 /// <summary>A hit an arrow landed this frame.</summary>
@@ -66,6 +75,16 @@ internal sealed class RangerArrows
     /// <summary>Above this share of its health, an enemy counts as healthy (see <see cref="HitRules.HealthyDamage"/>).</summary>
     public const float HealthyAbove = 0.8f;
 
+    /// <summary>Fork: the two halves fly this many degrees either side of the arrow's heading (20 apart).</summary>
+    public const float ForkHalfAngleDegrees = 10f;
+
+    /// <summary>Storm of Splinters: how many, how hard (a share of the killing arrow's damage), how fast (a share of its speed), how far, how big.</summary>
+    public const int SplinterCount = 4;
+    public const float SplinterDamage = 0.5f;
+    public const float SplinterSpeed = 0.8f;
+    public const float SplinterRange = 12f;
+    public const float SplinterScale = 0.6f;
+
     private enum Flight
     {
         Flying,
@@ -74,6 +93,7 @@ internal sealed class RangerArrows
     }
 
     private readonly List<Arrow> _arrows = new();
+    private readonly List<Arrow> _spawned = new();
     private readonly Random _random;
 
     public RangerArrows(Random random) => _random = random;
@@ -150,6 +170,8 @@ internal sealed class RangerArrows
         }
 
         _arrows.RemoveAll(gone.Contains);
+        _arrows.AddRange(_spawned);   // forks and splinters born this frame start flying next frame
+        _spawned.Clear();
         return hits;
     }
 
@@ -157,6 +179,7 @@ internal sealed class RangerArrows
     {
         var all = _arrows.ToList();
         _arrows.Clear();
+        _spawned.Clear();
         return all;
     }
 
@@ -192,6 +215,12 @@ internal sealed class RangerArrows
             arrow.AlreadyHit.Add(enemy);
             Strike(arrow, enemy, at, enemies, hits);
 
+            if (arrow.Rules.Fork && !arrow.Forked)
+            {
+                arrow.Forked = true;
+                SpawnForks(arrow, at);
+            }
+
             if (arrow.PierceLeft > 0)
             {
                 arrow.PierceLeft--;
@@ -206,7 +235,8 @@ internal sealed class RangerArrows
 
     private void Strike(Arrow arrow, Enemy enemy, Vector3D<float> at, EnemyField enemies, List<ArrowHit> hits)
     {
-        bool crit = arrow.CritChance > 0f && _random.NextDouble() < arrow.CritChance;
+        bool untouched = enemy.Health >= enemy.MaxHealth;
+        bool crit = (arrow.Rules.FirstHitCrits && untouched) || (arrow.CritChance > 0f && _random.NextDouble() < arrow.CritChance);
         float damage = DamageAgainst(arrow, enemy) * (crit ? arrow.CritMultiplier : 1f);
         bool killed = enemies.Damage(enemy, damage);
 
@@ -218,6 +248,74 @@ internal sealed class RangerArrows
         }
 
         hits.Add(new ArrowHit(enemy, at, damage, killed, crit));
+
+        if (killed && arrow.Rules.Splinters && !arrow.IsSplinter)
+        {
+            SpawnSplinters(arrow, at);
+        }
+    }
+
+    /// <summary>Fork: two halves of the arrow fly on from where it hit, either side of its heading. They carry what the arrow had left and never split again.</summary>
+    private void SpawnForks(Arrow arrow, Vector3D<float> at)
+    {
+        float speed = arrow.Velocity.Length;
+        foreach (float degrees in new[] { -ForkHalfAngleDegrees, ForkHalfAngleDegrees })
+        {
+            var heading = Turn(arrow.Heading, degrees * MathF.PI / 180f);
+            var half = Copy(arrow, at, heading, speed);
+            half.FlightLeft = arrow.FlightLeft;
+            _spawned.Add(half);
+        }
+    }
+
+    /// <summary>Storm of Splinters: small arrows burst out flat and evenly spread from a kill, each with half the killing arrow's damage. They don't pierce, chain, fork or splinter.</summary>
+    private void SpawnSplinters(Arrow arrow, Vector3D<float> at)
+    {
+        float speed = arrow.Velocity.Length * SplinterSpeed;
+        float start = (float)_random.NextDouble() * MathF.Tau;
+        for (int i = 0; i < SplinterCount; i++)
+        {
+            float angle = start + MathF.Tau * i / SplinterCount;
+            var splinter = Copy(arrow, at, new Vector3D<float>(MathF.Sin(angle), 0f, MathF.Cos(angle)), speed);
+            splinter.Damage = arrow.Damage * SplinterDamage;
+            splinter.FlightLeft = SplinterRange / speed;
+            splinter.PierceLeft = 0;
+            splinter.ChainsLeft = 0;
+            splinter.IsSplinter = true;
+            splinter.Scale = SplinterScale;
+            _spawned.Add(splinter);
+        }
+    }
+
+    /// <summary>A new arrow like <paramref name="arrow"/> (its damage, crits, what it has left, what it has hit), leaving <paramref name="at"/> along <paramref name="heading"/>.</summary>
+    private static Arrow Copy(Arrow arrow, Vector3D<float> at, Vector3D<float> heading, float speed)
+    {
+        var copy = new Arrow
+        {
+            Position = at,
+            Heading = heading,
+            Velocity = heading * speed,
+            Damage = arrow.Damage,
+            PierceLeft = arrow.PierceLeft,
+            CritChance = arrow.CritChance,
+            CritMultiplier = arrow.CritMultiplier,
+            ChainsLeft = arrow.ChainsLeft,
+            ChainRange = arrow.ChainRange,
+            ChainIndex = arrow.ChainIndex,
+            Rules = arrow.Rules,
+            Forked = true,
+            IsSplinter = arrow.IsSplinter,
+            Scale = arrow.Scale,
+        };
+        copy.AlreadyHit.UnionWith(arrow.AlreadyHit);
+        return copy;
+    }
+
+    /// <summary><paramref name="heading"/> turned about the vertical by <paramref name="radians"/> (the same turn a model's yaw makes).</summary>
+    public static Vector3D<float> Turn(Vector3D<float> heading, float radians)
+    {
+        float cos = MathF.Cos(radians), sin = MathF.Sin(radians);
+        return Vector3D.Normalize(new Vector3D<float>(heading.X * cos + heading.Z * sin, heading.Y, -heading.X * sin + heading.Z * cos));
     }
 
     /// <summary>Turns the arrow, from where it hit, toward the nearest live enemy it hasn't hit yet within its chain range. False if there is none.</summary>

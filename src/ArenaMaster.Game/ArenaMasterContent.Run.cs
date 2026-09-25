@@ -106,7 +106,8 @@ public sealed partial class ArenaMasterContent
         FollowOrders(_director.Update(_runSeconds, _enemies), window.PlayerFeet, groundAt);
         UpdateMomentum();
 
-        foreach (var hit in _bow.Update(window, deltaSeconds, _stats, _enemies, _numbers, groundAt, canFire: !_condition.IsStunned))
+        bool standingStill = window.PlayerMoveDirection == Vector3D<float>.Zero && _ranger.DashVelocity == Vector3D<float>.Zero && _condition.Knockback == Vector3D<float>.Zero;
+        foreach (var hit in _bow.Update(window, deltaSeconds, _stats, _enemies, _numbers, groundAt, canFire: !_condition.IsStunned, standingStill))
         {
             if (hit.Crit && hit.Enemy.Kind.Tier != EnemyTier.Fodder)
             {
