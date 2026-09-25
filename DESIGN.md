@@ -14,13 +14,14 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 
 ## The core loop
 
+0. At **camp**, check the item chest, spend passive tree points, and choose a loadout of up to 5 items at the departure gate.
 1. Start a 30-minute run as a class.
 2. Move and aim. Attacks fire automatically in the direction the camera faces (Megabonk-style), so positioning and aim matter but you never click to attack.
 3. Kill monsters, which drop XP. Collect it to level up.
 4. On level up the game pauses and offers **3 choices**: new abilities, upgrades to owned abilities, or stat boosts. Choices stack and can come up again.
 5. Monsters and chests drop **items** that give passive bonuses and multipliers for the rest of the run.
 6. Survive the escalating waves, elites and bosses to the 30-minute mark.
-7. After the run, spend progress on permanent unlocks (see **Meta progression**).
+7. The run ends in victory, death, or "Return to Camp" from the pause menu. Items found are already in the stash, and the passive tree has banked its experience. Back at camp, spend it.
 
 ## Camera and controls (draft)
 
@@ -58,32 +59,41 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
 - **Levelling:** each ghoul drops a 1 XP gem. Level n to n+1 takes 5n XP. Gems within the pickup radius (3 m base) fly to the player. Each level pauses the game and offers 3 random upgrades from the pool below; maxed ones drop out, and once all are maxed the offer is a heal (Second Wind, 30 HP). A death ends the run and resets level, upgrades and clock.
 - **Level-up pool (built, first pass):** Sharpened Tips (+20% damage, x5), Quick Draw (+15% attack speed, x5), Split Shot (+1 arrow fanned 7 degrees apart, x4), Piercing Arrows (+1 pierce, x3), Deadeye (+8% crit, crits x2, base 5%, x5), Fletching (+20% arrow speed and +15% range, x3), Fleet Foot (+8% move speed, x5), Vitality (+20 max HP and heal, x5), Scavenger (+35% pickup range, x4).
 - **Ideas for later levels of the pool (draft):** Rain of Arrows (area), Traps, Poison or Fire Arrows (damage over time), Hawk companion, health regen.
-- **Passive tree (draft):** three branches that each push a different build:
-  - **Marksman:** crits, single-target and boss damage.
-  - **Volley:** multi-projectile, area, clearing swarms.
-  - **Trapper/Beast:** traps, damage over time, companion.
-- **How passive points are earned (open):** in-run on level up, or permanently between runs, or both.
+- **Passive trees:** a class has several trees; the player picks one to be active. The active tree earns the run's experience (its base amount, before item bonuses) and levels during runs, but points are only spent at camp. Respec is free (for now). Cap: tree level 50, one point per level. Levelling is slow on purpose: level n to n+1 takes 200 + 60 x n^1.6 experience.
+- **First tree: Sharpshooter** (`Ranger/SharpshooterTree.cs`, built): 34 nodes in 7 tiers opening at tree levels 1, 3, 6, 10, 15, 21, 28, in three lanes (Precision, Volley, Trickshot). Two starting nodes: Steady Hands and Honed Draw (+10% damage and attack speed per rank, x5). Nine majors (one rank each). Chain Projectiles is a tier 2 major (user's request). A node needs its tier's level and a ranked parent.
+  - Playable now: every minor node except Arrowstorm, plus the majors Chain Projectiles, Twin Shot and Deadeye.
+  - Shown as "coming soon" (can't be taken yet): Rain of Arrows, Arrowstorm, Sniper's Focus, Fork, and the three capstones (One Shot One Kill, Endless Quiver, Storm of Splinters). All are tier 5+, so level 15+.
+  - The mockup: https://claude.ai/artifact/FT8PtJd252AjLdRuyinfvh
 
 ## Items
 
 - Dropped by monsters (elites and bosses more likely) and found in chests.
-- Give passive bonuses and multipliers for the rest of the run. They stack.
+- Give passive bonuses and multipliers. They stack.
+- **Items are kept between runs** (changed by the user after step 5). Everything found goes into the stash at camp. Before a run, the player picks up to **5 different items** to bring, and each comes with every copy owned. The limit of 5 is a starting point to tune while playing.
 - Rarity tiers: common, rare, epic, legendary.
 
 **What's built** (`src/ArenaMaster.Game/Items/`):
-- **Items last one run and are shared loot: any class can carry any item.** They speak in general terms (damage, attack speed, max health, ...) and each class's stats decide what those mean for it. This is how "classes share nothing" was read: class abilities, upgrade pools and passive trees are per class; the loot is the world's.
+- **Items are shared loot: any class can carry any item.** They speak in general terms (damage, attack speed, max health, ...) and each class's stats decide what those mean for it. This is how "classes share nothing" was read: class abilities, upgrade pools and passive trees are per class; the loot is the world's.
 - **Bonuses vs multipliers:** commons and rares give bonuses that add to each other and to the class's upgrades. Epics and legendaries give multipliers that multiply the total.
 - **Sources:**
   - A chest turns up 18-45 m from the player every 60 s (first at 0:40, at most 3 waiting), marked by a gold beam. Odds: 60% common, 28% rare, 10% epic, 2% legendary.
   - An elite drops a chest that is rare or better.
   - A boss drops a chest that is epic or better.
   - Fodder has a 1-in-200 chance to drop an item orb.
-  - Walk into a chest or orb to take it.
+  - Walk into a chest or orb to take it. It works for the rest of the run and goes into the stash at once (kept even if the run is lost).
 - **The 16 items:**
   - *Common:* Whetstone (+8% damage), Feather Charm (+8% attack speed), Worn Boots (+6% move speed), Troll Blood (+0.4 HP/s), Leather Brigandine (6% less damage taken), Lodestone (+20% pickup range), Old Tome (+8% XP).
   - *Rare:* Hawk Feather (+6% crit), Troll Heart (+25 max HP), Vampire Fang (heal 1 per kill), Serrated Edge (+30% crit damage).
   - *Epic:* Rune of Might (x1.2 damage), Swiftwind Sigil (x1.15 attack speed), Ironbark Totem (x0.85 damage taken, +20 max HP).
   - *Legendary:* Dragon Heart (+60 max HP, +1.5 HP/s), Hunter's Moon (x1.35 damage, +10% crit).
+
+## Camp (built)
+
+- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle. A fire, a tent, and three stations; walk up and press E:
+  - **Stash chest** -> Item Chest: every item, how many owned, and which are still undiscovered.
+  - **Archery target** -> the passive tree (the in-game version of the mockup).
+  - **Departure gate** -> loadout (pick up to 5 items), then Begin run.
+- Progress is saved to `%AppData%/ArenaMaster/profile.json` (stash, loadout, trees). It saves on every change at camp, every 20 s in a run, when the tree levels, and at the end of a run.
 
 ## Meta progression (like Megabonk)
 
@@ -98,14 +108,15 @@ Each step should be playable before the next one starts. **[engine]** means the 
 2. *(Done; the user is happy with the feel.)* **Shooting and killing:** an auto-firing bow, arrow projectiles, one basic chaser enemy, hit detection, damage, death. [engine: general projectile/hitbox/damage helpers] [game: the bow, the enemy]
 3. *(Done; the user is happy with the feel.)* **Levelling up:** XP drops and pickup, the level-up pause with 3 choices, the first handful of stacking upgrades, and a HUD (HP, XP bar, timer, level). [game]
 4. *(Done; the user is happy with the feel.)* **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] (The engine steering turned out not to be needed yet: the game's own separation handles about 80 enemies. Revisit with the swarm renderer in step 7.)
-5. *(Built; waiting for the user to try it.)* **Items:** drops, chests, bonuses and multipliers. [game]
-6. **Ranger passive tree:** the tree UI and nodes. [game]
+5. *(Done; reworked in step 6 so items persist.)* **Items:** drops, chests, bonuses and multipliers. [game]
+6. *(Built; waiting for the user to try it.)* **Camp, save file, persistent items and loadouts, and the Sharpshooter passive tree.** [game] [engine: TeleportPlayer, pause-menu buttons, MapsMenu switch]
 7. **Swarms:** a batched crowd renderer for hundreds of animated enemies. [engine]
-8. **Meta progression:** unlocks, currency, a save file. [game]
+8. **Meta progression:** unlocks, currency. (The save file came in step 6.) [game]
 9. Iterate on the Ranger until it feels right, then design class #2.
 
 ## Open questions
 
 - One big arena or a large Megabonk-style map? (Leaning toward the hybrid described above.)
-- Are passive-tree points earned in-run, permanently between runs, or both?
-- Megabonk's items are found during a run and meta progression unlocks them. Is that the model, or should some items persist between runs?
+- Should item experience bonuses (Old Tome) also speed up the passive tree? (Left for later; currently they don't.)
+- Items stack for good across runs. With no cap on copies, a 5-item loadout will keep getting stronger; watch the balance while playing.
+- Respec is free for now. Keep it free, or give it a cost later?

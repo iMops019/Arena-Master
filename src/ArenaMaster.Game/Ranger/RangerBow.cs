@@ -22,8 +22,11 @@ internal sealed class RangerBow
 
     public RangerBow(Random random) => _arrows = new RangerArrows(random);
 
-    /// <summary>Fires when it's time (unless <paramref name="canFire"/> is false - a stun holds the bow), then moves the arrows already in the air.</summary>
-    public void Update(EngineWindow window, float deltaSeconds, RangerStats stats, EnemyField enemies, DamageNumbers numbers, Func<float, float, float?> groundAt, bool canFire = true)
+    /// <summary>
+    /// Fires when it's time (unless <paramref name="canFire"/> is false - a stun holds the bow), then moves the arrows already in the air. Returns this frame's hits,
+    /// for anything that answers to them (healing on a crit, say).
+    /// </summary>
+    public List<ArrowHit> Update(EngineWindow window, float deltaSeconds, RangerStats stats, EnemyField enemies, DamageNumbers numbers, Func<float, float, float?> groundAt, bool canFire = true)
     {
         _cooldown = canFire ? _cooldown - deltaSeconds : MathF.Max(_cooldown, 0.15f);
         if (_cooldown <= 0f && window.Camera is { } camera && window.Terrain is { } terrain)
@@ -39,12 +42,14 @@ internal sealed class RangerBow
             var aim = AimDirection(origin, CrosshairTarget(camera, terrain, enemies, stats.Range), camera.Front, aimFlat);
             foreach (var direction in Fan(aim, stats.ArrowsPerShot, RangerStats.SplitSpreadDegrees))
             {
-                _arrows.Fire(origin, direction, stats.ArrowSpeed, stats.Range, stats.Damage, stats.Pierce, stats.CritChance, stats.CritMultiplier);
+                _arrows.Fire(origin, direction, stats.ArrowSpeed, stats.Range, stats.Damage, stats.Pierce, stats.CritChance, stats.CritMultiplier,
+                    stats.Chains, stats.ChainRange, stats.HitRules);
             }
         }
 
         var gone = new List<Arrow>();
-        foreach (var hit in _arrows.Update(deltaSeconds, enemies, groundAt, gone))
+        var hits = _arrows.Update(deltaSeconds, enemies, groundAt, gone);
+        foreach (var hit in hits)
         {
             numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
         }
@@ -67,6 +72,8 @@ internal sealed class RangerBow
                 _props[arrow] = window.PlaceProp(placement);
             }
         }
+
+        return hits;
     }
 
     /// <summary>Takes every arrow out of the world (a restart).</summary>

@@ -12,11 +12,7 @@ internal sealed class RangerController
 {
     public const string BodyModel = "ranger_placeholder.glb";
 
-    /// <summary>Extra speed during a dash, on top of running, metres per second.</summary>
-    public const float DashSpeed = 20f;
-
     public const float DashDuration = 0.18f;
-    public const float DashCooldown = 1.2f;
 
     /// <summary>How quickly the body turns toward the aim: the fraction of the remaining turn made per second, roughly (exponential smoothing).</summary>
     private const float TurnRate = 16f;
@@ -27,9 +23,12 @@ internal sealed class RangerController
     private float _cooldownLeft;
     private Vector3D<float> _dashDirection;
     private bool _dashKeyWasDown;
+    private float _dashSpeed = RangerStats.BaseDashSpeed;
+
+    private float _cooldownLength = RangerStats.BaseDashCooldown;
 
     /// <summary>0 while the dash is recharging, rising to 1 when it is ready again.</summary>
-    public float DashReadiness => 1f - _cooldownLeft / DashCooldown;
+    public float DashReadiness => 1f - _cooldownLeft / _cooldownLength;
 
     /// <summary>The dash's push this frame (metres per second, flat), zero when not dashing. The content adds it to any knock-back and hands the sum to the engine.</summary>
     public Vector3D<float> DashVelocity { get; private set; }
@@ -39,11 +38,11 @@ internal sealed class RangerController
     {
         window.WalkSpeed = stunned ? 0f : stats.MoveSpeed;
         window.PlayerCanJump = !stunned;
-        UpdateDash(window, deltaSeconds, stunned);
+        UpdateDash(window, deltaSeconds, stats, stunned);
         UpdateBody(window, deltaSeconds);
     }
 
-    private void UpdateDash(EngineWindow window, float deltaSeconds, bool stunned)
+    private void UpdateDash(EngineWindow window, float deltaSeconds, RangerStats stats, bool stunned)
     {
         _cooldownLeft = MathF.Max(0f, _cooldownLeft - deltaSeconds);
 
@@ -57,11 +56,13 @@ internal sealed class RangerController
             // Dash the way the keys point, or straight ahead (where the camera looks) with none held.
             _dashDirection = window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : AimFlat(window);
             _dashTimeLeft = DashDuration;
-            _cooldownLeft = DashCooldown;
+            _cooldownLength = stats.DashCooldown;
+            _cooldownLeft = _cooldownLength;
+            _dashSpeed = stats.DashSpeed;
         }
 
         _dashTimeLeft -= deltaSeconds;
-        DashVelocity = _dashTimeLeft > 0f ? _dashDirection * DashSpeed : Vector3D<float>.Zero;
+        DashVelocity = _dashTimeLeft > 0f ? _dashDirection * _dashSpeed : Vector3D<float>.Zero;
     }
 
     private void UpdateBody(EngineWindow window, float deltaSeconds)

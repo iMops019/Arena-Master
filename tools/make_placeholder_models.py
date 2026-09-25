@@ -12,6 +12,9 @@
   chest_placeholder.glb   a wooden treasure chest with gold bands, 1 m wide
   loot_beam.glb           a thin gold pillar of light, 8 m tall, marking a chest from afar
   item_<rarity>.glb       an item orb in its rarity's colour (common, rare, epic, legendary), centred on its middle
+  camp_tent.glb, camp_firepit.glb, camp_stash.glb, camp_target.glb, camp_gate.glb
+                          the camp: a canvas tent, a ring of stones with logs (the engine's fire burns on it), the stash chest,
+                          the archery target (the passive tree station) and the departure gate (the way into a run)
 
 The engine's model conventions: one mesh, one primitive, colours from one base-colour texture (vertex colours are
 ignored), facing +Z, feet at y = 0, metres. The texture is a strip of flat colour swatches and each face's UVs point
@@ -65,6 +68,14 @@ PALETTE = {
     "epic_light": (220, 160, 255),
     "legendary": (255, 170, 30),
     "legendary_light": (255, 225, 140),
+    "canvas": (206, 190, 150),
+    "canvas_dark": (150, 132, 96),
+    "stone": (120, 118, 112),
+    "iron": (70, 74, 80),
+    "straw": (214, 186, 110),
+    "target_red": (190, 48, 40),
+    "target_white": (236, 232, 220),
+    "banner": (44, 104, 60),
 }
 COLOURS = list(PALETTE)
 
@@ -349,6 +360,76 @@ def build_item_orb(rarity):
     return m
 
 
+def build_tent():
+    """An A-frame canvas tent, 3 m long, 2.2 m wide, 1.9 m tall, its opening facing +Z."""
+    m = Mesh()
+    w, h, l = 1.1, 1.9, 1.5
+    # Two sloped roof panels, facing outward
+    for side in (-1, 1):
+        a, b = (side * w, 0.0, l), (side * w, 0.0, -l)
+        c, d = (0.0, h, -l), (0.0, h, l)
+        normal = _normalize((side * h, w, 0.0))
+        if side == 1:
+            m.quad(a, b, c, d, normal, "canvas")
+        else:
+            m.quad(b, a, d, c, normal, "canvas")
+    # Back wall, and a dark doorway triangle at the front
+    m.tri((w, 0.0, -l), (-w, 0.0, -l), (0.0, h, -l), "canvas_dark")
+    m.tri((-w * 0.45, 0.0, l - 0.01), (w * 0.45, 0.0, l - 0.01), (0.0, h * 0.8, l - 0.01), "dark")
+    m.box(-0.04, 0.0, l, 0.04, h + 0.15, l + 0.08, "wood")      # front pole
+    return m
+
+
+def build_firepit():
+    """A ring of stones 1.4 m across with a few logs laid in it."""
+    import math
+    m = Mesh()
+    for i in range(10):
+        a = 2 * math.pi * i / 10
+        x, z = math.cos(a) * 0.62, math.sin(a) * 0.62
+        m.box(x - 0.12, 0.0, z - 0.1, x + 0.12, 0.16, z + 0.1, "stone")
+    m.box(-0.45, 0.0, -0.07, 0.45, 0.13, 0.07, "chest_dark")
+    m.box(-0.07, 0.05, -0.45, 0.07, 0.18, 0.45, "wood")
+    return m
+
+
+def build_stash():
+    """The stash: a big iron-bound chest, 1.6 m wide, on a low plinth."""
+    m = Mesh()
+    m.box(-0.90, 0.0, -0.55, 0.90, 0.12, 0.55, "stone")
+    m.box(-0.80, 0.12, -0.48, 0.80, 0.82, 0.48, "chest_wood")
+    m.box(-0.82, 0.82, -0.50, 0.82, 1.10, 0.50, "chest_dark")
+    for x in (-0.62, -0.05, 0.52):
+        m.box(x, 0.11, -0.51, x + 0.10, 1.11, 0.51, "iron")
+    m.box(-0.12, 0.62, 0.48, 0.12, 0.90, 0.53, "gold")          # lock, on the front
+    return m
+
+
+def build_target():
+    """An archery target: a straw boss 1.2 m across on two legs, painted rings on its front (+Z)."""
+    m = Mesh()
+    m.box(-0.55, 0.0, -0.30, -0.47, 1.45, -0.22, "wood")        # legs
+    m.box(0.47, 0.0, -0.30, 0.55, 1.45, -0.22, "wood")
+    m.box(-0.60, 0.55, -0.20, 0.60, 1.75, 0.05, "straw")        # the boss
+    m.box(-0.45, 0.70, 0.05, 0.45, 1.60, 0.07, "target_white")  # rings, front to back
+    m.box(-0.32, 0.83, 0.07, 0.32, 1.47, 0.09, "target_red")
+    m.box(-0.19, 0.96, 0.09, 0.19, 1.34, 0.11, "target_white")
+    m.box(-0.08, 1.07, 0.11, 0.08, 1.23, 0.13, "target_red")
+    m.box(0.12, 1.05, 0.13, 0.15, 1.08, 0.60, "wood")           # an arrow in it
+    return m
+
+
+def build_gate():
+    """The departure gate: two posts 4 m apart and 3.4 m tall, a crossbeam, and a green banner hanging in the middle."""
+    m = Mesh()
+    m.box(-2.1, 0.0, -0.15, -1.8, 3.4, 0.15, "wood")
+    m.box(1.8, 0.0, -0.15, 2.1, 3.4, 0.15, "wood")
+    m.box(-2.4, 3.1, -0.18, 2.4, 3.45, 0.18, "chest_dark")
+    m.box(-0.7, 1.9, -0.03, 0.7, 3.1, 0.03, "banner")
+    m.box(-0.2, 2.3, 0.03, 0.2, 2.7, 0.05, "gold")               # a crest on the banner
+    return m
+
+
 def png_bytes():
     width, height = SWATCH * len(COLOURS), SWATCH
     row = b"".join(bytes(PALETTE[c]) * SWATCH for c in COLOURS)
@@ -416,7 +497,9 @@ if __name__ == "__main__":
                         ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),
                         ("chest_placeholder.glb", build_chest), ("loot_beam.glb", build_beam),
                         ("item_common.glb", lambda: build_item_orb("common")), ("item_rare.glb", lambda: build_item_orb("rare")),
-                        ("item_epic.glb", lambda: build_item_orb("epic")), ("item_legendary.glb", lambda: build_item_orb("legendary"))):
+                        ("item_epic.glb", lambda: build_item_orb("epic")), ("item_legendary.glb", lambda: build_item_orb("legendary")),
+                        ("camp_tent.glb", build_tent), ("camp_firepit.glb", build_firepit), ("camp_stash.glb", build_stash),
+                        ("camp_target.glb", build_target), ("camp_gate.glb", build_gate)):
         mesh = build()
         write_glb(mesh, MODELS / name)
         print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")

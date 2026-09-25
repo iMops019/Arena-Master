@@ -9,6 +9,7 @@ var window = new EngineWindow
     Mode = EngineMode.Play,
     StartOnTitleScreen = true,
     BuiltInPanels = false,   // no survival inventory, build menu or player menu in this game
+    MapsMenu = false,        // the world is the game's own; an engine map would replace it
     GameContent = new ArenaMasterContent(),
 };
 
