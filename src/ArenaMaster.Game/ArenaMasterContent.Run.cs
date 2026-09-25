@@ -1,8 +1,8 @@
 using ArenaMaster.Game.Camp;
+using ArenaMaster.Game.Classes;
 using ArenaMaster.Game.Combat;
 using ArenaMaster.Game.Items;
 using ArenaMaster.Game.Progression;
-using ArenaMaster.Game.Ranger;
 using ArenaMaster.Game.Ui;
 using CEngine.Core;
 using Silk.NET.Input;
@@ -10,7 +10,7 @@ using Silk.NET.Maths;
 
 namespace ArenaMaster.Game;
 
-// A run: 30 minutes as the Ranger in the middle of the map, with the loadout's items (and only those) giving bonuses. Experience levels the run (a pick of three
+// A run: 30 minutes as the chosen class in the middle of the map, with the loadout's items (and only those) giving bonuses. Experience levels the run (a pick of three
 // upgrades each time) and the active passive tree too. Items found go straight into the chest for a later run - they do nothing in this one. It ends in victory
 // at 30:00, in death, or on "Return to Camp", and its summary follows.
 public sealed partial class ArenaMasterContent
@@ -26,10 +26,6 @@ public sealed partial class ArenaMasterContent
     /// <summary>How often a run saves the tree's experience and the items found, so a crash or a quit loses little.</summary>
     private const float RunSaveInterval = 20f;
 
-    /// <summary>How long a kill counts toward Momentum.</summary>
-    private const float MomentumWindow = 3f;
-
-    private readonly RangerBow _bow;
     private readonly Experience _experience = new();
     private readonly RunDirector _director = new();
     private readonly EnemyField _enemies;
@@ -42,7 +38,6 @@ public sealed partial class ArenaMasterContent
     private readonly LootField _loot;
     private readonly LootView _lootView = new();
     private readonly Queue<RunItem> _itemToasts = new();
-    private readonly Queue<float> _recentKills = new();
     private float _itemToastLeft;
 
     /// <summary>The fraction of an experience point an experience bonus has built up but not yet paid out.</summary>
@@ -53,11 +48,9 @@ public sealed partial class ArenaMasterContent
     private int _runTreeLevels;
     private float _saveIn;
 
-    /// <summary>What the Quartermaster's upgrades give this run on the level-up screen, and what has been banished so far.</summary>
+    /// <summary>What the Quartermaster's upgrades give this run on the level-up screen. The class keeps what has been banished.</summary>
     private int _rerollsLeft;
     private int _banishesLeft;
-    private readonly HashSet<RangerUpgrade> _banished = new();
-    private List<UpgradeChoice> _levelUpChoices = new();
     private int _elitesKilled;
     private int _bossesKilled;
 
@@ -67,19 +60,16 @@ public sealed partial class ArenaMasterContent
     /// <summary>Sets out from the gate: a fresh run with the loadout's items, the tree's bonuses, full health, at the run start.</summary>
     private void BeginRun(EngineWindow window)
     {
-        _stats.Reset();
-        _stats.Tree = SharpshooterBonuses.From(_tree.Save.Ranks);
+        _hero.UseTree(_tree.Save.Ranks);
         _items.Begin(Loadout.ItemsToBring(_profile));   // the loadout as it stands now: finds made on this run won't join it
-        _stats.Items = _items.Carried.Bonuses;
-        _health.Reset(_stats.MaxHealth);
-        _health.DamageTaken = _stats.DamageTaken;
+        _hero.BeginRun(_items.Carried.Bonuses, _health);
+        _health.DamageTaken = _hero.DamageTaken;
         _condition.Clear();
         _experience.Reset();
         _experienceCarry = 0f;
         _pendingLevels = 0;
         _enemies.ResetKills();
         _director.Reset();
-        _recentKills.Clear();
         _itemToasts.Clear();
         _itemToastLeft = 0f;
         _runSeconds = 0f;
@@ -88,7 +78,6 @@ public sealed partial class ArenaMasterContent
         _saveIn = RunSaveInterval;
         _rerollsLeft = Shop.RerollsPerRun(_profile);
         _banishesLeft = Shop.BanishesPerRun(_profile);
-        _banished.Clear();
         _elitesKilled = 0;
         _bossesKilled = 0;
 
@@ -112,19 +101,15 @@ public sealed partial class ArenaMasterContent
         }
 
         FollowOrders(_director.Update(_runSeconds, _enemies), window.PlayerFeet, groundAt);
-        UpdateMomentum();
 
-        bool standingStill = window.PlayerMoveDirection == Vector3D<float>.Zero && _ranger.DashVelocity == Vector3D<float>.Zero && _condition.Knockback == Vector3D<float>.Zero;
-        foreach (var hit in _bow.Update(window, deltaSeconds, _stats, _enemies, _numbers, groundAt, canFire: !_condition.IsStunned, standingStill))
-        {
-            if (hit.Crit && hit.Enemy.Kind.Tier != EnemyTier.Fodder)
-            {
-                _health.Heal(_stats.Tree.EliteCritHeal);   // Headhunter
-            }
-        }
-
-        var player = new PlayerTarget(window.PlayerFeet, window.PlayerGrounded, _health, _condition);
+        // The class attacks; the enemies move and strike (against the block chance and damage cut as they stand this frame); the class answers their blows.
+        bool standingStill = window.PlayerMoveDirection == Vector3D<float>.Zero && _hero.DashVelocity == Vector3D<float>.Zero && _condition.Knockback == Vector3D<float>.Zero;
+        var frame = new RunFrame(window, deltaSeconds, _runSeconds, _enemies, _numbers, groundAt, _health, _condition, standingStill);
+        _hero.Attack(frame);
+        _health.DamageTaken = _hero.DamageTaken;
+        var player = new PlayerTarget(window.PlayerFeet, window.PlayerGrounded, _health, _condition, _hero.BlockChance);
         var gone = _enemies.Update(deltaSeconds, player, groundAt);
+        _hero.Answer(frame);
         foreach (var killed in _enemies.TakeNewlyKilled())
         {
             OnKill(killed);
@@ -133,7 +118,7 @@ public sealed partial class ArenaMasterContent
         _enemyView.Sync(window, _enemies, gone, deltaSeconds, groundAt);
 
         var collected = new List<XpGem>();
-        GainExperience(_gems.Update(deltaSeconds, window.PlayerFeet, _stats.PickupRadius, collected));
+        GainExperience(_gems.Update(deltaSeconds, window.PlayerFeet, _hero.PickupRadius, collected));
         _gemView.Sync(window, _gems, deltaSeconds);
 
         var goneChests = new List<Chest>();
@@ -144,7 +129,7 @@ public sealed partial class ArenaMasterContent
         }
 
         _lootView.Sync(window, _loot, goneChests, gonePickups, deltaSeconds);
-        _health.Heal(_stats.Regeneration * deltaSeconds);
+        _health.Heal(_hero.Regeneration * deltaSeconds);
 
         _saveIn -= deltaSeconds;
         if (_saveIn <= 0f)
@@ -197,7 +182,7 @@ public sealed partial class ArenaMasterContent
         var gonePickups = new List<ItemPickup>();
         _loot.Clear(goneChests, gonePickups);
         _lootView.Sync(window, _loot, goneChests, gonePickups, 0f);
-        _bow.Clear(window);
+        _hero.Clear(window);
         _numbers.Clear();
         _levelUp.Close();
         _pendingLevels = 0;
@@ -209,7 +194,7 @@ public sealed partial class ArenaMasterContent
     {
         _gems.Drop(killed.Position, killed.Kind.Experience);
         _health.Heal(_items.Carried.Bonuses.HealOnKill);
-        _recentKills.Enqueue(_runSeconds);
+        _hero.OnKill(killed, _runSeconds);
 
         switch (killed.Kind.Tier)
         {
@@ -226,17 +211,6 @@ public sealed partial class ArenaMasterContent
                 _loot.DropItem(killed.Position);
                 break;
         }
-    }
-
-    /// <summary>Momentum: how many kills in the last few seconds, which the stats turn into attack speed.</summary>
-    private void UpdateMomentum()
-    {
-        while (_recentKills.Count > 0 && _recentKills.Peek() < _runSeconds - MomentumWindow)
-        {
-            _recentKills.Dequeue();
-        }
-
-        _stats.MomentumStacks = Math.Min(RangerStats.MaxMomentumStacks, _recentKills.Count);
     }
 
     /// <summary>
@@ -283,9 +257,9 @@ public sealed partial class ArenaMasterContent
     /// <summary>A higher max health (an item, an upgrade) heals the difference.</summary>
     private void SyncMaxHealth()
     {
-        if (_stats.MaxHealth > _health.Max)
+        if (_hero.MaxHealth > _health.Max)
         {
-            _health.RaiseMax(_stats.MaxHealth - _health.Max);
+            _health.RaiseMax(_hero.MaxHealth - _health.Max);
         }
     }
 
@@ -374,16 +348,14 @@ public sealed partial class ArenaMasterContent
         if (action.Reroll && _rerollsLeft > 0)
         {
             _rerollsLeft--;
-            _levelUp.Refresh(RangerUpgrades.Roll(_stats, _random, excluded: _banished), _rerollsLeft, _banishesLeft);
+            _levelUp.Refresh(_hero.RollLevelUp(_random), _rerollsLeft, _banishesLeft);
             return;
         }
 
-        if (action.Banish is { } index && _banishesLeft > 0 && _levelUpChoices[index].Upgrade is { } banished)
+        if (action.Banish is { } index && _banishesLeft > 0)
         {
             _banishesLeft--;
-            _banished.Add(banished);
-            _levelUpChoices = RangerUpgrades.Replace(_levelUpChoices, index, _stats, _random, _banished);
-            _levelUp.Refresh(_levelUpChoices, _rerollsLeft, _banishesLeft);
+            _levelUp.Refresh(_hero.BanishCard(index, _random), _rerollsLeft, _banishesLeft);
             return;
         }
 
@@ -392,7 +364,8 @@ public sealed partial class ArenaMasterContent
             return;
         }
 
-        Apply(choice);
+        _hero.TakeCard(choice, _health);
+        SyncMaxHealth();
         _pendingLevels--;
         if (_pendingLevels > 0)
         {
@@ -408,20 +381,7 @@ public sealed partial class ArenaMasterContent
     private void OpenLevelUp(EngineWindow window)
     {
         int reached = _experience.Level - _pendingLevels + 1;
-        _levelUpChoices = RangerUpgrades.Roll(_stats, _random, excluded: _banished);
-        _levelUp.Open(_levelUpChoices, reached, _rerollsLeft, _banishesLeft);
+        _levelUp.Open(_hero.RollLevelUp(_random), reached, _rerollsLeft, _banishesLeft);
         window.GamePaused = true;
-    }
-
-    private void Apply(UpgradeChoice choice)
-    {
-        if (choice.Upgrade is not { } upgrade)
-        {
-            _health.Heal(RangerUpgrades.SecondWindHeal);
-            return;
-        }
-
-        _stats.Increase(upgrade);
-        SyncMaxHealth();
     }
 }

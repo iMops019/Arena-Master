@@ -9,12 +9,12 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 ## Ground rules
 
 - **Nothing carries over from `ConnEngine-Game`** (the older game on this engine): no code, assets, designs or content. Arena Master starts clean.
-- **One class at a time.** Build the first class (Ranger) and its passive tree, and iterate until it feels right, before starting a second class.
-- **Classes don't share anything.** Each class has its own attacks, level-up pool and passive tree. No shared abilities between classes.
+- **One class at a time.** Build the first class (Ranger) and its passive tree, and iterate until it feels right, before starting a second class. (On 2026-09-25 the user chose to start the second class, the Paladin, before the Ranger tuning pass.)
+- **Classes don't share anything.** Each class has its own attacks, level-up pool and passive tree. No shared abilities between classes. In code, each class lives in its own folder (`Ranger/`, `Paladin/`) and the game runs it through one seam, `Classes/IHeroClass`; the Paladin shares no code with the Ranger (its own stats, controller, pool and tree). Shared are only the world's things: enemies, items, the camp, the meta progression, and the general combat rules in `Combat/` (a blow can be blocked; any class can have a block chance, the Ranger's is 0).
 
 ## The core loop
 
-0. At **camp**, check the item chest, spend passive tree points, read the bounty board, buy upgrades from the quartermaster with silver, and choose a loadout of up to 5 items (more with Bigger Pack) at the departure gate.
+0. At **camp**, choose a class at the weapon rack, check the item chest, spend passive tree points, read the bounty board, buy upgrades from the quartermaster with silver, and choose a loadout of up to 5 items (more with Bigger Pack) at the departure gate.
 1. Start a 30-minute run as a class.
 2. Move and aim. Attacks fire automatically in the direction the camera faces (Megabonk-style), so positioning and aim matter but you never click to attack.
 3. Kill monsters, which drop XP. Collect it to level up.
@@ -26,7 +26,7 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 ## Camera and controls (built)
 
 - Third-person follow camera behind the player. The mouse orbits the camera and sets the aim direction.
-- WASD to move (7 m/s), Space to jump, Shift to dash (a 0.18 s burst with a 1.2 s cooldown).
+- WASD to move (the Ranger 7 m/s, the Paladin 6.4), Space to jump, Shift to dash (the Ranger: a 0.18 s burst with a 1.2 s cooldown; the Paladin's shield rush: 0.2 s, a little slower, 1.6 s cooldown).
 - Esc pauses (Return to Camp is in the pause menu). The level-up screen is its own pause. E uses a camp station and closes camp screens.
 - The title screen has Play (continue the save) and **New Game** (start over, behind a confirmation; the old save is copied to `profile.backup-<date-time>.json`, never deleted).
 
@@ -73,6 +73,34 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
     - *Storm of Splinters:* an arrow that kills bursts into 4 small flat splinters at 50% of its damage (12 m range). Splinters never burst again.
   - The mockup: https://claude.ai/artifact/FT8PtJd252AjLdRuyinfvh
 
+## Second class: Paladin (built, first pass)
+
+The user's brief: a Paladin with a flail and a big crusader shield. The first tree is **Defiance**. Its attack is **Holy Nova**: an area explosion that damages what it hits, then leaves a holy circle on the ground that damages enemies over time and heals the player over time. Defiance is about unlocking thorns and boosting them, life regeneration, block chance, boosting blocks, Holy Nova nodes and majors, and area nodes and majors.
+
+Everything below the brief is a first pass **(draft)**: the numbers, the level-up pool, the tree's nodes and majors, and where the nova goes off.
+
+- **Holy Nova** (`Paladin/HolyLight.cs`): bursts on its own every 1.25 s, **centred on the Paladin** (a nova goes off around the caster; the Paladin is built to stand in the crowd, so aim matters less than where you stand). 30 damage to every enemy within 4.5 m (5% crit, x2). A stun holds it, as it holds the Ranger's bow.
+- **Holy circle**: each nova leaves one on the ground where it went off: 3 m in radius, 4 s, 10 damage per second to each enemy in it (a tick every 0.5 s), and 2 health per second to the Paladin while standing in one. Circles' damage stacks where they overlap; their healing doesn't (Consecrated Ground makes it stack). At most 12 at once. Their steady burn shows as the enemies flashing, not as damage numbers.
+- **The shield**: 10% base chance to **block** a blow (contact or attack). A block stops all of it: no damage, no knock-back, no stun. Block chance is capped at 60%.
+- **Thorns** (unlocked by Crown of Thorns): every 0.5 s, each enemy touching the Paladin takes 6 damage (more from the nodes).
+- **Base numbers**: 130 max health (the Ranger has 100), 6.4 m/s, 3 m pickup.
+- **Items** read the same way as for the Ranger: damage and attack speed mean the nova's (and the circles' and thorns' damage), crit means the nova's.
+- **Level-up pool** (`Paladin/PaladinUpgrades.cs`): Holy Wrath (+20% nova damage, x5), Quickened Prayer (+12% nova frequency, x5), Radiance (+10% nova and circle size, x4), Consecration (+25% circle damage and +0.5 s, x4), Shield Training (+4% block, x5), Heavy Plate (+20 max health and heal, x5), Prayer of Mending (+0.5 health per second, x5), Barbed Plating (+40% thorns, x4, only once thorns are unlocked), Pilgrim's Stride (+8% move speed, x5), Gleaner (+35% pickup range, x4).
+- **Defiance tree** (`Paladin/DefianceTree.cs`): 40 nodes in 7 tiers (the same levels as the Sharpshooter: 1, 3, 6, 10, 15, 21, 28) and four lanes: **Bulwark** (block chance, what a block does, regeneration), **Retribution** (thorns), **Radiance** (the nova) and **Consecration** (area: the nova's reach and the circles). Two starting nodes: Shield Wall (+2% block, +8 max health per rank) and Zealous Light (+10% nova damage, +5% frequency per rank). Thirteen majors, a capstone per lane:
+  - *Crown of Thorns* (tier 2, Retribution): unlocks thorns.
+  - *Echoing Nova* (tier 3, Radiance): every nova bursts again 0.35 s later at 60% damage.
+  - *Shield of Faith* (tier 4, Bulwark): every 12 s a holy shield readies and the next blow is blocked for certain ("SHIELD OF FAITH" under the crosshair while it's up).
+  - *Retribution* (tier 4, Retribution): every blow that reaches the Paladin, landed or blocked, is paid back: the attacker takes 200% of it.
+  - *Consecrated Ground* (tier 4, Consecration): the circles' healing stacks, one per circle stood in.
+  - *Wrath of the Many* (tier 5, Radiance): +2% nova damage per enemy it hits, up to +60%.
+  - *Expanding Light* (tier 5, Consecration): circles grow to twice their size over their life.
+  - *Unbroken Vow* (tier 6, Bulwark): once per run, a killing blow leaves the Paladin on 1 health and heals 40%.
+  - *Sanctuary* (tier 6, Consecration): in a holy circle, 20% less damage taken and +10% block.
+  - Capstones (tier 7): *Holy Bastion* (every block releases a nova at 75% damage), *Crown of Briars* (thorns reach every enemy within 3 m, +50%), *Radiant Avatar* (every 8th nova is a Great Nova: twice the radius, triple the damage, a bigger circle), *Resonance* (every nova also bursts from each holy circle at 50%).
+  - Minors worth knowing: Braced Stance (block chance while standing still), Shield Bash (a block damages the attacker), Mending Guard (a block heals), Iron Briars (thorns add a share of max health), Bloodthorns (thorns kills heal), Desperate Prayer (more regeneration below 40% health), Lingering Light (+1 s circles per rank).
+- **How it plays, from a simulation** (no rendering, the real director, a level-up taken at random each level): a fresh Paladin with no tree points who stands its ground survives the first 10 minutes; one that keeps walking leaves its circles behind and died at about 4.5 minutes. With a modest tree (about 30 points) both survive 10 minutes easily. Defiance rewards standing your ground. Whether that's fun, or standing still is too strong, is the first thing to feel out.
+- The model is a stand-in like the Ranger's (plate, a white tabard with a red cross, a great helm, the tower shield on the left arm, the flail in the right hand). Nothing is animated: the flail doesn't swing yet.
+
 ## Items
 
 - Dropped by monsters (elites and bosses more likely) and found in chests.
@@ -97,9 +125,10 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 
 ## Camp (built)
 
-- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle. A fire, a tent, and five stations; walk up and press E:
+- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle. A fire, a tent, and six stations; walk up and press E:
+  - **Weapon rack** (behind the spawn) -> choose the class: the Ranger or the Paladin. Each keeps its own tree; the item chest, silver and upgrades are shared.
   - **Stash chest** -> Item Chest: every item, how many owned, and which are still undiscovered.
-  - **Archery target** -> the passive tree (the in-game version of the mockup).
+  - **Archery target** -> the chosen class's passive tree (the in-game version of the mockup).
   - **Bounty board** -> the bounties, done and to do.
   - **Quartermaster's stall** -> upgrades for silver.
   - **Departure gate** -> loadout (pick up to 5 items, more if bought), then Begin run.
@@ -136,9 +165,12 @@ Each step should be playable before the next one starts. **[engine]** means the 
 6. *(Done.)* **Camp, save file, persistent items and loadouts, and the Sharpshooter passive tree.** [game] [engine: TeleportPlayer, pause-menu buttons, MapsMenu switch]
 7. *(Done.)* **Swarms:** a batched crowd renderer for hundreds of enemies. [engine: `SetCrowd`, instanced props] [game: enemies, arrows and gems drawn as crowds; an enemy grid for spacing and hits; the director ramps to 300 fodder; gems merge past 400; damage numbers capped at 60]. The enemies are rigid stand-ins. Animated crowds (baked animation) wait for rigged enemy models.
 8. *(Built, first pass; the user is starting a fresh save to try it.)* **Meta progression:** silver, the Quartermaster, the Bounty Board, locked items, and a New Game button on the title screen. (The save file came in step 6.) [game] [engine: title-screen buttons]
-9. Iterate on the Ranger until it feels right, then design class #2.
+9. *(Built, first pass.)* **Class #2, the Paladin, and its Defiance tree**, with a class rack at camp to switch. [game]
+10. Play both classes and tune: the Ranger, then the Paladin (above all, how much standing still should pay). Then a second tree for either, or class #3.
 
 ## Open questions
+
+- The Paladin: should the Holy Nova stay centred on the Paladin, or go off where the crosshair aims (so aim matters, as for the Ranger)? Should the flail do anything of its own?
 
 - Should item experience bonuses (Old Tome) also speed up the passive tree? (Left for later; currently they don't.)
 - Items stack for good across runs. With no cap on copies, a loadout keeps getting stronger; watch the balance while playing.

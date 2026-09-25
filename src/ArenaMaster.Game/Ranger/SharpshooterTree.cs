@@ -105,7 +105,9 @@ internal static class SharpshooterTree
         Major(OneShotOneKill, "One Shot, One Kill", 7, 230, P, new[] { "lethal", SnipersFocus }, "The first arrow to hit each enemy is always a critical hit."),
         Major(EndlessQuiver, "Endless Quiver", 7, 505, V, new[] { "storm", "hardened" }, "Every 10th shot fires a full ring of 16 arrows around you."),
         Major(StormOfSplinters, "Storm of Splinters", 7, 770, T, new[] { "cascade", Fork }, "An arrow that kills bursts into 4 splinters, each dealing 50% of its damage."),
-    }, new[] { 1, 3, 6, 10, 15, 21, 28 });
+    }, new[] { 1, 3, 6, 10, 15, 21, 28 },
+        new[] { (P, 220f), (V, 480f), (T, 770f) },
+        new HashSet<string> { MaxHealth, Regeneration, Pierce, ExtraChains, EliteCritHeal, RainArrows });
 }
 
 /// <summary>What the ranks spent in the Sharpshooter tree add up to, in the terms <see cref="RangerStats"/> and the arrows use (fractions for percentages).</summary>

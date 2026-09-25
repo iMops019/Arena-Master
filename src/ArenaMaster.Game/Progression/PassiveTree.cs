@@ -33,8 +33,17 @@ internal sealed record TreeNode(
     }
 }
 
-/// <summary>A class's passive tree: its nodes and the tree level each tier opens at.</summary>
-internal sealed record TreeDefinition(string Id, string Name, IReadOnlyList<TreeNode> Nodes, IReadOnlyList<int> TierLevels)
+/// <summary>
+/// A class's passive tree: its nodes, the tree level each tier opens at, its lanes (named, with where their label sits across the tree screen's layout), and the
+/// stats counted in plain numbers rather than percentages (for the build totals).
+/// </summary>
+internal sealed record TreeDefinition(
+    string Id,
+    string Name,
+    IReadOnlyList<TreeNode> Nodes,
+    IReadOnlyList<int> TierLevels,
+    IReadOnlyList<(string Name, float X)> Lanes,
+    IReadOnlySet<string> FlatStats)
 {
     public TreeNode Node(string id) => Nodes.First(n => n.Id == id);
 

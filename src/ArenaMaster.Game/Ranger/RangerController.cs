@@ -42,6 +42,16 @@ internal sealed class RangerController
         UpdateBody(window, deltaSeconds);
     }
 
+    /// <summary>Takes the body out of the world (another class was chosen). The next <see cref="Update"/> puts it back.</summary>
+    public void Hide(EngineWindow window)
+    {
+        if (_bodyId is { } id)
+        {
+            window.RemovePlacedProp(id);
+            _bodyId = null;
+        }
+    }
+
     private void UpdateDash(EngineWindow window, float deltaSeconds, RangerStats stats, bool stunned)
     {
         _cooldownLeft = MathF.Max(0f, _cooldownLeft - deltaSeconds);

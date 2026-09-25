@@ -1,6 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using ArenaMaster.Game.Camp;
+using ArenaMaster.Game.Classes;
 using ArenaMaster.Game.Combat;
 using ArenaMaster.Game.Items;
+using ArenaMaster.Game.Paladin;
 using ArenaMaster.Game.Progression;
 using ArenaMaster.Game.Ranger;
 using ArenaMaster.Game.Ui;
@@ -24,10 +27,11 @@ internal enum GameMode
 }
 
 /// <summary>
-/// Arena Master's side of the engine seam. The player starts at camp (see <c>ArenaMasterContent.Camp.cs</c>): the item chest, the passive tree and the departure gate.
-/// Setting out starts a 30-minute run as the Ranger (<c>ArenaMasterContent.Run.cs</c>) in the middle of the map; the run ends in victory, death, or a return to camp,
-/// shows its summary, and puts the player back at camp. What lasts between runs - the item stash, the loadout, the tree - is the <see cref="Profile"/>, saved as it
-/// changes. This file holds the world and the switching between those parts; the HUD is in <c>ArenaMasterContent.Hud.cs</c>.
+/// Arena Master's side of the engine seam. The player starts at camp (see <c>ArenaMasterContent.Camp.cs</c>): the item chest, the passive tree, the class rack and
+/// the departure gate. Setting out starts a 30-minute run (<c>ArenaMasterContent.Run.cs</c>) in the middle of the map as the chosen class - the Ranger or the
+/// Paladin, each an <see cref="IHeroClass"/>; the run ends in victory, death, or a return to camp, shows its summary, and puts the player back at camp. What lasts
+/// between runs - the item stash, the loadout, the class and its tree - is the <see cref="Profile"/>, saved as it changes. This file holds the world and the
+/// switching between those parts; the HUD is in <c>ArenaMasterContent.Hud.cs</c>.
 /// </summary>
 public sealed partial class ArenaMasterContent : IGameContent
 {
@@ -41,9 +45,11 @@ public sealed partial class ArenaMasterContent : IGameContent
     private readonly string _profilePath;
     private Profile _profile;
     private TreeProgress _tree;
-    private readonly RangerStats _stats = new();
-    private readonly RangerController _ranger = new();
-    private readonly PlayerHealth _health = new(RangerStats.BaseMaxHealth);
+
+    /// <summary>Every playable class, and the one being played (the profile's choice).</summary>
+    private readonly IHeroClass[] _classes;
+    private IHeroClass _hero;
+    private readonly PlayerHealth _health = new(100f);
     private readonly PlayerCondition _condition = new();
     private readonly HashSet<Key> _keysDown = new();
     private EngineWindow? _window;
@@ -63,9 +69,9 @@ public sealed partial class ArenaMasterContent : IGameContent
         _profilePath = profilePath;
         _profile = ProfileStore.Load(profilePath);
         Loadout.Sanitize(_profile);
-        _tree = new TreeProgress(SharpshooterTree.Tree, _profile.Tree(SharpshooterTree.ClassId, SharpshooterTree.TreeId));
-        _stats.Tree = SharpshooterBonuses.From(_tree.Save.Ranks);
-        _bow = new RangerBow(_random);
+        _classes = new IHeroClass[] { new RangerClass(_random), new PaladinClass(_random) };
+        UseClass(ClassFor(_profile.ActiveClass));
+        _health.Reset(_hero.MaxHealth);
         _enemies = new EnemyField(_random);
         _loot = new LootField(_random)
         {
@@ -153,13 +159,13 @@ public sealed partial class ArenaMasterContent : IGameContent
             return;
         }
 
-        _ranger.Update(window, deltaSeconds, _stats, _condition.IsStunned);
+        _hero.Move(window, deltaSeconds, _condition.IsStunned);
         _health.Update(deltaSeconds);
         _condition.Update(deltaSeconds);
         _numbers.Update(deltaSeconds);
         _announcementLeft = MathF.Max(0f, _announcementLeft - deltaSeconds);
         UpdateItemToasts(deltaSeconds);
-        window.PlayerPush = _ranger.DashVelocity + _condition.Knockback;
+        window.PlayerPush = _hero.DashVelocity + _condition.Knockback;
 
         switch (_mode)
         {
@@ -252,9 +258,32 @@ public sealed partial class ArenaMasterContent : IGameContent
         }
 
         _profile = new Profile();
-        _tree = new TreeProgress(SharpshooterTree.Tree, _profile.Tree(SharpshooterTree.ClassId, SharpshooterTree.TreeId));
+        var hero = ClassFor(_profile.ActiveClass);
+        if (hero != _hero)
+        {
+            _hero.Hide(window);
+        }
+
+        UseClass(hero);
         SaveProfile();
         ReturnToCamp(window);
+    }
+
+    /// <summary>The class with id <paramref name="id"/>, or the first (the Ranger) if there is none - an old or hand-edited save.</summary>
+    private IHeroClass ClassFor(string id) => _classes.FirstOrDefault(c => c.Id == id) ?? _classes[0];
+
+    /// <summary>
+    /// Makes <paramref name="hero"/> the class played: it goes in the profile, its tree's progress becomes the active tree, and it takes that tree's bonuses. The
+    /// caller takes the old class's body out of the world.
+    /// </summary>
+    [MemberNotNull(nameof(_hero), nameof(_tree))]
+    private void UseClass(IHeroClass hero)
+    {
+        _hero = hero;
+        _profile.ActiveClass = hero.Id;
+        _profile.ActiveTree = hero.Tree.Id;
+        _tree = new TreeProgress(hero.Tree, _profile.Tree(hero.Id, hero.Tree.Id));
+        hero.UseTree(_tree.Save.Ranks);
     }
 
     /// <summary>Writes the profile. A failure is shown on the HUD rather than stopping the game.</summary>

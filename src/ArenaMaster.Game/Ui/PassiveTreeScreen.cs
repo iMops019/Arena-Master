@@ -16,13 +16,9 @@ internal sealed class PassiveTreeScreen : GameScreen
     private const float LayoutBottom = 990f;
 
     private static readonly float[] TierY = { 935f, 810f, 685f, 560f, 435f, 310f, 185f };
-    private static readonly string[] Lanes = { "Precision", "Volley", "Trickshot" };
-    private static readonly float[] LaneX = { 220f, 480f, 770f };
-
-    /// <summary>Stats counted in plain numbers rather than percentages in the build totals.</summary>
-    private static readonly HashSet<string> FlatStats = new() { "Max health", "Health per second", "Pierce", "Extra chains", "Heal on elite crit", "Rain arrows" };
 
     private string? _selected;
+    private TreeDefinition? _shown;
 
     /// <summary>Set whenever a rank is taken or refunded, so the caller knows to save.</summary>
     public bool Changed { get; set; }
@@ -37,7 +33,12 @@ internal sealed class PassiveTreeScreen : GameScreen
 
         MarkDrawn();
         var tree = progress.Tree;
-        _selected ??= tree.Nodes[0].Id;
+        if (_shown != tree)
+        {
+            _shown = tree;   // a different class's tree: its own first node, not the last one's pick
+            _selected = tree.Nodes[0].Id;
+        }
+
         float scale = UiTheme.Scale;
 
         UiTheme.BeginScreen("##passivetree", 0.92f, 0.9f);
@@ -102,10 +103,10 @@ internal sealed class PassiveTreeScreen : GameScreen
             UiTheme.Text(At(10f, TierY[t] + 2f), $"Lv {tree.TierLevels[t]}", open ? UiTheme.Muted : UiTheme.Faint, 0.6f);
         }
 
-        for (int i = 0; i < Lanes.Length; i++)
+        foreach (var (name, x) in tree.Lanes)
         {
-            string lane = Lanes[i].ToUpperInvariant();
-            var at = At(LaneX[i], LayoutTop + 10f);
+            string lane = name.ToUpperInvariant();
+            var at = At(x, LayoutTop + 10f);
             UiTheme.Text(at - new Vector2(UiTheme.TextWidth(lane, 0.7f) * 0.5f, 0f), lane, UiTheme.Muted, 0.7f);
         }
 
@@ -233,7 +234,7 @@ internal sealed class PassiveTreeScreen : GameScreen
 
         y += 14f * scale;
         string next = !node.Playable ? "Coming soon: shown so you can plan around it."
-            : node.Major ? "One rank. Changes how the bow plays."
+            : node.Major ? "One rank. Changes how you play."
             : ranks == 0 ? $"Per rank: {node.Describe(1)}"
             : ranks < node.MaxRanks ? $"Next rank: {node.Describe(ranks + 1)}"
             : "Fully ranked.";
@@ -269,7 +270,7 @@ internal sealed class PassiveTreeScreen : GameScreen
         y += font * 0.95f;
         foreach (var (stat, value) in Totals(progress))
         {
-            string amount = (value > 0 ? "+" : "") + MathF.Round(value * 10f) / 10f + (FlatStats.Contains(stat) ? "" : "%");
+            string amount = (value > 0 ? "+" : "") + MathF.Round(value * 10f) / 10f + (progress.Tree.FlatStats.Contains(stat) ? "" : "%");
             UiTheme.Text(new Vector2(min.X + pad, y), stat, UiTheme.Ink, 0.7f);
             UiTheme.Text(new Vector2(max.X - pad - UiTheme.TextWidth(amount, 0.7f), y), amount, UiTheme.BrassHi, 0.7f);
             y += font * 0.85f;

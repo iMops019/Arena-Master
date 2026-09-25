@@ -1,5 +1,9 @@
 """Writes blocky stand-in models to assets/models/ until real ones are made. Plain Python, no dependencies:
   ranger_placeholder.glb  the Ranger (tunic, hood, cape, bow, quiver)
+  paladin_placeholder.glb the Paladin (plate armour, a white tabard with a red cross, a great helm, a tower shield on the
+                          left arm and a flail in the right hand)
+  holy_nova.glb           a flat gold ring of radius 1, scaled as a Holy Nova spreads out over the ground
+  holy_circle.glb         a flat holy circle of radius 1: a gold ring with an inner ring and a cross, the ground a nova leaves
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
   ghoul_placeholder.glb   the first enemy: a hunched ghoul with long arms and red eyes
   xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
@@ -13,9 +17,10 @@
   loot_beam.glb           a thin gold pillar of light, 8 m tall, marking a chest from afar
   item_<rarity>.glb       an item orb in its rarity's colour (common, rare, epic, legendary), centred on its middle
   camp_tent.glb, camp_firepit.glb, camp_stash.glb, camp_target.glb, camp_gate.glb, camp_board.glb, camp_stall.glb
-                          the camp: a canvas tent, a ring of stones with logs (the engine's fire burns on it), the stash chest,
+  camp_rack.glb           the camp: a canvas tent, a ring of stones with logs (the engine's fire burns on it), the stash chest,
                           the archery target (the passive tree station), the departure gate (the way into a run), the bounty
-                          board (a notice board with papers pinned to it) and the quartermaster's stall (a counter under an awning)
+                          board (a notice board with papers pinned to it), the quartermaster's stall (a counter under an awning)
+                          and the weapon rack (the class station: a bow and a shield with a flail)
 
 The engine's model conventions: one mesh, one primitive, colours from one base-colour texture (vertex colours are
 ignored), facing +Z, feet at y = 0, metres. The texture is a strip of flat colour swatches and each face's UVs point
@@ -77,6 +82,13 @@ PALETTE = {
     "target_red": (190, 48, 40),
     "target_white": (236, 232, 220),
     "banner": (44, 104, 60),
+    "plate": (168, 174, 184),
+    "plate_dark": (104, 110, 122),
+    "tabard": (232, 228, 214),
+    "crusader": (178, 30, 34),
+    "visor": (18, 16, 16),
+    "holy": (255, 232, 140),
+    "holy_light": (255, 248, 210),
 }
 COLOURS = list(PALETTE)
 
@@ -166,6 +178,88 @@ def build_ranger():
     m.box(0.08, 1.50, -0.28, 0.16, 1.60, -0.21, "fletching")
     m.box(-0.40, 0.45, 0.02, -0.36, 1.75, 0.07, "wood")       # bow stave
     m.box(-0.39, 0.52, -0.03, -0.375, 1.68, -0.015, "fletching")  # bow string
+    return m
+
+
+def build_paladin():
+    m = Mesh()
+    # Sabatons and greaves
+    m.box(-0.21, 0.0, -0.09, -0.03, 0.16, 0.15, "plate_dark")
+    m.box(0.03, 0.0, -0.09, 0.21, 0.16, 0.15, "plate_dark")
+    m.box(-0.20, 0.16, -0.08, -0.04, 0.84, 0.08, "plate")
+    m.box(0.04, 0.16, -0.08, 0.20, 0.84, 0.08, "plate")
+    # Breastplate, belt, and the tabard hanging over it with its red cross
+    m.box(-0.27, 0.74, -0.15, 0.27, 1.46, 0.15, "plate")
+    m.box(-0.28, 0.84, -0.16, 0.28, 0.92, 0.16, "leather")
+    m.box(-0.20, 0.52, 0.15, 0.20, 1.40, 0.17, "tabard")
+    m.box(-0.20, 0.52, -0.17, 0.20, 1.40, -0.15, "tabard")
+    m.box(-0.04, 0.78, 0.17, 0.04, 1.30, 0.18, "crusader")
+    m.box(-0.14, 1.10, 0.17, 0.14, 1.17, 0.18, "crusader")
+    # Pauldrons, arms, gauntlets
+    m.box(-0.44, 1.30, -0.15, -0.22, 1.50, 0.15, "plate_dark")
+    m.box(0.22, 1.30, -0.15, 0.44, 1.50, 0.15, "plate_dark")
+    m.box(-0.40, 0.86, -0.08, -0.27, 1.32, 0.08, "plate")
+    m.box(0.27, 0.86, -0.08, 0.40, 1.32, 0.08, "plate")
+    m.box(-0.40, 0.76, -0.07, -0.27, 0.87, 0.09, "plate_dark")
+    m.box(0.27, 0.76, -0.07, 0.40, 0.87, 0.09, "plate_dark")
+    # Great helm with a visor slit and a gold crest
+    m.box(-0.14, 1.46, -0.14, 0.14, 1.80, 0.14, "plate")
+    m.box(-0.11, 1.62, 0.14, 0.11, 1.65, 0.145, "visor")
+    m.box(-0.015, 1.50, 0.14, 0.015, 1.62, 0.145, "visor")
+    m.box(-0.03, 1.80, -0.12, 0.03, 1.88, 0.12, "gold")
+    # A cape down the back
+    m.box(-0.26, 0.50, -0.21, 0.26, 1.46, -0.17, "crusader")
+    # The great crusader shield on the left arm (-X), faced forward: gold rim, white field, red cross
+    m.box(-0.66, 0.42, 0.13, -0.10, 1.40, 0.18, "gold")
+    m.box(-0.63, 0.46, 0.18, -0.13, 1.36, 0.20, "tabard")
+    m.box(-0.415, 0.52, 0.20, -0.335, 1.30, 0.215, "crusader")
+    m.box(-0.58, 1.00, 0.20, -0.18, 1.08, 0.215, "crusader")
+    # The flail in the right hand (+X): a haft, a short chain, and a spiked iron ball hanging forward
+    m.box(0.31, 0.70, 0.04, 0.37, 1.10, 0.10, "wood")
+    m.box(0.30, 1.08, 0.03, 0.38, 1.13, 0.11, "iron")
+    for y, z in ((1.06, 0.15), (0.98, 0.21), (0.90, 0.26)):
+        m.box(0.32, y - 0.03, z - 0.025, 0.36, y + 0.03, z + 0.025, "iron")
+    cx, cy, cz, r, s = 0.34, 0.76, 0.30, 0.09, 0.025
+    m.box(cx - r, cy - r, cz - r, cx + r, cy + r, cz + r, "iron")
+    m.box(cx - 1.8 * r, cy - s, cz - s, cx + 1.8 * r, cy + s, cz + s, "steel")   # spikes through the ball on all three axes
+    m.box(cx - s, cy - 1.8 * r, cz - s, cx + s, cy + 1.8 * r, cz + s, "steel")
+    m.box(cx - s, cy - s, cz - 1.8 * r, cx + s, cy + s, cz + 1.8 * r, "steel")
+    return m
+
+
+def build_holy_circle():
+    """The ground a Holy Nova leaves: a gold ring of radius 1, a thinner ring inside it, and a cross of light between them."""
+    m = build_ring(0.9, 1.0, "holy")
+    inner = build_ring(0.5, 0.56, "holy_light")
+    base = len(m.positions)
+    m.positions += inner.positions
+    m.normals += inner.normals
+    m.uvs += inner.uvs
+    m.indices += [i + base for i in inner.indices]
+    for x0, z0, x1, z1 in ((-0.05, -0.9, 0.05, 0.9), (-0.9, -0.05, 0.9, 0.05)):
+        m.quad((x0, 0.005, z1), (x1, 0.005, z1), (x1, 0.005, z0), (x0, 0.005, z0), (0, 1, 0), "holy_light")
+    return m
+
+
+def build_rack():
+    """The weapon rack, the class station: a wooden frame 2 m wide holding a bow on one side and a crusader shield with a flail on the other. Its front faces +Z."""
+    m = Mesh()
+    m.box(-1.0, 0.0, -0.12, -0.9, 1.8, 0.0, "wood")
+    m.box(0.9, 0.0, -0.12, 1.0, 1.8, 0.0, "wood")
+    m.box(-1.05, 1.75, -0.16, 1.05, 1.9, 0.04, "chest_dark")
+    m.box(-1.0, 0.35, -0.10, 1.0, 0.45, -0.02, "wood")
+    # The Ranger's bow and quiver, left
+    m.box(-0.62, 0.45, 0.0, -0.58, 1.70, 0.05, "wood")
+    m.box(-0.55, 0.52, 0.0, -0.54, 1.63, 0.01, "fletching")
+    m.box(-0.40, 0.45, -0.02, -0.26, 1.05, 0.10, "leather")
+    m.box(-0.38, 1.05, 0.0, -0.28, 1.16, 0.08, "fletching")
+    # The Paladin's shield and flail, right
+    m.box(0.18, 0.48, 0.0, 0.74, 1.62, 0.05, "gold")
+    m.box(0.21, 0.52, 0.05, 0.71, 1.58, 0.07, "tabard")
+    m.box(0.425, 0.60, 0.07, 0.505, 1.50, 0.085, "crusader")
+    m.box(0.25, 1.12, 0.07, 0.67, 1.20, 0.085, "crusader")
+    m.box(0.80, 0.9, 0.0, 0.85, 1.55, 0.05, "wood")
+    m.box(0.74, 0.62, -0.03, 0.90, 0.78, 0.13, "iron")
     return m
 
 
@@ -521,7 +615,9 @@ def write_glb(mesh, path):
 
 
 if __name__ == "__main__":
-    for name, build in (("ranger_placeholder.glb", build_ranger), ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul), ("xp_gem_placeholder.glb", build_xp_gem),
+    for name, build in (("ranger_placeholder.glb", build_ranger), ("paladin_placeholder.glb", build_paladin),
+                        ("holy_nova.glb", lambda: build_ring(0.88, 1.0, "holy")), ("holy_circle.glb", build_holy_circle),
+                        ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul), ("xp_gem_placeholder.glb", build_xp_gem),
                         ("brute_placeholder.glb", build_brute), ("hollow_king_placeholder.glb", build_hollow_king),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
                         ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),
@@ -530,7 +626,7 @@ if __name__ == "__main__":
                         ("item_epic.glb", lambda: build_item_orb("epic")), ("item_legendary.glb", lambda: build_item_orb("legendary")),
                         ("camp_tent.glb", build_tent), ("camp_firepit.glb", build_firepit), ("camp_stash.glb", build_stash),
                         ("camp_target.glb", build_target), ("camp_gate.glb", build_gate),
-                        ("camp_board.glb", build_board), ("camp_stall.glb", build_stall)):
+                        ("camp_board.glb", build_board), ("camp_stall.glb", build_stall), ("camp_rack.glb", build_rack)):
         mesh = build()
         write_glb(mesh, MODELS / name)
         print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")

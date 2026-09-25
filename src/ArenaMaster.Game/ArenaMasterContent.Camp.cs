@@ -1,13 +1,12 @@
 using ArenaMaster.Game.Camp;
-using ArenaMaster.Game.Ranger;
 using ArenaMaster.Game.Ui;
 using CEngine.Core;
 using Silk.NET.Input;
 
 namespace ArenaMaster.Game;
 
-// Camp: walking up to a station and pressing E opens its screen - the item chest, the passive tree, the bounty board, the quartermaster, or the loadout at the
-// departure gate, which is where a run begins.
+// Camp: walking up to a station and pressing E opens its screen - the item chest, the passive tree, the class rack, the bounty board, the quartermaster, or the
+// loadout at the departure gate, which is where a run begins.
 // A screen pauses the world (the engine's GamePaused) and frees the cursor until it is closed.
 public sealed partial class ArenaMasterContent
 {
@@ -17,6 +16,7 @@ public sealed partial class ArenaMasterContent
     private readonly RunSummaryScreen _summaryScreen = new();
     private readonly BountyBoardScreen _bountyScreen = new();
     private readonly QuartermasterScreen _shopScreen = new();
+    private readonly ClassScreen _classScreen = new();
     private readonly ConfirmScreen _newGameScreen = new(
         "New game",
         "Start over from nothing? Your item chest, loadout, passive tree, silver, bounties and quartermaster upgrades all go back to the start. Your current save is kept as a backup copy next to it.",
@@ -27,7 +27,7 @@ public sealed partial class ArenaMasterContent
 
     private void UpdateCamp(EngineWindow window)
     {
-        _health.Reset(_stats.MaxHealth);   // camp is safe
+        _health.Reset(_hero.MaxHealth);   // camp is safe
         _nearStation = CampLayout.StationNear(window.PlayerFeet);
 
         // Testing shortcut, like the run's F5-F7: F8 at camp gives the active tree one level, to try deep nodes without the runs. Goes before a real release.
@@ -59,6 +59,9 @@ public sealed partial class ArenaMasterContent
             case CampStation.Quartermaster:
                 _shopScreen.Open();
                 break;
+            case CampStation.Classes:
+                _classScreen.Open();
+                break;
         }
 
         window.GamePaused = true;
@@ -79,11 +82,11 @@ public sealed partial class ArenaMasterContent
 
         if (_treeScreen.IsOpen)
         {
-            bool closed = _treeScreen.Draw(_tree, "Ranger");
+            bool closed = _treeScreen.Draw(_tree, _hero.Name);
             if (_treeScreen.Changed)
             {
                 _treeScreen.Changed = false;
-                _stats.Tree = SharpshooterBonuses.From(_tree.Save.Ranks);
+                _hero.UseTree(_tree.Save.Ranks);
                 SaveProfile();
             }
 
@@ -122,9 +125,27 @@ public sealed partial class ArenaMasterContent
             return true;
         }
 
+        if (_classScreen.IsOpen)
+        {
+            var (closed, chosen) = _classScreen.Draw(_classes, _hero, _profile);
+            if (chosen is not null && chosen != _hero)
+            {
+                _hero.Hide(window);
+                UseClass(chosen);
+                SaveProfile();
+            }
+
+            if (closed)
+            {
+                CloseScreen(window);
+            }
+
+            return true;
+        }
+
         if (_loadoutScreen.IsOpen)
         {
-            var result = _loadoutScreen.Draw(_profile);
+            var result = _loadoutScreen.Draw(_profile, _hero.Name);
             if (result != LoadoutScreen.Result.None)
             {
                 SaveProfile();   // the loadout is remembered either way
@@ -149,6 +170,7 @@ public sealed partial class ArenaMasterContent
         _loadoutScreen.Close();
         _bountyScreen.Close();
         _shopScreen.Close();
+        _classScreen.Close();
     }
 
     private void CloseScreen(EngineWindow window)
@@ -161,9 +183,9 @@ public sealed partial class ArenaMasterContent
     private void ReturnToCamp(EngineWindow window)
     {
         _mode = GameMode.Camp;
-        _stats.Reset();
-        _stats.Tree = SharpshooterBonuses.From(_tree.Save.Ranks);
-        _health.Reset(_stats.MaxHealth);
+        _hero.ReturnToCamp();
+        _hero.UseTree(_tree.Save.Ranks);
+        _health.Reset(_hero.MaxHealth);
         _condition.Clear();
         if (window.Terrain is { } terrain)
         {

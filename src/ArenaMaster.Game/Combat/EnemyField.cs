@@ -82,8 +82,14 @@ internal sealed class Enemy
         : 0f;
 }
 
-/// <summary>Where the player is and what enemies can do to them this frame.</summary>
-internal readonly record struct PlayerTarget(Vector3D<float> Feet, bool Grounded, PlayerHealth Health, PlayerCondition Condition);
+/// <summary>
+/// Where the player is and what enemies can do to them this frame. <paramref name="BlockChance"/> (0 to 1) is the chance a blow is turned aside completely: no
+/// damage, no shove, no stun. It's 0 for a class without a shield.
+/// </summary>
+internal readonly record struct PlayerTarget(Vector3D<float> Feet, bool Grounded, PlayerHealth Health, PlayerCondition Condition, float BlockChance = 0f);
+
+/// <summary>A blow that reached the player this frame, landed or blocked: who struck, and how hard (before any cut to damage taken).</summary>
+internal readonly record struct Strike(Enemy Attacker, float Damage, bool Blocked);
 
 /// <summary>
 /// Every enemy on the map: keeping the field topped up with fodder around the player, moving them (straight at the player, kept apart from each other and off the
@@ -110,6 +116,7 @@ internal sealed class EnemyField
     private readonly List<Enemy> _enemies = new();
     private readonly List<Enemy> _newlyKilled = new();
     private readonly List<(EnemyKind Kind, Vector3D<float> Position)> _summoned = new();
+    private readonly List<Strike> _strikes = new();
     private readonly EnemyGrid _grid = new();
     private readonly Random _random;
     private bool _gridStale = true;
@@ -140,6 +147,9 @@ internal sealed class EnemyField
 
     public int AliveCount => _enemies.Count(e => e.IsAlive && e.Kind.Tier == EnemyTier.Fodder);
 
+    /// <summary>The blows that reached the player during the last <see cref="Update"/>, landed or blocked, for anything that answers them (thorns, say).</summary>
+    public IReadOnlyList<Strike> Strikes => _strikes;
+
     /// <summary>The first living boss, if one is on the field.</summary>
     public Enemy? Boss => _enemies.FirstOrDefault(e => e.IsAlive && e.Kind.Tier == EnemyTier.Boss);
 
@@ -163,6 +173,7 @@ internal sealed class EnemyField
     /// </summary>
     public List<Enemy> Update(float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
     {
+        _strikes.Clear();
         SpawnTowardTarget(deltaSeconds, player.Feet, groundAt);
         RefreshGrid();
 
@@ -252,6 +263,29 @@ internal sealed class EnemyField
         return best;
     }
 
+    /// <summary>
+    /// The live enemies whose bodies reach into the flat circle of <paramref name="radius"/> around <paramref name="centre"/>: everything an area attack there touches,
+    /// big ones from further off. A list, so the caller can hurt them as it goes.
+    /// </summary>
+    public List<Enemy> Within(Vector3D<float> centre, float radius)
+    {
+        RefreshGrid();
+        var found = new List<Enemy>();
+        foreach (var enemy in _grid.Near(centre.X, centre.Z, radius + MaxEnemyRadius))
+        {
+            if (enemy.IsAlive)
+            {
+                Geometry.FlatDirection(centre, enemy.Position, out float distance);
+                if (distance <= radius + enemy.Kind.Radius)
+                {
+                    found.Add(enemy);
+                }
+            }
+        }
+
+        return found;
+    }
+
     /// <summary>Takes every enemy away at once (a restart). Returns them so their view can be cleared.</summary>
     public List<Enemy> Clear()
     {
@@ -259,6 +293,7 @@ internal sealed class EnemyField
         _enemies.Clear();
         _newlyKilled.Clear();
         _summoned.Clear();
+        _strikes.Clear();
         _spawnTimer = 0f;
         _gridStale = true;
         return all;
@@ -377,7 +412,7 @@ internal sealed class EnemyField
         }
 
         bool touching = gap <= reach + 0.1f && MathF.Abs(position.Y - player.Feet.Y) < kind.Height;
-        if (touching && enemy.ContactCooldown <= 0f && player.Health.TakeDamage(kind.ContactDamage * enemy.DamageScale))
+        if (touching && enemy.ContactCooldown <= 0f && Strike(enemy, kind.ContactDamage * enemy.DamageScale, player, out _))
         {
             enemy.ContactCooldown = kind.ContactInterval;
         }
@@ -512,9 +547,10 @@ internal sealed class EnemyField
         }
     }
 
-    private static void Hit(Enemy enemy, AttackSpec attack, PlayerTarget player, Vector3D<float> shove)
+    /// <summary>An attack's hit on the player: its damage, then its shove and stun. A blocked blow stops all three.</summary>
+    private void Hit(Enemy enemy, AttackSpec attack, PlayerTarget player, Vector3D<float> shove)
     {
-        if (player.Health.TakeDamage(attack.Damage * enemy.DamageScale))
+        if (Strike(enemy, attack.Damage * enemy.DamageScale, player, out bool blocked) && !blocked)
         {
             player.Condition.Knock(shove, attack.Knockback);
             if (attack.Stun > 0f)
@@ -522,6 +558,32 @@ internal sealed class EnemyField
                 player.Condition.Stun(attack.Stun);
             }
         }
+    }
+
+    /// <summary>
+    /// A blow reaching the player: turned aside by a block (a roll against <see cref="PlayerTarget.BlockChance"/>) or landing. Either way it connects and goes on
+    /// <see cref="Strikes"/>. False if the player can't be hurt just now (dead, or in the grace after the last hit); then nothing happens.
+    /// </summary>
+    private bool Strike(Enemy enemy, float damage, PlayerTarget player, out bool blocked)
+    {
+        blocked = false;
+        if (!player.Health.CanBeHurt)
+        {
+            return false;
+        }
+
+        if (player.BlockChance > 0f && _random.NextDouble() < player.BlockChance)
+        {
+            blocked = true;
+            player.Health.Deflect();
+        }
+        else if (!player.Health.TakeDamage(damage))
+        {
+            return false;
+        }
+
+        _strikes.Add(new Strike(enemy, damage, blocked));
+        return true;
     }
 
     /// <summary>Turns toward what the attack is aimed at: the lane or the landing spot while they are shown, otherwise the player.</summary>

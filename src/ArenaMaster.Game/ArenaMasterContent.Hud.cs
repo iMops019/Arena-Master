@@ -35,7 +35,7 @@ public sealed partial class ArenaMasterContent
 
     private void DrawCampHud(IHud hud)
     {
-        hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 20f), "CAMP", Gold, 1.2f);
+        hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 20f), $"CAMP  ·  {_hero.Name.ToUpperInvariant()}", Gold, 1.2f);
         int free = _tree.FreePoints;
         string tree = $"{_tree.Tree.Name}  ·  Lv {_tree.Level}" + (free > 0 ? $"  ·  {free} point{(free == 1 ? "" : "s")} to spend" : "");
         hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 52f), tree, free > 0 ? Teal : White, 0.85f);
@@ -50,7 +50,8 @@ public sealed partial class ArenaMasterContent
         else
         {
             hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -120f),
-                "Chest and quartermaster on the left, tree target and bounty board on the right, the gate ahead starts a run", new Vector4D<float>(1f, 1f, 1f, 0.6f), 0.8f);
+                "Chest and quartermaster on the left, tree target and bounty board on the right, class rack behind you, the gate ahead starts a run",
+                new Vector4D<float>(1f, 1f, 1f, 0.6f), 0.8f);
         }
 
         DrawDash(hud);
@@ -119,9 +120,9 @@ public sealed partial class ArenaMasterContent
         {
             hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 60f), "STUNNED", new Vector4D<float>(1f, 0.85f, 0.3f, 1f), 1.2f);
         }
-        else if (_bow.FocusReady(_stats))
+        else if (_hero.Status is { } status)
         {
-            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 34f), "FOCUSED", Teal, 0.8f);   // Sniper's Focus: the next shot is the big one
+            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 34f), status, Teal, 0.8f);   // a readied shot, a shield up, a block
         }
 
         if (_announcementLeft > 0f)
@@ -131,13 +132,13 @@ public sealed partial class ArenaMasterContent
         }
     }
 
-    /// <summary>Dash charge, bottom centre: fills back up after each dash.</summary>
+    /// <summary>The Shift move's charge, bottom centre: fills back up after each use.</summary>
     private void DrawDash(IHud hud)
     {
-        float ready = Math.Clamp(_ranger.DashReadiness, 0f, 1f);
+        float ready = Math.Clamp(_hero.DashReadiness, 0f, 1f);
         var fill = ready >= 1f ? new Vector4D<float>(0.55f, 0.85f, 0.45f, 0.95f) : new Vector4D<float>(0.45f, 0.55f, 0.45f, 0.8f);
         hud.Bar(HudAnchor.BottomCenter, new Vector2D<float>(0f, -40f), new Vector2D<float>(160f, 8f), ready, fill, Shade);
-        hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -54f), "DASH  [Shift]", new Vector4D<float>(1f, 1f, 1f, ready >= 1f ? 0.85f : 0.45f), 0.7f);
+        hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -54f), $"{_hero.DashLabel}  [Shift]", new Vector4D<float>(1f, 1f, 1f, ready >= 1f ? 0.85f : 0.45f), 0.7f);
     }
 
     private static Vector4D<float> RarityColor(ItemRarity rarity, float alpha) => rarity switch

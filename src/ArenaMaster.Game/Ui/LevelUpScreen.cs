@@ -1,11 +1,13 @@
 using System.Numerics;
-using ArenaMaster.Game.Ranger;
 using ImGuiNET;
 
 namespace ArenaMaster.Game.Ui;
 
-/// <summary>What the player did on the level-up screen: took a card, rerolled the lot, or banished one (by its place in the row).</summary>
-internal sealed record LevelUpAction(UpgradeChoice? Take = null, bool Reroll = false, int? Banish = null);
+/// <summary>One card on the level-up screen: an upgrade and the level it would reach, or (<paramref name="IsHeal"/>) the heal offered once everything is maxed.</summary>
+internal sealed record LevelUpCard(string Name, string Description, int NewLevel, int MaxLevel, bool IsHeal = false);
+
+/// <summary>What the player did on the level-up screen: took a card or banished one (each by its place in the row), or rerolled the lot.</summary>
+internal sealed record LevelUpAction(int? Take = null, bool Reroll = false, int? Banish = null);
 
 /// <summary>
 /// The level-up screen: the world is paused behind it (the content sets <c>EngineWindow.GamePaused</c>), and the player picks one of the offered upgrades by clicking
@@ -19,7 +21,7 @@ internal sealed class LevelUpScreen
 
     private static readonly ImGuiKey[] NumberKeys = { ImGuiKey._1, ImGuiKey._2, ImGuiKey._3, ImGuiKey._4 };
 
-    private IReadOnlyList<UpgradeChoice> _choices = Array.Empty<UpgradeChoice>();
+    private IReadOnlyList<LevelUpCard> _choices = Array.Empty<LevelUpCard>();
     private int _level;
     private int _rerolls;
     private int _banishes;
@@ -29,7 +31,7 @@ internal sealed class LevelUpScreen
     public bool IsOpen { get; private set; }
 
     /// <summary>Shows <paramref name="choices"/> for <paramref name="level"/>, with <paramref name="rerolls"/> and <paramref name="banishes"/> left this run.</summary>
-    public void Open(IReadOnlyList<UpgradeChoice> choices, int level, int rerolls = 0, int banishes = 0)
+    public void Open(IReadOnlyList<LevelUpCard> choices, int level, int rerolls = 0, int banishes = 0)
     {
         _choices = choices;
         _level = level;
@@ -40,7 +42,7 @@ internal sealed class LevelUpScreen
     }
 
     /// <summary>New choices on the open screen (after a reroll or a banish), with what is left of each.</summary>
-    public void Refresh(IReadOnlyList<UpgradeChoice> choices, int rerolls, int banishes)
+    public void Refresh(IReadOnlyList<LevelUpCard> choices, int rerolls, int banishes)
     {
         _choices = choices;
         _rerolls = rerolls;
@@ -99,7 +101,7 @@ internal sealed class LevelUpScreen
 
             if (DrawCard(i, _choices[i], new Vector2(cardWidth, cardHeight), scale, armed))
             {
-                action = new LevelUpAction(Take: _choices[i]);
+                action = new LevelUpAction(Take: i);
             }
         }
 
@@ -115,7 +117,7 @@ internal sealed class LevelUpScreen
                 }
 
                 ImGui.PushID(100 + i);
-                bool canBanish = _choices[i].Upgrade is not null && armed;
+                bool canBanish = !_choices[i].IsHeal && armed;
                 if (UiTheme.Button("Banish", new Vector2(cardWidth, 30f * scale), enabled: canBanish))
                 {
                     action = new LevelUpAction(Banish: i);
@@ -145,7 +147,7 @@ internal sealed class LevelUpScreen
             {
                 if (ImGui.IsKeyPressed(NumberKeys[i], false))
                 {
-                    action = new LevelUpAction(Take: _choices[i]);
+                    action = new LevelUpAction(Take: i);
                 }
             }
 
@@ -168,7 +170,7 @@ internal sealed class LevelUpScreen
     }
 
     /// <summary>One card: the number key, the upgrade's name, its level, what it does. The whole card is the button.</summary>
-    private static bool DrawCard(int index, UpgradeChoice choice, Vector2 size, float scale, bool armed)
+    private static bool DrawCard(int index, LevelUpCard choice, Vector2 size, float scale, bool armed)
     {
         var start = ImGui.GetCursorScreenPos();
         ImGui.PushID(index);
@@ -191,7 +193,7 @@ internal sealed class LevelUpScreen
         draw.AddText(ImGui.GetFont(), fontSize * 0.8f, start + new Vector2(pad, pad), muted, $"[{index + 1}]");
         draw.AddText(ImGui.GetFont(), fontSize * 1.15f, start + new Vector2(pad, pad + fontSize * 1.1f), white, choice.Name);
 
-        string level = choice.Upgrade is null ? "" : choice.NewLevel == 1 ? "NEW" : $"Level {choice.NewLevel} / {choice.MaxLevel}";
+        string level = choice.IsHeal ? "" : choice.NewLevel == 1 ? "NEW" : $"Level {choice.NewLevel} / {choice.MaxLevel}";
         draw.AddText(ImGui.GetFont(), fontSize * 0.85f, start + new Vector2(pad, pad + fontSize * 2.5f), gold, level);
 
         draw.AddText(ImGui.GetFont(), fontSize * 0.9f, start + new Vector2(pad, pad + fontSize * 3.9f), white, choice.Description, size.X - 2f * pad);
