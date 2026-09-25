@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ArenaMaster.Game/ArenaMaster.Game.csproj" />
+    <Project Path="src/ArenaMaster.Editor/ArenaMaster.Editor.csproj" />
+    <Project Path="src/ArenaMaster.Play/ArenaMaster.Play.csproj" />
+  </Folder>
+  <Folder Name="/engine/">
+    <Project Path="engine/src/ConnEngine.Core/ConnEngine.Core.csproj" />
+  </Folder>
+</Solution>

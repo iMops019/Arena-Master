@@ -1,0 +1,8 @@
+bin/
+obj/
+.vs/
+*.user
+imgui.ini
+
+# Raw Meshy exports (FBX + PBR texture sets): convert with engine/tools/asset-pipeline and commit only the small .glb
+assets/raw/
