@@ -12,30 +12,22 @@ internal sealed class RangerBow
 {
     public const string ArrowModel = "arrow_placeholder.glb";
 
-    /// <summary>Seconds between shots.</summary>
-    public float FireInterval { get; set; } = 0.5f;
-
-    public float Damage { get; set; } = 12f;
-
-    public float ArrowSpeed { get; set; } = 50f;
-
-    /// <summary>How far an arrow flies before it drops, metres.</summary>
-    public float Range { get; set; } = 60f;
-
     /// <summary>Where on the Ranger the arrow leaves from: this high above the feet, this far ahead.</summary>
     private const float ReleaseHeight = 1.3f;
     private const float ReleaseForward = 0.5f;
 
-    private readonly RangerArrows _arrows = new();
+    private readonly RangerArrows _arrows;
     private readonly Dictionary<Arrow, int> _props = new();
     private float _cooldown;
 
-    public void Update(EngineWindow window, float deltaSeconds, EnemyField enemies, DamageNumbers numbers, Func<float, float, float?> groundAt)
+    public RangerBow(Random random) => _arrows = new RangerArrows(random);
+
+    public void Update(EngineWindow window, float deltaSeconds, RangerStats stats, EnemyField enemies, DamageNumbers numbers, Func<float, float, float?> groundAt)
     {
         _cooldown -= deltaSeconds;
         if (_cooldown <= 0f && window.Camera is { } camera && window.Terrain is { } terrain)
         {
-            _cooldown += FireInterval;
+            _cooldown += stats.FireInterval;
             if (_cooldown < 0f)
             {
                 _cooldown = 0f;   // after a pause, don't fire a burst to catch up
@@ -43,14 +35,17 @@ internal sealed class RangerBow
 
             var aimFlat = Flat(camera.Front);
             var origin = window.PlayerFeet + new Vector3D<float>(0f, ReleaseHeight, 0f) + aimFlat * ReleaseForward;
-            var target = CrosshairTarget(camera, terrain, enemies);
-            _arrows.Fire(origin, AimDirection(origin, target, camera.Front, aimFlat), ArrowSpeed, Range, Damage);
+            var aim = AimDirection(origin, CrosshairTarget(camera, terrain, enemies, stats.Range), camera.Front, aimFlat);
+            foreach (var direction in Fan(aim, stats.ArrowsPerShot, RangerStats.SplitSpreadDegrees))
+            {
+                _arrows.Fire(origin, direction, stats.ArrowSpeed, stats.Range, stats.Damage, stats.Pierce, stats.CritChance);
+            }
         }
 
         var gone = new List<Arrow>();
         foreach (var hit in _arrows.Update(deltaSeconds, enemies, groundAt, gone))
         {
-            numbers.Add(hit.Position, hit.Damage, hit.Killed);
+            numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
         }
 
         foreach (var arrow in gone)
@@ -99,10 +94,24 @@ internal sealed class RangerBow
         return Vector3D.Dot(Flat(direction), aimFlat) < 0.5f ? cameraFront : direction;
     }
 
-    /// <summary>What the crosshair is on: the nearest enemy or ground along the camera's line of sight, or a point far along it if there is neither.</summary>
-    private Vector3D<float> CrosshairTarget(Camera camera, Terrain terrain, EnemyField enemies)
+    /// <summary>
+    /// <paramref name="count"/> directions fanned out evenly around <paramref name="aim"/>, turned about the vertical <paramref name="spreadDegrees"/> apart - the middle one
+    /// (for an odd count) straight along the aim.
+    /// </summary>
+    public static IEnumerable<Vector3D<float>> Fan(Vector3D<float> aim, int count, float spreadDegrees)
     {
-        float reach = Range + 10f;
+        for (int i = 0; i < count; i++)
+        {
+            float angle = (i - (count - 1) * 0.5f) * spreadDegrees * MathF.PI / 180f;
+            float cos = MathF.Cos(angle), sin = MathF.Sin(angle);
+            yield return new Vector3D<float>(aim.X * cos + aim.Z * sin, aim.Y, -aim.X * sin + aim.Z * cos);
+        }
+    }
+
+    /// <summary>What the crosshair is on: the nearest enemy or ground along the camera's line of sight, or a point far along it if there is neither.</summary>
+    private static Vector3D<float> CrosshairTarget(Camera camera, Terrain terrain, EnemyField enemies, float range)
+    {
+        float reach = range + 10f;
         var far = camera.Position + camera.Front * reach;
         var target = far;
         float best = reach;

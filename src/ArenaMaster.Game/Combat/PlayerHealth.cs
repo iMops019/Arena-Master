@@ -14,7 +14,7 @@ internal sealed class PlayerHealth
         Current = max;
     }
 
-    public float Max { get; }
+    public float Max { get; private set; }
 
     public float Current { get; private set; }
 
@@ -38,9 +38,20 @@ internal sealed class PlayerHealth
 
     public void Update(float deltaSeconds) => _grace = MathF.Max(0f, _grace - deltaSeconds);
 
-    public void Restore()
+    /// <summary>Raises the maximum by <paramref name="amount"/> and heals the same amount.</summary>
+    public void RaiseMax(float amount)
     {
-        Current = Max;
+        Max += amount;
+        Current += amount;
+    }
+
+    public void Heal(float amount) => Current = MathF.Min(Max, Current + amount);
+
+    /// <summary>Back to full health at <paramref name="max"/> (a new run).</summary>
+    public void Reset(float max)
+    {
+        Max = max;
+        Current = max;
         _grace = 0f;
     }
 }

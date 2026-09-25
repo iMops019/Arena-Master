@@ -2,6 +2,7 @@
   ranger_placeholder.glb  the Ranger (tunic, hood, cape, bow, quiver)
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
   ghoul_placeholder.glb   the first enemy: a hunched ghoul with long arms and red eyes
+  xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
 
 The engine's model conventions: one mesh, one primitive, colours from one base-colour texture (vertex colours are
 ignored), facing +Z, feet at y = 0, metres. The texture is a strip of flat colour swatches and each face's UVs point
@@ -32,6 +33,8 @@ PALETTE = {
     "ghoul_rags": (66, 54, 70),
     "ghoul_eye": (235, 40, 28),
     "bone": (214, 204, 176),
+    "gem": (80, 214, 236),
+    "gem_light": (190, 246, 255),
 }
 COLOURS = list(PALETTE)
 
@@ -163,6 +166,18 @@ def build_ghoul():
     return m
 
 
+def build_xp_gem():
+    """An elongated octahedron, 0.3 m tall: light facets on top, deeper blue below."""
+    m = Mesh()
+    top, bottom = (0.0, 0.16, 0.0), (0.0, -0.14, 0.0)
+    ring = [(0.09, 0.0, 0.0), (0.0, 0.0, 0.09), (-0.09, 0.0, 0.0), (0.0, 0.0, -0.09)]
+    for i in range(4):
+        a, b = ring[i], ring[(i + 1) % 4]
+        m.tri(a, top, b, "gem_light")
+        m.tri(b, bottom, a, "gem")
+    return m
+
+
 def png_bytes():
     width, height = SWATCH * len(COLOURS), SWATCH
     row = b"".join(bytes(PALETTE[c]) * SWATCH for c in COLOURS)
@@ -224,7 +239,7 @@ def write_glb(mesh, path):
 
 
 if __name__ == "__main__":
-    for name, build in (("ranger_placeholder.glb", build_ranger), ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul)):
+    for name, build in (("ranger_placeholder.glb", build_ranger), ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul), ("xp_gem_placeholder.glb", build_xp_gem)):
         mesh = build()
         write_glb(mesh, MODELS / name)
         print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")

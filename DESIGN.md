@@ -40,9 +40,9 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
 ## First class: Ranger
 
 - **Basic attack:** a bow that auto-fires arrows where the camera aims. The arrows converge on whatever the crosshair is on. Current numbers: 1 shot per 0.5 s, 12 damage, 50 m/s, 60 m range, straight flight.
-- **Level-up pool (draft):**
-  - Stats: damage, attack speed, projectile count, pierce, crit chance/damage, projectile speed, move speed, pickup radius, max HP, regen.
-  - Abilities: Volley (fan of arrows), Piercing Shot, Rain of Arrows (area), Traps, Poison or Fire Arrows (damage over time), Hawk companion.
+- **Levelling:** each ghoul drops a 1 XP gem. Level n to n+1 takes 5n XP. Gems within the pickup radius (3 m base) fly to the player. Each level pauses the game and offers 3 random upgrades from the pool below; maxed ones drop out, and once all are maxed the offer is a heal (Second Wind, 30 HP). A death ends the run and resets level, upgrades and clock.
+- **Level-up pool (built, first pass):** Sharpened Tips (+20% damage, x5), Quick Draw (+15% attack speed, x5), Split Shot (+1 arrow fanned 7 degrees apart, x4), Piercing Arrows (+1 pierce, x3), Deadeye (+8% crit, crits x2, base 5%, x5), Fletching (+20% arrow speed and +15% range, x3), Fleet Foot (+8% move speed, x5), Vitality (+20 max HP and heal, x5), Scavenger (+35% pickup range, x4).
+- **Ideas for later levels of the pool (draft):** Rain of Arrows (area), Traps, Poison or Fire Arrows (damage over time), Hawk companion, health regen.
 - **Passive tree (draft):** three branches that each push a different build:
   - **Marksman:** crits, single-target and boss damage.
   - **Volley:** multi-projectile, area, clearing swarms.
@@ -65,8 +65,8 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
 Each step should be playable before the next one starts. **[engine]** means the work goes in C-Engine (commit and push there, then `./update-engine.ps1` here). **[game]** means the work goes in this repo.
 
 1. *(Done; the user is happy with the feel.)* **Third-person Ranger movement:** follow camera, WASD, jump, dash, on a test map with a placeholder character. [engine: general follow camera] [game: Ranger controller]
-2. *(Built; waiting for the user to try it.)* **Shooting and killing:** an auto-firing bow, arrow projectiles, one basic chaser enemy, hit detection, damage, death. [engine: general projectile/hitbox/damage helpers] [game: the bow, the enemy]
-3. **Levelling up:** XP drops and pickup, the level-up pause with 3 choices, the first handful of stacking upgrades, and a HUD (HP, XP bar, timer, level). [game]
+2. *(Done; the user is happy with the feel.)* **Shooting and killing:** an auto-firing bow, arrow projectiles, one basic chaser enemy, hit detection, damage, death. [engine: general projectile/hitbox/damage helpers] [game: the bow, the enemy]
+3. *(Built; waiting for the user to try it.)* **Levelling up:** XP drops and pickup, the level-up pause with 3 choices, the first handful of stacking upgrades, and a HUD (HP, XP bar, timer, level). [game]
 4. **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] [engine: basic steering/avoidance for many enemies]
 5. **Items:** drops, chests, bonuses and multipliers. [game]
 6. **Ranger passive tree:** the tree UI and nodes. [game]

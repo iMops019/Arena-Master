@@ -53,6 +53,7 @@ internal sealed class EnemyField
     public const float LeashDistance = 75f;
 
     private readonly List<Enemy> _enemies = new();
+    private readonly List<Enemy> _newlyKilled = new();
     private readonly Random _random;
     private int _nextId = 1;
     private float _spawnTimer;
@@ -129,21 +130,30 @@ internal sealed class EnemyField
         enemy.Health = 0f;
         enemy.DeadFor = 0f;
         Kills++;
+        _newlyKilled.Add(enemy);
         return true;
+    }
+
+    /// <summary>The enemies killed since the last call, whatever killed them - for drops.</summary>
+    public List<Enemy> TakeNewlyKilled()
+    {
+        var killed = _newlyKilled.ToList();
+        _newlyKilled.Clear();
+        return killed;
     }
 
     /// <summary>
     /// The first live enemy the moving sphere (<paramref name="from"/> to <paramref name="to"/>, radius <paramref name="radius"/>) touches, and how far along the move (0 to 1) it did.
-    /// Each enemy is a capsule around its standing axis.
+    /// Each enemy is a capsule around its standing axis. Enemies in <paramref name="skip"/> are passed over (ones a piercing arrow has already gone through).
     /// </summary>
-    public Enemy? FirstHit(Vector3D<float> from, Vector3D<float> to, float radius, out float along)
+    public Enemy? FirstHit(Vector3D<float> from, Vector3D<float> to, float radius, out float along, IReadOnlySet<Enemy>? skip = null)
     {
         Enemy? best = null;
         along = float.MaxValue;
 
         foreach (var enemy in _enemies)
         {
-            if (!enemy.IsAlive)
+            if (!enemy.IsAlive || skip?.Contains(enemy) == true)
             {
                 continue;
             }
@@ -166,6 +176,7 @@ internal sealed class EnemyField
     {
         var all = _enemies.ToList();
         _enemies.Clear();
+        _newlyKilled.Clear();
         _spawnTimer = 0f;
         return all;
     }

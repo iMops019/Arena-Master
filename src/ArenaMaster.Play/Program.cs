@@ -8,6 +8,7 @@ var window = new EngineWindow
     Height = 720,
     Mode = EngineMode.Play,
     StartOnTitleScreen = true,
+    BuiltInPanels = false,   // no survival inventory, build menu or player menu in this game
     GameContent = new ArenaMasterContent(),
 };
 

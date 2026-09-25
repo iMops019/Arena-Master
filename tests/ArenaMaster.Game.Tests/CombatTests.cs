@@ -148,7 +148,7 @@ public class PlayerHealthTests
         Assert.True(health.IsDead);
         Assert.Equal(0f, health.Current);
 
-        health.Restore();
+        health.Reset(30f);
         Assert.False(health.IsDead);
         Assert.Equal(30f, health.Current);
     }

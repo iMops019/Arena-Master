@@ -1,0 +1,153 @@
+using System.Numerics;
+using ArenaMaster.Game.Ranger;
+using ImGuiNET;
+
+namespace ArenaMaster.Game.Ui;
+
+/// <summary>
+/// The level-up screen: the world is paused behind it (the content sets <c>EngineWindow.GamePaused</c>), and the player picks one of the offered upgrades by clicking
+/// its card or pressing 1, 2 or 3. Drawn with ImGui from <c>IGameContent.DrawOverlay</c>.
+/// </summary>
+internal sealed class LevelUpScreen
+{
+    /// <summary>Choices can't be taken for this long after the screen opens, so a key or click already under way doesn't pick one by accident.</summary>
+    private const double ArmDelaySeconds = 0.35;
+
+    private static readonly ImGuiKey[] NumberKeys = { ImGuiKey._1, ImGuiKey._2, ImGuiKey._3, ImGuiKey._4 };
+
+    private IReadOnlyList<UpgradeChoice> _choices = Array.Empty<UpgradeChoice>();
+    private int _level;
+    private double _openedAt = double.NegativeInfinity;
+    private bool _stampOpenTime;
+
+    public bool IsOpen { get; private set; }
+
+    public void Open(IReadOnlyList<UpgradeChoice> choices, int level)
+    {
+        _choices = choices;
+        _level = level;
+        IsOpen = true;
+        _stampOpenTime = true;
+    }
+
+    public void Close() => IsOpen = false;
+
+    /// <summary>Draws the screen and returns the choice the player took this frame, if any (the screen closes itself when one is taken).</summary>
+    public UpgradeChoice? Draw()
+    {
+        if (!IsOpen)
+        {
+            return null;
+        }
+
+        if (_stampOpenTime)
+        {
+            _openedAt = ImGui.GetTime();
+            _stampOpenTime = false;
+        }
+
+        bool armed = ImGui.GetTime() - _openedAt >= ArmDelaySeconds;
+        var display = ImGui.GetIO().DisplaySize;
+        float scale = Math.Clamp(display.Y / 720f, 0.75f, 3f);
+
+        ImGui.GetBackgroundDrawList().AddRectFilled(Vector2.Zero, display, ImGui.ColorConvertFloat4ToU32(new Vector4(0.02f, 0.03f, 0.06f, 0.6f)));
+
+        float cardWidth = 250f * scale;
+        float cardHeight = 190f * scale;
+        float gap = 24f * scale;
+        float totalWidth = _choices.Count * cardWidth + (_choices.Count - 1) * gap;
+        var windowSize = new Vector2(totalWidth + 48f * scale, cardHeight + 150f * scale);
+
+        ImGui.SetNextWindowPos(display * 0.5f, ImGuiCond.Always, new Vector2(0.5f, 0.5f));
+        ImGui.SetNextWindowSize(windowSize, ImGuiCond.Always);
+        ImGui.PushStyleColor(ImGuiCol.WindowBg, new Vector4(0.07f, 0.09f, 0.08f, 0.94f));
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 10f * scale);
+        ImGui.Begin("##levelup", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoScrollbar);
+        ImGui.SetWindowFontScale(scale);
+
+        CenteredText("LEVEL UP!", 1.7f, scale, new Vector4(1f, 0.84f, 0.35f, 1f));
+        CenteredText($"Level {_level}  -  choose one", 1f, scale, new Vector4(0.85f, 0.88f, 0.85f, 1f));
+        ImGui.Dummy(new Vector2(0f, 10f * scale));
+
+        UpgradeChoice? taken = null;
+        ImGui.SetCursorPosX((ImGui.GetWindowWidth() - totalWidth) * 0.5f);
+        for (int i = 0; i < _choices.Count; i++)
+        {
+            if (i > 0)
+            {
+                ImGui.SameLine(0f, gap);
+            }
+
+            if (DrawCard(i, _choices[i], new Vector2(cardWidth, cardHeight), scale, armed))
+            {
+                taken = _choices[i];
+            }
+        }
+
+        ImGui.Dummy(new Vector2(0f, 8f * scale));
+        CenteredText("Click a card, or press 1 / 2 / 3", 0.8f, scale, new Vector4(0.6f, 0.65f, 0.6f, 1f));
+
+        if (armed && taken is null)
+        {
+            for (int i = 0; i < _choices.Count && i < NumberKeys.Length; i++)
+            {
+                if (ImGui.IsKeyPressed(NumberKeys[i], false))
+                {
+                    taken = _choices[i];
+                }
+            }
+        }
+
+        ImGui.End();
+        ImGui.PopStyleVar();
+        ImGui.PopStyleColor();
+
+        if (taken is not null)
+        {
+            IsOpen = false;
+        }
+
+        return taken;
+    }
+
+    /// <summary>One card: the number key, the upgrade's name, its level, what it does. The whole card is the button.</summary>
+    private static bool DrawCard(int index, UpgradeChoice choice, Vector2 size, float scale, bool armed)
+    {
+        var start = ImGui.GetCursorScreenPos();
+        ImGui.PushID(index);
+        bool clicked = ImGui.InvisibleButton("card", size) && armed;
+        bool hovered = ImGui.IsItemHovered();
+        ImGui.PopID();
+
+        var draw = ImGui.GetWindowDrawList();
+        var fill = hovered && armed ? new Vector4(0.2f, 0.32f, 0.22f, 1f) : new Vector4(0.13f, 0.19f, 0.15f, 1f);
+        var border = hovered && armed ? new Vector4(0.95f, 0.8f, 0.35f, 1f) : new Vector4(0.35f, 0.5f, 0.38f, 1f);
+        draw.AddRectFilled(start, start + size, ImGui.ColorConvertFloat4ToU32(fill), 8f * scale);
+        draw.AddRect(start, start + size, ImGui.ColorConvertFloat4ToU32(border), 8f * scale, ImDrawFlags.None, 2f * scale);
+
+        float pad = 14f * scale;
+        float fontSize = ImGui.GetFontSize();
+        var white = ImGui.ColorConvertFloat4ToU32(new Vector4(0.95f, 0.96f, 0.94f, 1f));
+        var gold = ImGui.ColorConvertFloat4ToU32(new Vector4(1f, 0.84f, 0.35f, 1f));
+        var muted = ImGui.ColorConvertFloat4ToU32(new Vector4(0.7f, 0.76f, 0.7f, 1f));
+
+        draw.AddText(ImGui.GetFont(), fontSize * 0.8f, start + new Vector2(pad, pad), muted, $"[{index + 1}]");
+        draw.AddText(ImGui.GetFont(), fontSize * 1.15f, start + new Vector2(pad, pad + fontSize * 1.1f), white, choice.Name);
+
+        string level = choice.Upgrade is null ? "" : choice.NewLevel == 1 ? "NEW" : $"Level {choice.NewLevel} / {choice.MaxLevel}";
+        draw.AddText(ImGui.GetFont(), fontSize * 0.85f, start + new Vector2(pad, pad + fontSize * 2.5f), gold, level);
+
+        draw.AddText(ImGui.GetFont(), fontSize * 0.9f, start + new Vector2(pad, pad + fontSize * 3.9f), white, choice.Description, size.X - 2f * pad);
+        return clicked;
+    }
+
+    /// <summary>A centred line at <paramref name="size"/> times the screen's own scale (<paramref name="scale"/>), in <paramref name="color"/>.</summary>
+    private static void CenteredText(string text, float size, float scale, Vector4 color)
+    {
+        ImGui.SetWindowFontScale(scale * size);
+        float width = ImGui.CalcTextSize(text).X;
+        ImGui.SetCursorPosX(MathF.Max((ImGui.GetWindowWidth() - width) * 0.5f, 0f));
+        ImGui.TextColored(color, text);
+        ImGui.SetWindowFontScale(scale);
+    }
+}

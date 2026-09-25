@@ -5,15 +5,12 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Ranger;
 
 /// <summary>
-/// The Ranger's body and movement on top of the engine's third-person walker: a faster run, a dash on Shift, and a body that turns to face where the camera aims (the bow fires
+/// The Ranger's body and movement on top of the engine's third-person walker: a run at the stats' speed, a dash on Shift, and a body that turns to face where the camera aims (the bow fires
 /// that way). The engine does the walking, jumping and collision; this sets the speed, pushes for the dash, and draws the body at the player's feet.
 /// </summary>
 internal sealed class RangerController
 {
     public const string BodyModel = "ranger_placeholder.glb";
-
-    /// <summary>Running speed, metres per second.</summary>
-    public const float RunSpeed = 7f;
 
     /// <summary>Extra speed during a dash, on top of running, metres per second.</summary>
     public const float DashSpeed = 20f;
@@ -34,9 +31,9 @@ internal sealed class RangerController
     /// <summary>0 while the dash is recharging, rising to 1 when it is ready again.</summary>
     public float DashReadiness => 1f - _cooldownLeft / DashCooldown;
 
-    public void Update(EngineWindow window, float deltaSeconds)
+    public void Update(EngineWindow window, float deltaSeconds, RangerStats stats)
     {
-        window.WalkSpeed = RunSpeed;
+        window.WalkSpeed = stats.MoveSpeed;
         UpdateDash(window, deltaSeconds);
         UpdateBody(window, deltaSeconds);
     }

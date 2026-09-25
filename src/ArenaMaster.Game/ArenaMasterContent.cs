@@ -1,5 +1,6 @@
 using ArenaMaster.Game.Combat;
 using ArenaMaster.Game.Ranger;
+using ArenaMaster.Game.Ui;
 using CEngine.Core;
 using Silk.NET.Maths;
 
@@ -7,7 +8,8 @@ namespace ArenaMaster.Game;
 
 /// <summary>
 /// Arena Master's side of the engine seam. For now: a small test map (rolling hills, some trees and rocks to run around and jump onto), the Ranger in third person with an
-/// auto-firing bow, and ghouls that keep coming (build-order steps 1 and 2 in DESIGN.md).
+/// auto-firing bow, ghouls that keep coming, and a run's worth of levelling: experience gems, level-ups that pause for a pick of three upgrades, and a restart on death
+/// (build-order steps 1 to 3 in DESIGN.md).
 /// </summary>
 public sealed class ArenaMasterContent : IGameContent
 {
@@ -17,19 +19,33 @@ public sealed class ArenaMasterContent : IGameContent
     private const float TerrainHeightScale = 60f;
     private const float BaseHeight = TerrainHeightScale * 0.3f;   // where the height-based palette is grass
 
-    /// <summary>How long the "slain" message shows before the fight starts over.</summary>
+    /// <summary>How long the "slain" message shows before a new run starts.</summary>
     private const float RespawnDelay = 3f;
 
+    private readonly Random _random = new();
+    private readonly RangerStats _stats = new();
     private readonly RangerController _ranger = new();
-    private readonly RangerBow _bow = new();
-    private readonly PlayerHealth _health = new(100f);
-    private readonly EnemyField _enemies = new(new Random());
+    private readonly RangerBow _bow;
+    private readonly PlayerHealth _health = new(RangerStats.BaseMaxHealth);
+    private readonly Experience _experience = new();
+    private readonly EnemyField _enemies;
     private readonly EnemyView _enemyView = new();
+    private readonly XpGemField _gems = new();
+    private readonly XpGemView _gemView = new();
     private readonly DamageNumbers _numbers = new();
+    private readonly LevelUpScreen _levelUp = new();
     private EngineWindow? _window;
     private bool _started;
     private float _respawnIn;
-    private int _lastRunKills;
+    private float _runSeconds;
+    private int _pendingLevels;
+    private (int Kills, int Level, float Seconds) _lastRun;
+
+    public ArenaMasterContent()
+    {
+        _bow = new RangerBow(_random);
+        _enemies = new EnemyField(_random);
+    }
 
     public string AssetsRoot => Path.Combine(EngineAssets.RepoRoot, "assets");
 
@@ -95,7 +111,7 @@ public sealed class ArenaMasterContent : IGameContent
 
         float? GroundAt(float x, float z) => terrain.TryGetHeight(x, z, out float height) ? height : null;
 
-        _ranger.Update(window, deltaSeconds);
+        _ranger.Update(window, deltaSeconds, _stats);
         _health.Update(deltaSeconds);
         _numbers.Update(deltaSeconds);
 
@@ -104,46 +120,74 @@ public sealed class ArenaMasterContent : IGameContent
             _respawnIn -= deltaSeconds;
             if (_respawnIn <= 0f)
             {
-                _health.Restore();
-                _enemies.ResetKills();
+                StartRun();
             }
 
             return;
         }
 
-        _bow.Update(window, deltaSeconds, _enemies, _numbers, GroundAt);
+        _runSeconds += deltaSeconds;
+
+        _bow.Update(window, deltaSeconds, _stats, _enemies, _numbers, GroundAt);
         var gone = _enemies.Update(deltaSeconds, window.PlayerFeet, GroundAt, _health);
+        foreach (var killed in _enemies.TakeNewlyKilled())
+        {
+            _gems.Drop(killed.Position, killed.Kind.Experience);
+        }
+
         _enemyView.Sync(window, _enemies, gone, deltaSeconds);
+
+        var collected = new List<XpGem>();
+        _pendingLevels += _experience.Add(_gems.Update(deltaSeconds, window.PlayerFeet, _stats.PickupRadius, collected));
+        _gemView.Sync(window, _gems, collected, deltaSeconds);
 
         if (_health.IsDead)
         {
             Slain(window);
         }
+        else if (_pendingLevels > 0 && !_levelUp.IsOpen)
+        {
+            OpenLevelUp(window);
+        }
     }
 
-    /// <summary>The Ranger went down: clear the field and start over after a moment.</summary>
-    private void Slain(EngineWindow window)
+    public void DrawOverlay(EngineWindow window)
     {
-        _lastRunKills = _enemies.Kills;
-        foreach (var enemy in _enemies.Clear())
+        if (_levelUp.Draw() is not { } choice)
         {
-            _enemyView.Remove(window, enemy);
+            return;
         }
 
-        _bow.Clear(window);
-        _numbers.Clear();
-        _respawnIn = RespawnDelay;
+        Apply(choice);
+        _pendingLevels--;
+        if (_pendingLevels > 0)
+        {
+            OpenLevelUp(window);   // several levels at once: one pick each
+        }
+        else
+        {
+            window.GamePaused = false;
+        }
     }
 
     public void DrawHud(IHud hud)
     {
         var white = new Vector4D<float>(1f, 1f, 1f, 0.9f);
+        var gold = new Vector4D<float>(1f, 0.84f, 0.35f, 1f);
         var shade = new Vector4D<float>(0f, 0f, 0f, 0.45f);
 
         if (_window?.Camera is { } camera)
         {
             _numbers.Draw(hud, camera);
         }
+
+        // Experience across the top, with the level at its left end; the run clock under its middle; kills at the right.
+        float width = hud.ScreenSize.X - 48f;
+        hud.Bar(HudAnchor.TopLeft, new Vector2D<float>(24f, 14f), new Vector2D<float>(width, 12f), _experience.Progress,
+            new Vector4D<float>(0.35f, 0.8f, 0.95f, 0.95f), shade);
+        hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 32f), $"LV {_experience.Level}", gold, 1f);
+        hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 32f), Clock(_runSeconds), white, 1.1f);
+        hud.Text(HudAnchor.TopRight, new Vector2D<float>(-26f, 32f), $"Kills  {_enemies.Kills}", white, 0.9f);
 
         // Health, bottom left, flashing red when hit.
         float health = _health.Current / _health.Max;
@@ -155,9 +199,6 @@ public sealed class ArenaMasterContent : IGameContent
             hud.Rect(HudAnchor.TopLeft, Vector2D<float>.Zero, new Vector2D<float>(hud.ScreenSize.X, hud.ScreenSize.Y), new Vector4D<float>(0.7f, 0f, 0f, 0.18f * _health.HurtFlash));
         }
 
-        // Kills, top right.
-        hud.Text(HudAnchor.TopRight, new Vector2D<float>(-24f, 20f), $"Kills  {_enemies.Kills}", white, 0.9f);
-
         // Dash charge, bottom centre: fills back up after each dash.
         float ready = Math.Clamp(_ranger.DashReadiness, 0f, 1f);
         var fill = ready >= 1f ? new Vector4D<float>(0.55f, 0.85f, 0.45f, 0.95f) : new Vector4D<float>(0.45f, 0.55f, 0.45f, 0.8f);
@@ -166,8 +207,62 @@ public sealed class ArenaMasterContent : IGameContent
 
         if (_respawnIn > 0f)
         {
-            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, -30f), "YOU WERE SLAIN", new Vector4D<float>(0.95f, 0.3f, 0.3f, 1f), 1.8f);
-            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 20f), $"Kills: {_lastRunKills}     Back in {MathF.Ceiling(_respawnIn)}...", white, 0.9f);
+            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, -40f), "YOU WERE SLAIN", new Vector4D<float>(0.95f, 0.3f, 0.3f, 1f), 1.8f);
+            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 10f), $"Survived {Clock(_lastRun.Seconds)}     Level {_lastRun.Level}     Kills {_lastRun.Kills}", white, 0.9f);
+            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 44f), $"New run in {MathF.Ceiling(_respawnIn)}...", white, 0.8f);
         }
     }
+
+    /// <summary>Pauses the world and offers three upgrades for the next level still to be picked for.</summary>
+    private void OpenLevelUp(EngineWindow window)
+    {
+        int reached = _experience.Level - _pendingLevels + 1;
+        _levelUp.Open(RangerUpgrades.Roll(_stats, _random), reached);
+        window.GamePaused = true;
+    }
+
+    private void Apply(UpgradeChoice choice)
+    {
+        if (choice.Upgrade is not { } upgrade)
+        {
+            _health.Heal(RangerUpgrades.SecondWindHeal);
+            return;
+        }
+
+        _stats.Increase(upgrade);
+        if (upgrade == RangerUpgrade.Vitality)
+        {
+            _health.RaiseMax(_stats.MaxHealth - _health.Max);
+        }
+    }
+
+    /// <summary>The Ranger went down: clear the field, remember how the run went, and start over after a moment.</summary>
+    private void Slain(EngineWindow window)
+    {
+        _lastRun = (_enemies.Kills, _experience.Level, _runSeconds);
+        foreach (var enemy in _enemies.Clear())
+        {
+            _enemyView.Remove(window, enemy);
+        }
+
+        _gemView.Sync(window, _gems, _gems.Clear(), 0f);
+        _bow.Clear(window);
+        _numbers.Clear();
+        _levelUp.Close();
+        _pendingLevels = 0;
+        window.GamePaused = false;
+        _respawnIn = RespawnDelay;
+    }
+
+    /// <summary>A fresh run: level 1, no upgrades, full health, the clock back at zero.</summary>
+    private void StartRun()
+    {
+        _stats.Reset();
+        _experience.Reset();
+        _health.Reset(_stats.MaxHealth);
+        _enemies.ResetKills();
+        _runSeconds = 0f;
+    }
+
+    private static string Clock(float seconds) => $"{(int)seconds / 60:00}:{(int)seconds % 60:00}";
 }

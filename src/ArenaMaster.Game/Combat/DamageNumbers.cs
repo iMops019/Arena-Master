@@ -9,9 +9,9 @@ internal sealed class DamageNumbers
     private const float Lifetime = 0.8f;
     private const float RiseSpeed = 1.6f;   // metres per second
 
-    private readonly List<(Vector3D<float> Position, int Amount, bool Kill, float Age)> _numbers = new();
+    private readonly List<(Vector3D<float> Position, int Amount, bool Kill, bool Crit, float Age)> _numbers = new();
 
-    public void Add(Vector3D<float> position, float amount, bool kill) => _numbers.Add((position, (int)MathF.Round(amount), kill, 0f));
+    public void Add(Vector3D<float> position, float amount, bool kill, bool crit = false) => _numbers.Add((position, (int)MathF.Round(amount), kill, crit, 0f));
 
     public void Update(float deltaSeconds)
     {
@@ -53,9 +53,11 @@ internal sealed class DamageNumbers
             float x = (clip.X / clip.W * 0.5f + 0.5f) * screen.X;
             float y = (1f - (clip.Y / clip.W * 0.5f + 0.5f)) * screen.Y;
             float fade = 1f - n.Age / Lifetime;
-            var color = n.Kill ? new Vector4D<float>(1f, 0.78f, 0.3f, fade) : new Vector4D<float>(1f, 1f, 1f, fade);
-            string text = n.Amount.ToString();
-            float scale = n.Kill ? 1.1f : 0.9f;
+            var color = n.Crit ? new Vector4D<float>(1f, 0.42f, 0.2f, fade)
+                : n.Kill ? new Vector4D<float>(1f, 0.78f, 0.3f, fade)
+                : new Vector4D<float>(1f, 1f, 1f, fade);
+            string text = n.Crit ? n.Amount + "!" : n.Amount.ToString();
+            float scale = n.Crit ? 1.3f : n.Kill ? 1.1f : 0.9f;
             hud.Text(HudAnchor.TopLeft, new Vector2D<float>(x - text.Length * 5f * scale, y), text, color, scale);
         }
     }

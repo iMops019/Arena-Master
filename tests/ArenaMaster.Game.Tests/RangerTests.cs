@@ -15,7 +15,7 @@ public class RangerArrowTests
     {
         var enemies = QuietField();
         var ghoul = enemies.Spawn(new Vector3D<float>(10f, 0f, 0f));
-        var arrows = new RangerArrows();
+        var arrows = new RangerArrows(new Random(1));
         arrows.Fire(new Vector3D<float>(0f, 1.2f, 0f), new Vector3D<float>(1f, 0f, 0f), speed: 50f, range: 60f, damage: 12f);
 
         var gone = new List<Arrow>();
@@ -31,7 +31,7 @@ public class RangerArrowTests
     [Fact]
     public void AMissedArrow_SticksInTheGround_ThenGoes()
     {
-        var arrows = new RangerArrows();
+        var arrows = new RangerArrows(new Random(1));
         arrows.Fire(new Vector3D<float>(0f, 1f, 0f), new Vector3D<float>(1f, -0.5f, 0f), speed: 20f, range: 60f, damage: 12f);
 
         var gone = new List<Arrow>();
@@ -57,7 +57,7 @@ public class RangerArrowTests
     [Fact]
     public void AnArrow_DropsOutAtTheEndOfItsRange()
     {
-        var arrows = new RangerArrows();
+        var arrows = new RangerArrows(new Random(1));
         arrows.Fire(new Vector3D<float>(0f, 5f, 0f), new Vector3D<float>(0f, 0f, 1f), speed: 50f, range: 30f, damage: 12f);
 
         var gone = new List<Arrow>();
