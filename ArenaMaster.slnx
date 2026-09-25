@@ -5,6 +5,6 @@
     <Project Path="src/ArenaMaster.Play/ArenaMaster.Play.csproj" />
   </Folder>
   <Folder Name="/engine/">
-    <Project Path="engine/src/ConnEngine.Core/ConnEngine.Core.csproj" />
+    <Project Path="engine/src/CEngine.Core/CEngine.Core.csproj" />
   </Folder>
 </Solution>

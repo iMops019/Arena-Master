@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\engine\src\ConnEngine.Core\ConnEngine.Core.csproj" />
+    <ProjectReference Include="..\..\engine\src\CEngine.Core\CEngine.Core.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

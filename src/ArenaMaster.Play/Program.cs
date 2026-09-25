@@ -1,5 +1,5 @@
 using ArenaMaster.Game;
-using ConnEngine.Core;
+using CEngine.Core;
 
 var window = new EngineWindow
 {

@@ -1,4 +1,4 @@
-# Moves the engine submodule to the latest commit on ConnEngine's main branch and commits the bump.
+# Moves the engine submodule to the latest commit on C-Engine's main branch and commits the bump.
 # Engine changes are made and pushed in the engine's own repo first; this only picks them up here.
 $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
