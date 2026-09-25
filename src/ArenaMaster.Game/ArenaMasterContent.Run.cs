@@ -9,8 +9,9 @@ using Silk.NET.Maths;
 
 namespace ArenaMaster.Game;
 
-// A run: 30 minutes as the Ranger in the middle of the map, starting with the loadout's items. Experience levels the run (a pick of three upgrades each time) and the
-// active passive tree too. Items found go straight into the stash. It ends in victory at 30:00, in death, or on "Return to Camp", and its summary follows.
+// A run: 30 minutes as the Ranger in the middle of the map, with the loadout's items (and only those) giving bonuses. Experience levels the run (a pick of three
+// upgrades each time) and the active passive tree too. Items found go straight into the chest for a later run - they do nothing in this one. It ends in victory
+// at 30:00, in death, or on "Return to Camp", and its summary follows.
 public sealed partial class ArenaMasterContent
 {
     /// <summary>How much tougher the final boss is than the director's scaling alone would make it.</summary>
@@ -36,11 +37,10 @@ public sealed partial class ArenaMasterContent
     private readonly XpGemView _gemView = new();
     private readonly DamageNumbers _numbers = new();
     private readonly LevelUpScreen _levelUp = new();
-    private readonly ItemInventory _items = new();
+    private readonly RunItems _items = new();
     private readonly LootField _loot;
     private readonly LootView _lootView = new();
     private readonly Queue<RunItem> _itemToasts = new();
-    private readonly List<RunItem> _found = new();
     private readonly Queue<float> _recentKills = new();
     private float _itemToastLeft;
 
@@ -60,13 +60,8 @@ public sealed partial class ArenaMasterContent
     {
         _stats.Reset();
         _stats.Tree = SharpshooterBonuses.From(_tree.Save.Ranks);
-        _items.Clear();
-        foreach (var item in Loadout.ItemsToBring(_profile))
-        {
-            _items.Add(item);
-        }
-
-        _stats.Items = _items.Bonuses;
+        _items.Begin(Loadout.ItemsToBring(_profile));   // the loadout as it stands now: finds made on this run won't join it
+        _stats.Items = _items.Carried.Bonuses;
         _health.Reset(_stats.MaxHealth);
         _health.DamageTaken = _stats.DamageTaken;
         _condition.Clear();
@@ -75,7 +70,6 @@ public sealed partial class ArenaMasterContent
         _pendingLevels = 0;
         _enemies.ResetKills();
         _director.Reset();
-        _found.Clear();
         _recentKills.Clear();
         _itemToasts.Clear();
         _itemToastLeft = 0f;
@@ -178,7 +172,7 @@ public sealed partial class ArenaMasterContent
         _condition.Clear();
         SaveProfile();
 
-        _summaryScreen.Open(new RunSummary(ending, _runSeconds, _experience.Level, _enemies.Kills, _found.ToList(),
+        _summaryScreen.Open(new RunSummary(ending, _runSeconds, _experience.Level, _enemies.Kills, _items.Found.ToList(),
             _runTreeExperience, _runTreeLevels, _tree.Level, _tree.Tree.Name));
         _mode = GameMode.Summary;
         window.GamePaused = true;
@@ -188,7 +182,7 @@ public sealed partial class ArenaMasterContent
     private void OnKill(Enemy killed)
     {
         _gems.Drop(killed.Position, killed.Kind.Experience);
-        _health.Heal(_items.Bonuses.HealOnKill);
+        _health.Heal(_items.Carried.Bonuses.HealOnKill);
         _recentKills.Enqueue(_runSeconds);
 
         switch (killed.Kind.Tier)
@@ -228,7 +222,7 @@ public sealed partial class ArenaMasterContent
             return;
         }
 
-        _experienceCarry += amount * (1f + _items.Bonuses.ExperienceGain);
+        _experienceCarry += amount * (1f + _items.Carried.Bonuses.ExperienceGain);
         int whole = (int)_experienceCarry;
         _experienceCarry -= whole;
         _pendingLevels += _experience.Add(whole);
@@ -243,15 +237,13 @@ public sealed partial class ArenaMasterContent
         }
     }
 
-    /// <summary>Takes an item found on the run: into the run's items and its bonuses, into the stash for good, and up on screen.</summary>
+    /// <summary>
+    /// Takes an item found on the run: into the chest for good and up on screen. It gives nothing on this run - the run's bonuses are the loadout's, fixed when it
+    /// set out - so bringing it is a choice for the next run.
+    /// </summary>
     private void GainItem(RunItem item)
     {
-        _items.Add(item);
-        _profile.AddToStash(item.Id);
-        _found.Add(item);
-        _stats.Items = _items.Bonuses;
-        _health.DamageTaken = _stats.DamageTaken;
-        SyncMaxHealth();
+        _items.Find(item, _profile);
 
         _itemToasts.Enqueue(item);
         if (_itemToasts.Count == 1)

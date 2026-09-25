@@ -126,7 +126,42 @@ internal static class ItemCatalog
     }
 }
 
-/// <summary>The items carried this run, how many of each, in the order they were first found.</summary>
+/// <summary>
+/// A run's items. What the run starts with - the loadout, every copy owned at the moment of setting out - is fixed for the whole run and is all that gives
+/// bonuses. Items found during the run go straight into the chest and are listed as found, but do nothing until a later run brings them: a find never boosts the
+/// run it was found in, not even as an extra copy of an item already brought.
+/// </summary>
+internal sealed class RunItems
+{
+    private readonly List<RunItem> _found = new();
+
+    /// <summary>What the run set out with, and so what gives its bonuses.</summary>
+    public ItemInventory Carried { get; } = new();
+
+    /// <summary>What has been found so far this run, in the order found.</summary>
+    public IReadOnlyList<RunItem> Found => _found;
+
+    /// <summary>Starts a run carrying <paramref name="loadout"/> (each copy listed once), with nothing found yet.</summary>
+    public void Begin(IEnumerable<RunItem> loadout)
+    {
+        Carried.Clear();
+        foreach (var item in loadout)
+        {
+            Carried.Add(item);
+        }
+
+        _found.Clear();
+    }
+
+    /// <summary>An item picked up on the run: into <paramref name="profile"/>'s chest for good, and onto the found list - but not into <see cref="Carried"/>.</summary>
+    public void Find(RunItem item, Progression.Profile profile)
+    {
+        profile.AddToStash(item.Id);
+        _found.Add(item);
+    }
+}
+
+/// <summary>A set of items and how many of each, in the order they were first added.</summary>
 internal sealed class ItemInventory
 {
     private readonly List<(RunItem Item, int Count)> _items = new();

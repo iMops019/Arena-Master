@@ -212,7 +212,7 @@ internal sealed class LoadoutScreen : GameScreen
         var start = ImGui.GetCursorScreenPos();
         float width = ImGui.GetContentRegionAvail().X;
         float beginWidth = 200f * scale, backWidth = 130f * scale, clearWidth = 120f * scale;
-        UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.28f), "Every copy you own of a chosen item comes along. Items you find during the run are yours too.",
+        UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.28f), "Every copy you own of a chosen item comes along. Items found during a run go to the chest and only count once you bring them.",
             UiTheme.Muted, 0.8f, width - beginWidth - backWidth - clearWidth - 40f * scale);
 
         var result = Result.None;

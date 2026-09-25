@@ -91,21 +91,27 @@ public sealed partial class ArenaMasterContent
 
         DrawDash(hud);
 
-        // The items carried, down the right side in their rarity's colour.
+        // The items this run set out with (the ones giving bonuses), down the right side in their rarity's colour; then how many have been found for the chest.
         int row = 0;
-        foreach (var (item, count) in _items.Items)
+        foreach (var (item, count) in _items.Carried.Items)
         {
             string label = count > 1 ? $"{item.Name}  x{count}" : item.Name;
             hud.Text(HudAnchor.TopRight, new Vector2D<float>(-26f, 66f + row * 22f), label, RarityColor(item.Rarity, 0.95f), 0.7f);
             row++;
         }
 
-        // The item just found, big, under the top bar.
+        if (_items.Found.Count > 0)
+        {
+            hud.Text(HudAnchor.TopRight, new Vector2D<float>(-26f, 72f + row * 22f), $"Found for the chest: {_items.Found.Count}", new Vector4D<float>(1f, 1f, 1f, 0.6f), 0.65f);
+        }
+
+        // The item just found, big, under the top bar: it goes to the chest, for a later run.
         if (_itemToastLeft > 0f && _itemToasts.TryPeek(out var found))
         {
             float alpha = MathF.Min(1f, _itemToastLeft * 2f);
             hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 124f), $"{found.Rarity.ToString().ToUpperInvariant()}:  {found.Name}", RarityColor(found.Rarity, alpha), 1.2f);
-            hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 156f), found.Description, new Vector4D<float>(1f, 1f, 1f, 0.9f * alpha), 0.85f);
+            hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 156f), $"{found.Description}  ·  Sent to your chest. Bring it on a later run.",
+                new Vector4D<float>(1f, 1f, 1f, 0.9f * alpha), 0.85f);
         }
 
         if (_condition.IsStunned)

@@ -88,7 +88,7 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
   - An elite drops a chest that is rare or better.
   - A boss drops a chest that is epic or better.
   - Fodder has a 1-in-200 chance to drop an item orb.
-  - Walk into a chest or orb to take it. It works for the rest of the run and goes into the stash at once (kept even if the run is lost).
+  - Walk into a chest or orb to take it. It goes into the chest at once (kept even if the run is lost) but **does nothing in the run it was found in**, not even as an extra copy of an item already brought. The run's bonuses are the loadout's, fixed when it sets out. To use a find, choose it for a later run.
 - **The 16 items:**
   - *Common:* Whetstone (+8% damage), Feather Charm (+8% attack speed), Worn Boots (+6% move speed), Troll Blood (+0.4 HP/s), Leather Brigandine (6% less damage taken), Lodestone (+20% pickup range), Old Tome (+8% XP).
   - *Rare:* Hawk Feather (+6% crit), Troll Heart (+25 max HP), Vampire Fang (heal 1 per kill), Serrated Edge (+30% crit damage).
