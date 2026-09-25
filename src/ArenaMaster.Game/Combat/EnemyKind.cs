@@ -1,12 +1,60 @@
 namespace ArenaMaster.Game.Combat;
 
+/// <summary>How an enemy counts in a run: fodder fills the field, elites and bosses are spawned on the director's schedule.</summary>
+internal enum EnemyTier
+{
+    Fodder,
+    Elite,
+    Boss,
+}
+
+internal enum AttackType
+{
+    /// <summary>Crouches, then charges straight down a marked lane.</summary>
+    Lunge,
+
+    /// <summary>Marks a circle, leaps into the air and lands in it: damage, knock-back and a stun to anyone inside.</summary>
+    LeapSlam,
+
+    /// <summary>Raises its arms, then sends a ring out along the ground: jump it or take the hit.</summary>
+    Shockwave,
+
+    /// <summary>Raises its arms and calls a ring of fodder up around itself.</summary>
+    Summon,
+}
+
+/// <summary>
+/// One telegraphed attack and its numbers. Every attack has a wind-up (it stands still and shows what is coming), an active part (the charge, the leap, the spreading
+/// ring), and a recovery (it stands still, open to punishment). Distances in metres, times in seconds.
+/// </summary>
+/// <param name="MinRange">It only starts this attack with the player at least this far away...</param>
+/// <param name="MaxRange">...and no further than this.</param>
+/// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls.</param>
+/// <param name="HitWidth">Lunge: how close to the charging body counts as hit. Shockwave: half the ring's width. Unused otherwise.</param>
+/// <param name="LeapHeight">LeapSlam: the top of the arc, above the straight line from take-off to landing.</param>
+internal sealed record AttackSpec(
+    AttackType Type,
+    float MinRange,
+    float MaxRange,
+    float WindUp,
+    float Active,
+    float Recover,
+    float Damage,
+    float Reach,
+    float HitWidth = 0f,
+    float Knockback = 0f,
+    float Stun = 0f,
+    float LeapHeight = 0f);
+
 /// <summary>
 /// What one kind of enemy is: its model and its numbers. Distances are metres, speeds metres per second, times seconds. The body is a standing cylinder of
 /// <see cref="Radius"/> and <see cref="Height"/> from its feet - what arrows hit and what keeps it off the player and off other enemies. <see cref="Experience"/> is what its gem is worth.
+/// Its <see cref="Attacks"/> are chosen from (among those in range) whenever <see cref="AttackCooldown"/> has passed since the last one ended.
 /// </summary>
 internal sealed record EnemyKind(
     string Name,
     string Model,
+    EnemyTier Tier,
     float MaxHealth,
     float Speed,
     float Radius,
@@ -15,10 +63,15 @@ internal sealed record EnemyKind(
     float ContactInterval,
     int Experience)
 {
+    public IReadOnlyList<AttackSpec> Attacks { get; init; } = Array.Empty<AttackSpec>();
+
+    public float AttackCooldown { get; init; }
+
     /// <summary>The first enemy: slow, fragile fodder that shambles straight at the player and claws on contact.</summary>
     public static readonly EnemyKind Ghoul = new(
         Name: "Ghoul",
         Model: "ghoul_placeholder.glb",
+        Tier: EnemyTier.Fodder,
         MaxHealth: 30f,
         Speed: 3.6f,
         Radius: 0.4f,
@@ -26,4 +79,58 @@ internal sealed record EnemyKind(
         ContactDamage: 8f,
         ContactInterval: 0.8f,
         Experience: 1);
+
+    /// <summary>The first elite: a hulking brute that lunges down a lane and leaps to slam a marked circle.</summary>
+    public static readonly EnemyKind Brute = new(
+        Name: "Ghoul Brute",
+        Model: "brute_placeholder.glb",
+        Tier: EnemyTier.Elite,
+        MaxHealth: 260f,
+        Speed: 3.3f,
+        Radius: 0.75f,
+        Height: 2.4f,
+        ContactDamage: 15f,
+        ContactInterval: 1f,
+        Experience: 12)
+    {
+        AttackCooldown = 2.5f,
+        Attacks = new[]
+        {
+            new AttackSpec(AttackType.Lunge, MinRange: 3.5f, MaxRange: 9f, WindUp: 0.75f, Active: 0.45f, Recover: 0.7f,
+                Damage: 22f, Reach: 7.2f, HitWidth: 0.9f, Knockback: 12f),
+            new AttackSpec(AttackType.LeapSlam, MinRange: 5f, MaxRange: 14f, WindUp: 0.7f, Active: 0.75f, Recover: 0.8f,
+                Damage: 26f, Reach: 3.5f, Knockback: 10f, Stun: 0.9f, LeapHeight: 3f),
+        },
+    };
+
+    /// <summary>The boss: a towering ghoul king that slams, sends shockwaves along the ground, and calls up ghouls.</summary>
+    public static readonly EnemyKind HollowKing = new(
+        Name: "The Hollow King",
+        Model: "hollow_king_placeholder.glb",
+        Tier: EnemyTier.Boss,
+        MaxHealth: 3200f,
+        Speed: 2.9f,
+        Radius: 1.3f,
+        Height: 4.2f,
+        ContactDamage: 25f,
+        ContactInterval: 1f,
+        Experience: 80)
+    {
+        AttackCooldown = 2.2f,
+        Attacks = new[]
+        {
+            new AttackSpec(AttackType.LeapSlam, MinRange: 6f, MaxRange: 20f, WindUp: 1f, Active: 1f, Recover: 1f,
+                Damage: 35f, Reach: 6f, Knockback: 14f, Stun: 1f, LeapHeight: 5f),
+            new AttackSpec(AttackType.Shockwave, MinRange: 0f, MaxRange: 16f, WindUp: 1.1f, Active: 1.6f, Recover: 0.8f,
+                Damage: 25f, Reach: 18f, HitWidth: 0.7f, Knockback: 9f),
+            new AttackSpec(AttackType.Summon, MinRange: 0f, MaxRange: 60f, WindUp: 1f, Active: 0.1f, Recover: 0.6f,
+                Damage: 0f, Reach: 8f),
+        },
+    };
+}
+
+/// <summary>How much tougher than its base numbers an enemy spawns - the run director raises these over time.</summary>
+internal readonly record struct EnemyScaling(float Health, float Damage, float Speed)
+{
+    public static readonly EnemyScaling None = new(1f, 1f, 1f);
 }

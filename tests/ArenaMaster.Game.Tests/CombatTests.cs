@@ -16,7 +16,7 @@ public class EnemyFieldTests
         for (float t = 0f; t < seconds; t += Step)
         {
             player.Update(Step);
-            field.Update(Step, playerFeet, FlatGround, player);
+            field.Update(Step, new PlayerTarget(playerFeet, true, player, new PlayerCondition()), FlatGround);
         }
     }
 
@@ -77,7 +77,7 @@ public class EnemyFieldTests
         var gone = new List<Enemy>();
         for (float t = 0f; t < EnemyField.DeathDuration + 0.1f; t += Step)
         {
-            gone.AddRange(field.Update(Step, Vector3D<float>.Zero, FlatGround, new PlayerHealth(100f)));
+            gone.AddRange(field.Update(Step, new PlayerTarget(Vector3D<float>.Zero, true, new PlayerHealth(100f), new PlayerCondition()), FlatGround));
         }
 
         Assert.Contains(enemy, gone);
@@ -106,7 +106,7 @@ public class EnemyFieldTests
 
         for (int i = 0; i < 20; i++)
         {
-            field.Update(0.1f, Vector3D<float>.Zero, FlatGround, player);
+            field.Update(0.1f, new PlayerTarget(Vector3D<float>.Zero, true, player, new PlayerCondition()), FlatGround);
         }
 
         Assert.Equal(5, field.AliveCount);
@@ -119,7 +119,7 @@ public class EnemyFieldTests
         var field = QuietField();
         var straggler = field.Spawn(new Vector3D<float>(150f, 0f, 0f));
 
-        field.Update(Step, Vector3D<float>.Zero, FlatGround, new PlayerHealth(100f));
+        field.Update(Step, new PlayerTarget(Vector3D<float>.Zero, true, new PlayerHealth(100f), new PlayerCondition()), FlatGround);
 
         Assert.True(straggler.Position.Length <= field.SpawnMaxDistance + 0.01f);
     }

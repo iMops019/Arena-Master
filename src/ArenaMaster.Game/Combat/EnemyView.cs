@@ -4,15 +4,30 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Combat;
 
 /// <summary>
-/// Puts the <see cref="EnemyField"/> on screen as engine props: one placed prop per enemy, with a shambling bob while it walks, a flinch when it is hit, and a sink into the ground
-/// as it dies. There are no animations yet; the stand-in models are rigid.
+/// Puts the <see cref="EnemyField"/> on screen as engine props: one placed prop per enemy, with a shambling bob while it walks, a flinch when it is hit, a crouch or
+/// a rearing-up as it winds up an attack, and a sink into the ground as it dies. Attacks show their telegraphs on the ground: a red lane for a lunge, a red circle
+/// filling up for a leap slam's landing, a ring spreading out for a shockwave. There are no animations yet; the stand-in models are rigid.
 /// </summary>
 internal sealed class EnemyView
 {
-    private readonly Dictionary<int, int> _props = new();   // enemy id -> placed prop id
+    public const string RingModel = "telegraph_ring.glb";
+    public const string DiscModel = "telegraph_disc.glb";
+    public const string LaneModel = "telegraph_lane.glb";
+    public const string ShockwaveModel = "shockwave_ring.glb";
+
+    private enum Marker
+    {
+        Ring,
+        Disc,
+        Lane,
+        Shockwave,
+    }
+
+    private readonly Dictionary<int, int> _props = new();                     // enemy id -> placed prop id
+    private readonly Dictionary<(int Enemy, Marker Marker), int> _markers = new();   // telegraph -> placed prop id
     private float _time;
 
-    public void Sync(EngineWindow window, EnemyField field, IEnumerable<Enemy> gone, float deltaSeconds)
+    public void Sync(EngineWindow window, EnemyField field, IEnumerable<Enemy> gone, float deltaSeconds, Func<float, float, float?> groundAt)
     {
         _time += deltaSeconds;
 
@@ -21,17 +36,24 @@ internal sealed class EnemyView
             Remove(window, enemy);
         }
 
+        var shown = new HashSet<(int, Marker)>();
         foreach (var enemy in field.Enemies)
         {
-            var placement = Pose(enemy);
-            if (_props.TryGetValue(enemy.Id, out int propId))
+            Place(window, _props, enemy.Id, Pose(enemy));
+            if (enemy.IsAlive)
             {
-                window.SetPlacedProp(propId, placement);
+                foreach (var (marker, placement) in Telegraphs(enemy, groundAt))
+                {
+                    Place(window, _markers, (enemy.Id, marker), placement);
+                    shown.Add((enemy.Id, marker));
+                }
             }
-            else
-            {
-                _props[enemy.Id] = window.PlaceProp(placement);
-            }
+        }
+
+        foreach (var key in _markers.Keys.Where(k => !shown.Contains(k)).ToList())
+        {
+            window.RemovePlacedProp(_markers[key]);
+            _markers.Remove(key);
         }
     }
 
@@ -41,27 +63,114 @@ internal sealed class EnemyView
         {
             window.RemovePlacedProp(propId);
         }
+
+        foreach (var key in _markers.Keys.Where(k => k.Enemy == enemy.Id).ToList())
+        {
+            window.RemovePlacedProp(_markers[key]);
+            _markers.Remove(key);
+        }
+    }
+
+    private static void Place<TKey>(EngineWindow window, Dictionary<TKey, int> props, TKey key, PropPlacement placement)
+        where TKey : notnull
+    {
+        if (props.TryGetValue(key, out int id))
+        {
+            window.SetPlacedProp(id, placement);
+        }
+        else
+        {
+            props[key] = window.PlaceProp(placement);
+        }
     }
 
     private PropPlacement Pose(Enemy enemy)
     {
         var position = enemy.Position;
-        float scale = 1f + 0.12f * enemy.HitFlash;   // a quick swell on a hit
-        float pitch = -0.25f * enemy.HitFlash;       // and a flinch back
+        float scale = 1f + 0.12f * enemy.HitFlash * (enemy.Kind.Tier == EnemyTier.Fodder ? 1f : 0.3f);   // a quick swell on a hit; big ones barely
+        float pitch = -0.25f * enemy.HitFlash * (enemy.Kind.Tier == EnemyTier.Fodder ? 1f : 0.2f);         // and a flinch back
 
-        if (enemy.IsAlive)
+        if (!enemy.IsAlive)
+        {
+            float t = Math.Clamp(enemy.DeadFor / EnemyField.DeathDuration, 0f, 1f);
+            position.Y -= t * enemy.Kind.Height * 0.8f;   // sinks into the ground
+            return new PropPlacement(enemy.Kind.Model, position, enemy.Yaw, scale * (1f - 0.4f * t), pitch + 0.9f * t);
+        }
+
+        if (enemy.Attack is { } attack)
+        {
+            float windUp = enemy.WindUpProgress;
+            switch (enemy.AttackPhase, attack.Type)
+            {
+                case (AttackPhase.WindUp, AttackType.Lunge):
+                    pitch += 0.35f * windUp;                                                          // crouching to spring
+                    position.X += 0.05f * MathF.Sin(_time * 60f) * windUp;                           // and shaking with it
+                    break;
+                case (AttackPhase.WindUp, AttackType.LeapSlam):
+                    position.Y -= 0.25f * windUp;                                                     // squatting to jump
+                    break;
+                case (AttackPhase.WindUp, AttackType.Shockwave or AttackType.Summon):
+                    pitch -= 0.3f * windUp;                                                           // rearing up
+                    break;
+                case (AttackPhase.Active, AttackType.Lunge):
+                    pitch += 0.4f;                                                                    // head down, charging
+                    break;
+                case (AttackPhase.Active, AttackType.LeapSlam):
+                    pitch += 0.5f * (enemy.PhaseTime / attack.Active);                               // tipping forward to come down
+                    break;
+                case (AttackPhase.Recover, _):
+                    pitch += 0.2f;                                                                    // winded, open to punishment
+                    break;
+            }
+        }
+        else
         {
             position.Y += MathF.Abs(MathF.Sin(_time * 7f + enemy.Phase)) * 0.06f;
             pitch += 0.08f * MathF.Sin(_time * 3.5f + enemy.Phase);
         }
-        else
-        {
-            float t = Math.Clamp(enemy.DeadFor / EnemyField.DeathDuration, 0f, 1f);
-            position.Y -= t * enemy.Kind.Height * 0.8f;   // sinks into the ground
-            scale *= 1f - 0.4f * t;
-            pitch += 0.9f * t;                              // slumping forward
-        }
 
         return new PropPlacement(enemy.Kind.Model, position, enemy.Yaw, scale, pitch);
     }
+
+    /// <summary>What an enemy's current attack shows on the ground.</summary>
+    private IEnumerable<(Marker, PropPlacement)> Telegraphs(Enemy enemy, Func<float, float, float?> groundAt)
+    {
+        if (enemy.Attack is not { } attack)
+        {
+            yield break;
+        }
+
+        switch (attack.Type)
+        {
+            case AttackType.Lunge when enemy.AttackPhase == AttackPhase.WindUp:
+            {
+                var direction = enemy.AttackTarget - enemy.AttackOrigin;
+                float yaw = MathF.Atan2(direction.X, direction.Z);
+                yield return (Marker.Lane, new PropPlacement(LaneModel, Lift(enemy.AttackOrigin, 0.06f), yaw, 1f));
+                break;
+            }
+
+            case AttackType.LeapSlam when enemy.AttackPhase != AttackPhase.Recover:
+            {
+                // The ring shows the whole landing zone at once; the disc inside fills it up as the landing nears.
+                float progress = enemy.AttackPhase == AttackPhase.WindUp
+                    ? enemy.PhaseTime / (attack.WindUp + attack.Active)
+                    : (attack.WindUp + enemy.PhaseTime) / (attack.WindUp + attack.Active);
+                var at = enemy.AttackTarget;
+                yield return (Marker.Ring, new PropPlacement(RingModel, Lift(at, 0.08f), 0f, attack.Reach));
+                yield return (Marker.Disc, new PropPlacement(DiscModel, Lift(at, 0.05f), 0f, MathF.Max(0.05f, attack.Reach * Math.Clamp(progress, 0f, 1f))));
+                break;
+            }
+
+            case AttackType.Shockwave when enemy.AttackPhase == AttackPhase.Active:
+            {
+                var centre = enemy.AttackOrigin;
+                float ground = groundAt(centre.X, centre.Z) ?? centre.Y;
+                yield return (Marker.Shockwave, new PropPlacement(ShockwaveModel, new Vector3D<float>(centre.X, ground + 0.15f, centre.Z), 0f, enemy.ShockwaveRadius));
+                break;
+            }
+        }
+    }
+
+    private static Vector3D<float> Lift(Vector3D<float> p, float by) => new(p.X, p.Y + by, p.Z);
 }

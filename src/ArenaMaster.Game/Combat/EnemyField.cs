@@ -2,15 +2,25 @@ using Silk.NET.Maths;
 
 namespace ArenaMaster.Game.Combat;
 
+internal enum AttackPhase
+{
+    WindUp,
+    Active,
+    Recover,
+}
+
 /// <summary>One enemy in the world. <see cref="Position"/> is its feet.</summary>
 internal sealed class Enemy
 {
-    public Enemy(int id, EnemyKind kind, Vector3D<float> position)
+    public Enemy(int id, EnemyKind kind, Vector3D<float> position, EnemyScaling scaling)
     {
         Id = id;
         Kind = kind;
         Position = position;
-        Health = kind.MaxHealth;
+        MaxHealth = kind.MaxHealth * scaling.Health;
+        Health = MaxHealth;
+        Speed = kind.Speed * scaling.Speed;
+        DamageScale = scaling.Damage;
     }
 
     public int Id { get; }
@@ -21,7 +31,14 @@ internal sealed class Enemy
 
     public float Yaw { get; set; }
 
+    public float MaxHealth { get; }
+
     public float Health { get; set; }
+
+    public float Speed { get; }
+
+    /// <summary>What its contact and attack damage are multiplied by.</summary>
+    public float DamageScale { get; }
 
     public bool IsAlive => Health > 0f;
 
@@ -35,11 +52,43 @@ internal sealed class Enemy
 
     /// <summary>A per-enemy offset so a crowd doesn't bob in step.</summary>
     public float Phase { get; set; }
+
+    /// <summary>The attack under way, or null while it is just chasing.</summary>
+    public AttackSpec? Attack { get; set; }
+
+    public AttackPhase AttackPhase { get; set; }
+
+    /// <summary>Seconds into the current <see cref="AttackPhase"/>.</summary>
+    public float PhaseTime { get; set; }
+
+    /// <summary>Seconds until it may start another attack.</summary>
+    public float AttackCooldown { get; set; }
+
+    /// <summary>Where the attack started from: the lunge's start, the leap's take-off, the shockwave's centre.</summary>
+    public Vector3D<float> AttackOrigin { get; set; }
+
+    /// <summary>Where the attack is aimed: the lunge's end, the leap's landing spot.</summary>
+    public Vector3D<float> AttackTarget { get; set; }
+
+    /// <summary>Whether the attack has already hit (each attack hits at most once).</summary>
+    public bool AttackLanded { get; set; }
+
+    /// <summary>0 to 1 through the wind-up - how far along a telegraph is.</summary>
+    public float WindUpProgress => Attack is { } a && AttackPhase == AttackPhase.WindUp ? Math.Clamp(PhaseTime / a.WindUp, 0f, 1f) : 0f;
+
+    /// <summary>How far a shockwave has spread from its centre right now, or 0 if none is spreading.</summary>
+    public float ShockwaveRadius => Attack is { Type: AttackType.Shockwave } a && AttackPhase == AttackPhase.Active
+        ? Kind.Radius + (a.Reach - Kind.Radius) * Math.Clamp(PhaseTime / a.Active, 0f, 1f)
+        : 0f;
 }
 
+/// <summary>Where the player is and what enemies can do to them this frame.</summary>
+internal readonly record struct PlayerTarget(Vector3D<float> Feet, bool Grounded, PlayerHealth Health, PlayerCondition Condition);
+
 /// <summary>
-/// Every enemy on the map: spawning them around the player, moving them (straight at the player, kept apart from each other and off the player), their contact damage,
-/// taking hits and dying. Pure simulation - no engine calls - so it can be tested; <see cref="EnemyView"/> puts it on screen.
+/// Every enemy on the map: keeping the field topped up with fodder around the player, moving them (straight at the player, kept apart from each other and off the
+/// player), contact damage, the elites' and bosses' telegraphed attacks, taking hits and dying. Pure simulation - no engine calls - so it can be tested;
+/// <see cref="EnemyView"/> puts it on screen.
 /// </summary>
 internal sealed class EnemyField
 {
@@ -54,6 +103,7 @@ internal sealed class EnemyField
 
     private readonly List<Enemy> _enemies = new();
     private readonly List<Enemy> _newlyKilled = new();
+    private readonly List<(EnemyKind Kind, Vector3D<float> Position)> _summoned = new();
     private readonly Random _random;
     private int _nextId = 1;
     private float _spawnTimer;
@@ -62,9 +112,13 @@ internal sealed class EnemyField
 
     public IReadOnlyList<Enemy> Enemies => _enemies;
 
+    /// <summary>The fodder the field keeps topped up with.</summary>
     public EnemyKind Kind { get; set; } = EnemyKind.Ghoul;
 
-    /// <summary>How many live enemies the field keeps topped up to.</summary>
+    /// <summary>How much tougher than base the next spawns are (the run director raises it over time).</summary>
+    public EnemyScaling Scaling { get; set; } = EnemyScaling.None;
+
+    /// <summary>How many live fodder enemies the field keeps topped up to. Elites and bosses don't count.</summary>
     public int TargetCount { get; set; } = 14;
 
     /// <summary>Seconds between spawns while below <see cref="TargetCount"/>.</summary>
@@ -76,36 +130,51 @@ internal sealed class EnemyField
 
     public int Kills { get; private set; }
 
-    public int AliveCount => _enemies.Count(e => e.IsAlive);
+    public int AliveCount => _enemies.Count(e => e.IsAlive && e.Kind.Tier == EnemyTier.Fodder);
 
-    /// <summary>Puts an enemy of <see cref="Kind"/> at <paramref name="position"/> (its feet).</summary>
-    public Enemy Spawn(Vector3D<float> position)
+    /// <summary>The first living boss, if one is on the field.</summary>
+    public Enemy? Boss => _enemies.FirstOrDefault(e => e.IsAlive && e.Kind.Tier == EnemyTier.Boss);
+
+    /// <summary>Puts an enemy (of <see cref="Kind"/> unless <paramref name="kind"/> says otherwise, at the current <see cref="Scaling"/>) at <paramref name="position"/>, its feet.</summary>
+    public Enemy Spawn(Vector3D<float> position, EnemyKind? kind = null)
     {
-        var enemy = new Enemy(_nextId++, Kind, position) { Phase = (float)_random.NextDouble() * MathF.Tau };
+        var enemy = new Enemy(_nextId++, kind ?? Kind, position, Scaling) { Phase = (float)_random.NextDouble() * MathF.Tau };
+        enemy.AttackCooldown = enemy.Kind.AttackCooldown * 0.5f;   // a short breather after arriving
         _enemies.Add(enemy);
         return enemy;
     }
 
+    /// <summary>Spawns a <paramref name="kind"/> in the ring around the player. Null if no spot on the map could be found.</summary>
+    public Enemy? SpawnAround(EnemyKind kind, Vector3D<float> playerFeet, Func<float, float, float?> groundAt) =>
+        TryPickSpawnPoint(playerFeet, groundAt, out var point) ? Spawn(point, kind) : null;
+
     /// <summary>
-    /// Advances every enemy one frame. <paramref name="groundAt"/> gives the ground height at a point, or null off the map. Enemies touching the player hurt
+    /// Advances every enemy one frame. <paramref name="groundAt"/> gives the ground height at a point, or null off the map. Enemies hurt, shove and stun
     /// <paramref name="player"/>. Returns the enemies that finished dying this frame and are now gone (so their view can be removed).
     /// </summary>
-    public List<Enemy> Update(float deltaSeconds, Vector3D<float> playerFeet, Func<float, float, float?> groundAt, PlayerHealth player)
+    public List<Enemy> Update(float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
     {
-        SpawnTowardTarget(deltaSeconds, playerFeet, groundAt);
+        SpawnTowardTarget(deltaSeconds, player.Feet, groundAt);
 
         foreach (var enemy in _enemies)
         {
             enemy.HitFlash = MathF.Max(0f, enemy.HitFlash - deltaSeconds * 5f);
             if (enemy.IsAlive)
             {
-                Move(enemy, deltaSeconds, playerFeet, groundAt, player);
+                Move(enemy, deltaSeconds, player, groundAt);
             }
             else
             {
                 enemy.DeadFor += deltaSeconds;
             }
         }
+
+        foreach (var (kind, position) in _summoned)
+        {
+            Spawn(position, kind);
+        }
+
+        _summoned.Clear();
 
         var gone = _enemies.Where(e => !e.IsAlive && e.DeadFor >= DeathDuration).ToList();
         _enemies.RemoveAll(e => !e.IsAlive && e.DeadFor >= DeathDuration);
@@ -177,6 +246,7 @@ internal sealed class EnemyField
         var all = _enemies.ToList();
         _enemies.Clear();
         _newlyKilled.Clear();
+        _summoned.Clear();
         _spawnTimer = 0f;
         return all;
     }
@@ -217,19 +287,39 @@ internal sealed class EnemyField
         return false;
     }
 
-    private void Move(Enemy enemy, float deltaSeconds, Vector3D<float> playerFeet, Func<float, float, float?> groundAt, PlayerHealth player)
+    private void Move(Enemy enemy, float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
     {
         var kind = enemy.Kind;
-        var toPlayer = Geometry.FlatDirection(enemy.Position, playerFeet, out float distance);
+        enemy.ContactCooldown = MathF.Max(0f, enemy.ContactCooldown - deltaSeconds);
+        enemy.AttackCooldown = MathF.Max(0f, enemy.AttackCooldown - deltaSeconds);
 
-        if (distance > LeashDistance && TryPickSpawnPoint(playerFeet, groundAt, out var nearer))
+        if (enemy.Attack is not null)
+        {
+            RunAttack(enemy, deltaSeconds, player, groundAt);
+            return;
+        }
+
+        var toPlayer = Geometry.FlatDirection(enemy.Position, player.Feet, out float distance);
+
+        if (distance > LeashDistance && TryPickSpawnPoint(player.Feet, groundAt, out var nearer))
         {
             enemy.Position = nearer;   // lost far behind: bring it back into the fight
             return;
         }
 
-        // Walk at the player, eased off by any other enemy close enough to crowd it, so a pack spreads around the player instead of stacking into one.
-        var step = toPlayer * kind.Speed;
+        if (distance > 1e-3f)
+        {
+            enemy.Yaw = MathF.Atan2(toPlayer.X, toPlayer.Z);
+        }
+
+        if (enemy.AttackCooldown <= 0f && TryStartAttack(enemy, distance, player, groundAt))
+        {
+            return;
+        }
+
+        // Walk at the player, eased off by any other enemy close enough to crowd it, so a pack spreads around the player instead of stacking into one. The bigger of two
+        // enemies gives way less.
+        var step = toPlayer * enemy.Speed;
         foreach (var other in _enemies)
         {
             if (other == enemy || !other.IsAlive)
@@ -241,7 +331,9 @@ internal sealed class EnemyField
             var away = Geometry.FlatDirection(other.Position, enemy.Position, out float apart);
             if (apart < spacing)
             {
-                step += (apart > 1e-4f ? away : new Vector3D<float>(MathF.Sin(enemy.Phase), 0f, MathF.Cos(enemy.Phase))) * kind.Speed * (1f - apart / spacing) * 1.5f;
+                float giveWay = 2f * other.Kind.Radius / (kind.Radius + other.Kind.Radius);
+                var push = apart > 1e-4f ? away : new Vector3D<float>(MathF.Sin(enemy.Phase), 0f, MathF.Cos(enemy.Phase));
+                step += push * enemy.Speed * (1f - apart / spacing) * 1.5f * giveWay;
             }
         }
 
@@ -249,16 +341,15 @@ internal sealed class EnemyField
 
         // Stop at the player's edge rather than walk into them, and claw while touching.
         float reach = kind.Radius + PlayerRadius;
-        var fromPlayer = Geometry.FlatDirection(playerFeet, position, out float gap);
+        var fromPlayer = Geometry.FlatDirection(player.Feet, position, out float gap);
         if (gap < reach)
         {
             var push = gap > 1e-4f ? fromPlayer : -toPlayer;
-            position = new Vector3D<float>(playerFeet.X + push.X * reach, position.Y, playerFeet.Z + push.Z * reach);
+            position = new Vector3D<float>(player.Feet.X + push.X * reach, position.Y, player.Feet.Z + push.Z * reach);
         }
 
-        bool touching = gap <= reach + 0.1f && MathF.Abs(position.Y - playerFeet.Y) < kind.Height;
-        enemy.ContactCooldown = MathF.Max(0f, enemy.ContactCooldown - deltaSeconds);
-        if (touching && enemy.ContactCooldown <= 0f && player.TakeDamage(kind.ContactDamage))
+        bool touching = gap <= reach + 0.1f && MathF.Abs(position.Y - player.Feet.Y) < kind.Height;
+        if (touching && enemy.ContactCooldown <= 0f && player.Health.TakeDamage(kind.ContactDamage * enemy.DamageScale))
         {
             enemy.ContactCooldown = kind.ContactInterval;
         }
@@ -267,10 +358,168 @@ internal sealed class EnemyField
         {
             enemy.Position = new Vector3D<float>(position.X, ground, position.Z);
         }
+    }
 
+    /// <summary>Starts one of the enemy's attacks that suits how far away the player is, picked at random. False if none does.</summary>
+    private bool TryStartAttack(Enemy enemy, float distance, PlayerTarget player, Func<float, float, float?> groundAt)
+    {
+        var usable = enemy.Kind.Attacks.Where(a => distance >= a.MinRange && distance <= a.MaxRange).ToList();
+        if (usable.Count == 0)
+        {
+            return false;
+        }
+
+        var attack = usable[_random.Next(usable.Count)];
+        var toPlayer = Geometry.FlatDirection(enemy.Position, player.Feet, out _);
+
+        enemy.Attack = attack;
+        enemy.AttackPhase = AttackPhase.WindUp;
+        enemy.PhaseTime = 0f;
+        enemy.AttackLanded = false;
+        enemy.AttackOrigin = enemy.Position;
+        enemy.AttackTarget = attack.Type switch
+        {
+            // The lane is fixed the moment it is shown: the charge goes where the lane points, not where the player has moved to.
+            AttackType.Lunge => enemy.Position + toPlayer * attack.Reach,
+
+            // The landing spot is where the player stood when the circle appeared - so the circle is the warning, and leaving it is the answer.
+            AttackType.LeapSlam => new Vector3D<float>(player.Feet.X, groundAt(player.Feet.X, player.Feet.Z) ?? player.Feet.Y, player.Feet.Z),
+            _ => enemy.Position,
+        };
+
+        return true;
+    }
+
+    private void RunAttack(Enemy enemy, float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
+    {
+        var attack = enemy.Attack!;
+        enemy.PhaseTime += deltaSeconds;
+
+        switch (enemy.AttackPhase)
+        {
+            case AttackPhase.WindUp:
+                FaceAttack(enemy, player);
+                if (enemy.PhaseTime >= attack.WindUp)
+                {
+                    enemy.PhaseTime -= attack.WindUp;
+                    enemy.AttackPhase = AttackPhase.Active;
+                    if (attack.Type == AttackType.Summon)
+                    {
+                        Summon(enemy, (int)attack.Reach, groundAt);
+                    }
+                }
+
+                break;
+
+            case AttackPhase.Active:
+                float t = Math.Clamp(enemy.PhaseTime / attack.Active, 0f, 1f);
+                RunActive(enemy, attack, t, player, groundAt);
+                if (enemy.PhaseTime >= attack.Active)
+                {
+                    enemy.PhaseTime -= attack.Active;
+                    enemy.AttackPhase = AttackPhase.Recover;
+                }
+
+                break;
+
+            case AttackPhase.Recover:
+                if (enemy.PhaseTime >= attack.Recover)
+                {
+                    enemy.Attack = null;
+                    enemy.AttackCooldown = enemy.Kind.AttackCooldown;
+                }
+
+                break;
+        }
+    }
+
+    private void RunActive(Enemy enemy, AttackSpec attack, float t, PlayerTarget player, Func<float, float, float?> groundAt)
+    {
+        switch (attack.Type)
+        {
+            case AttackType.Lunge:
+            {
+                var flat = enemy.AttackOrigin + (enemy.AttackTarget - enemy.AttackOrigin) * t;
+                enemy.Position = new Vector3D<float>(flat.X, groundAt(flat.X, flat.Z) ?? enemy.Position.Y, flat.Z);
+                Geometry.FlatDirection(enemy.Position, player.Feet, out float gap);
+                if (!enemy.AttackLanded && gap <= enemy.Kind.Radius + attack.HitWidth + PlayerRadius && MathF.Abs(enemy.Position.Y - player.Feet.Y) < enemy.Kind.Height)
+                {
+                    enemy.AttackLanded = true;
+                    Hit(enemy, attack, player, enemy.AttackTarget - enemy.AttackOrigin);
+                }
+
+                break;
+            }
+
+            case AttackType.LeapSlam:
+            {
+                var flat = enemy.AttackOrigin + (enemy.AttackTarget - enemy.AttackOrigin) * t;
+                float groundY = enemy.AttackOrigin.Y + (enemy.AttackTarget.Y - enemy.AttackOrigin.Y) * t;
+                enemy.Position = new Vector3D<float>(flat.X, groundY + 4f * attack.LeapHeight * t * (1f - t), flat.Z);
+                if (t >= 1f && !enemy.AttackLanded)
+                {
+                    enemy.AttackLanded = true;
+                    enemy.Position = enemy.AttackTarget;
+                    var away = Geometry.FlatDirection(enemy.AttackTarget, player.Feet, out float gap);
+                    if (gap <= attack.Reach + PlayerRadius)
+                    {
+                        Hit(enemy, attack, player, away == Vector3D<float>.Zero ? new Vector3D<float>(MathF.Sin(enemy.Yaw), 0f, MathF.Cos(enemy.Yaw)) : away);
+                    }
+                }
+
+                break;
+            }
+
+            case AttackType.Shockwave:
+            {
+                var away = Geometry.FlatDirection(enemy.AttackOrigin, player.Feet, out float distance);
+                if (!enemy.AttackLanded && player.Grounded && MathF.Abs(distance - enemy.ShockwaveRadius) <= attack.HitWidth + PlayerRadius)
+                {
+                    enemy.AttackLanded = true;   // one hit per wave
+                    Hit(enemy, attack, player, away);
+                }
+
+                break;
+            }
+        }
+    }
+
+    private static void Hit(Enemy enemy, AttackSpec attack, PlayerTarget player, Vector3D<float> shove)
+    {
+        if (player.Health.TakeDamage(attack.Damage * enemy.DamageScale))
+        {
+            player.Condition.Knock(shove, attack.Knockback);
+            if (attack.Stun > 0f)
+            {
+                player.Condition.Stun(attack.Stun);
+            }
+        }
+    }
+
+    /// <summary>Turns toward what the attack is aimed at: the lane or the landing spot while they are shown, otherwise the player.</summary>
+    private static void FaceAttack(Enemy enemy, PlayerTarget player)
+    {
+        var at = enemy.Attack!.Type is AttackType.Lunge or AttackType.LeapSlam ? enemy.AttackTarget : player.Feet;
+        var toward = Geometry.FlatDirection(enemy.Position, at, out float distance);
         if (distance > 1e-3f)
         {
-            enemy.Yaw = MathF.Atan2(toPlayer.X, toPlayer.Z);
+            enemy.Yaw = MathF.Atan2(toward.X, toward.Z);
+        }
+    }
+
+    /// <summary>Calls <paramref name="count"/> fodder up in a ring around <paramref name="caller"/> (added after this frame's moves).</summary>
+    private void Summon(Enemy caller, int count, Func<float, float, float?> groundAt)
+    {
+        float ring = caller.Kind.Radius + 3f;
+        for (int i = 0; i < count; i++)
+        {
+            float angle = MathF.Tau * i / count + caller.Phase;
+            float x = caller.Position.X + MathF.Sin(angle) * ring;
+            float z = caller.Position.Z + MathF.Cos(angle) * ring;
+            if (groundAt(x, z) is { } ground)
+            {
+                _summoned.Add((Kind, new Vector3D<float>(x, ground, z)));
+            }
         }
     }
 }

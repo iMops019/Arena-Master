@@ -127,7 +127,8 @@ internal sealed class XpGemView
                 position.Y += 0.08f * MathF.Sin(_time * 3f + gem.Id);
             }
 
-            var placement = new PropPlacement(Model, position, _time * 2.5f + gem.Id, 1f);
+            float size = 1f + 0.35f * MathF.Log2(MathF.Max(1, gem.Value));   // bigger gems for bigger enemies
+            var placement = new PropPlacement(Model, position, _time * 2.5f + gem.Id, size);
             if (_props.TryGetValue(gem.Id, out int id))
             {
                 window.SetPlacedProp(id, placement);

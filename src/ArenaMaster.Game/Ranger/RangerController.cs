@@ -6,7 +6,7 @@ namespace ArenaMaster.Game.Ranger;
 
 /// <summary>
 /// The Ranger's body and movement on top of the engine's third-person walker: a run at the stats' speed, a dash on Shift, and a body that turns to face where the camera aims (the bow fires
-/// that way). The engine does the walking, jumping and collision; this sets the speed, pushes for the dash, and draws the body at the player's feet.
+/// that way). The engine does the walking, jumping and collision; this sets the speed, works out the dash's push, and draws the body at the player's feet.
 /// </summary>
 internal sealed class RangerController
 {
@@ -31,14 +31,19 @@ internal sealed class RangerController
     /// <summary>0 while the dash is recharging, rising to 1 when it is ready again.</summary>
     public float DashReadiness => 1f - _cooldownLeft / DashCooldown;
 
-    public void Update(EngineWindow window, float deltaSeconds, RangerStats stats)
+    /// <summary>The dash's push this frame (metres per second, flat), zero when not dashing. The content adds it to any knock-back and hands the sum to the engine.</summary>
+    public Vector3D<float> DashVelocity { get; private set; }
+
+    /// <summary>A stunned Ranger can't walk, jump or dash (the body still turns with the camera).</summary>
+    public void Update(EngineWindow window, float deltaSeconds, RangerStats stats, bool stunned)
     {
-        window.WalkSpeed = stats.MoveSpeed;
-        UpdateDash(window, deltaSeconds);
+        window.WalkSpeed = stunned ? 0f : stats.MoveSpeed;
+        window.PlayerCanJump = !stunned;
+        UpdateDash(window, deltaSeconds, stunned);
         UpdateBody(window, deltaSeconds);
     }
 
-    private void UpdateDash(EngineWindow window, float deltaSeconds)
+    private void UpdateDash(EngineWindow window, float deltaSeconds, bool stunned)
     {
         _cooldownLeft = MathF.Max(0f, _cooldownLeft - deltaSeconds);
 
@@ -47,7 +52,7 @@ internal sealed class RangerController
         bool pressed = dashKey && !_dashKeyWasDown;
         _dashKeyWasDown = dashKey;
 
-        if (pressed && _cooldownLeft <= 0f && _dashTimeLeft <= 0f)
+        if (pressed && !stunned && _cooldownLeft <= 0f && _dashTimeLeft <= 0f)
         {
             // Dash the way the keys point, or straight ahead (where the camera looks) with none held.
             _dashDirection = window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : AimFlat(window);
@@ -55,11 +60,8 @@ internal sealed class RangerController
             _cooldownLeft = DashCooldown;
         }
 
-        if (_dashTimeLeft > 0f)
-        {
-            _dashTimeLeft -= deltaSeconds;
-            window.PlayerPush = _dashTimeLeft > 0f ? _dashDirection * DashSpeed : Vector3D<float>.Zero;
-        }
+        _dashTimeLeft -= deltaSeconds;
+        DashVelocity = _dashTimeLeft > 0f ? _dashDirection * DashSpeed : Vector3D<float>.Zero;
     }
 
     private void UpdateBody(EngineWindow window, float deltaSeconds)

@@ -28,7 +28,22 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 - WASD to move (7 m/s), Space to jump, Shift to dash (a 0.18 s burst with a 1.2 s cooldown).
 - Esc pauses. The level-up screen is its own pause.
 
-## Enemies and pacing (draft, based on the recommended hybrid)
+## Enemies and pacing (built, first pass)
+
+**What's built** (numbers in `Combat/EnemyKind.cs` and `Combat/RunDirector.cs`):
+- **The director:** fodder grows from 14 to about 70 over the 30 minutes and spawns faster. Health scales +12% per minute, damage +5%/min, speed +1%/min.
+- **Ghoul (fodder):** 30 HP, 3.6 m/s, claws on contact for 8.
+- **Ghoul Brute (elite):** first at 3:00, then every 2.5 min, 1 per wave (2 after 10:00, 3 after 20:00). 260 HP, 12 XP. Two telegraphed attacks:
+  - *Lunge:* crouches for 0.75 s over a red lane, then charges 7.2 m down it. 22 damage plus knock-back.
+  - *Leap slam:* a red circle (3.5 m) fills up over 1.45 s, then it lands in it. 26 damage, knock-back, 0.9 s stun.
+- **The Hollow King (boss):** at 10:00, 20:00, and a final one (x1.5 health) at 27:00. 3200 HP before scaling, 80 XP. Health bar under the clock. Three attacks:
+  - *Leap slam:* 6 m circle, 35 damage, 1 s stun.
+  - *Shockwave:* a ring spreads 18 m along the ground; jump over it or take 25.
+  - *Summon:* 8 ghouls around itself.
+- **Win:** survive to 30:00. **Lose:** death. Either way, a summary shows and a new run starts.
+- **Dev keys (remove before release):** F5 skips a minute, F6 spawns a brute, F7 spawns the king.
+
+**The design intent this came from:**
 
 The map-style decision is **(open)**: one big arena or a large Megabonk-style map. The recommendation is a hybrid:
 
@@ -66,8 +81,8 @@ Each step should be playable before the next one starts. **[engine]** means the 
 
 1. *(Done; the user is happy with the feel.)* **Third-person Ranger movement:** follow camera, WASD, jump, dash, on a test map with a placeholder character. [engine: general follow camera] [game: Ranger controller]
 2. *(Done; the user is happy with the feel.)* **Shooting and killing:** an auto-firing bow, arrow projectiles, one basic chaser enemy, hit detection, damage, death. [engine: general projectile/hitbox/damage helpers] [game: the bow, the enemy]
-3. *(Built; waiting for the user to try it.)* **Levelling up:** XP drops and pickup, the level-up pause with 3 choices, the first handful of stacking upgrades, and a HUD (HP, XP bar, timer, level). [game]
-4. **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] [engine: basic steering/avoidance for many enemies]
+3. *(Done; the user is happy with the feel.)* **Levelling up:** XP drops and pickup, the level-up pause with 3 choices, the first handful of stacking upgrades, and a HUD (HP, XP bar, timer, level). [game]
+4. *(Built; waiting for the user to try it.)* **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] (The engine steering turned out not to be needed yet: the game's own separation handles about 80 enemies. Revisit with the swarm renderer in step 7.)
 5. **Items:** drops, chests, bonuses and multipliers. [game]
 6. **Ranger passive tree:** the tree UI and nodes. [game]
 7. **Swarms:** a batched crowd renderer for hundreds of animated enemies. [engine]

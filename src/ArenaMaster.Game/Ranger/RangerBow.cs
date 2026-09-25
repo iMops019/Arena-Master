@@ -22,9 +22,10 @@ internal sealed class RangerBow
 
     public RangerBow(Random random) => _arrows = new RangerArrows(random);
 
-    public void Update(EngineWindow window, float deltaSeconds, RangerStats stats, EnemyField enemies, DamageNumbers numbers, Func<float, float, float?> groundAt)
+    /// <summary>Fires when it's time (unless <paramref name="canFire"/> is false - a stun holds the bow), then moves the arrows already in the air.</summary>
+    public void Update(EngineWindow window, float deltaSeconds, RangerStats stats, EnemyField enemies, DamageNumbers numbers, Func<float, float, float?> groundAt, bool canFire = true)
     {
-        _cooldown -= deltaSeconds;
+        _cooldown = canFire ? _cooldown - deltaSeconds : MathF.Max(_cooldown, 0.15f);
         if (_cooldown <= 0f && window.Camera is { } camera && window.Terrain is { } terrain)
         {
             _cooldown += stats.FireInterval;

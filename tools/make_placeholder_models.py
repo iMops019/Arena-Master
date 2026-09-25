@@ -3,6 +3,12 @@
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
   ghoul_placeholder.glb   the first enemy: a hunched ghoul with long arms and red eyes
   xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
+  brute_placeholder.glb   the elite: a hulking horned ghoul brute, 2.4 m tall, with a bone club
+  hollow_king_placeholder.glb  the boss: a towering crowned ghoul king, 4.2 m tall, with a tattered cape
+  telegraph_ring.glb      a flat red ring of radius 1 on y = 0, scaled to an attack's radius (outline of where it lands)
+  telegraph_disc.glb      a flat dark-red disc of radius 1, scaled up inside the ring as an attack winds up
+  telegraph_lane.glb      a flat red lane 1.6 m wide and 7.2 m long from the origin along +Z (a lunge's path)
+  shockwave_ring.glb      a thin flat ring of radius 1 (width 0.07), scaled as a shockwave spreads
 
 The engine's model conventions: one mesh, one primitive, colours from one base-colour texture (vertex colours are
 ignored), facing +Z, feet at y = 0, metres. The texture is a strip of flat colour swatches and each face's UVs point
@@ -35,6 +41,16 @@ PALETTE = {
     "bone": (214, 204, 176),
     "gem": (80, 214, 236),
     "gem_light": (190, 246, 255),
+    "brute_skin": (96, 110, 84),
+    "brute_hide": (58, 42, 34),
+    "horn": (232, 222, 196),
+    "king_skin": (84, 88, 104),
+    "king_robe": (58, 22, 40),
+    "gold": (214, 170, 60),
+    "ghost_eye": (120, 255, 200),
+    "warn": (235, 40, 30),
+    "warn_dark": (120, 16, 14),
+    "shock": (255, 196, 90),
 }
 COLOURS = list(PALETTE)
 
@@ -178,6 +194,119 @@ def build_xp_gem():
     return m
 
 
+def build_brute():
+    """About 2.4 m tall, broad and stooped, horns, a bone club in the right hand."""
+    m = Mesh()
+    # Thick legs and hooves
+    m.box(-0.42, 0.0, -0.18, -0.12, 0.18, 0.26, "brute_hide")
+    m.box(0.12, 0.0, -0.18, 0.42, 0.18, 0.26, "brute_hide")
+    m.box(-0.40, 0.18, -0.16, -0.14, 0.95, 0.16, "brute_skin")
+    m.box(0.14, 0.18, -0.16, 0.40, 0.95, 0.16, "brute_skin")
+    # Hide loincloth, barrel belly, huge chest and shoulders leaning forward
+    m.box(-0.48, 0.80, -0.26, 0.48, 1.10, 0.26, "brute_hide")
+    m.box(-0.52, 1.05, -0.28, 0.52, 1.60, 0.34, "brute_skin")
+    m.box(-0.66, 1.55, -0.24, 0.66, 2.05, 0.46, "brute_skin")
+    m.box(-0.20, 1.40, -0.36, 0.20, 2.00, -0.28, "bone")        # spine plates
+    # Arms: left hanging, right gripping a club held forward
+    m.box(-0.90, 0.95, 0.00, -0.64, 1.95, 0.30, "brute_skin")
+    m.box(-0.92, 0.78, 0.04, -0.62, 0.98, 0.34, "brute_hide")   # fist
+    m.box(0.64, 1.10, 0.10, 0.90, 1.95, 0.40, "brute_skin")
+    m.box(0.62, 0.95, 0.20, 0.92, 1.15, 0.50, "brute_hide")     # fist
+    m.box(0.70, 0.55, 0.30, 0.84, 1.10, 1.30, "bone")           # club shaft, forward
+    m.box(0.64, 0.45, 1.10, 0.90, 0.80, 1.55, "bone")           # club head
+    # Head sunk between the shoulders, red eyes, tusks, horns
+    m.box(-0.22, 1.80, 0.36, 0.22, 2.20, 0.74, "brute_skin")
+    m.box(-0.16, 2.02, 0.74, -0.06, 2.08, 0.745, "ghoul_eye")
+    m.box(0.06, 2.02, 0.74, 0.16, 2.08, 0.745, "ghoul_eye")
+    m.box(-0.16, 1.80, 0.70, -0.10, 1.92, 0.78, "horn")
+    m.box(0.10, 1.80, 0.70, 0.16, 1.92, 0.78, "horn")
+    m.pyramid(-0.34, 2.10, 0.44, -0.18, 2.10, 0.60, (-0.52, 2.45, 0.40), "horn")
+    m.pyramid(0.18, 2.10, 0.44, 0.34, 2.10, 0.60, (0.52, 2.45, 0.40), "horn")
+    return m
+
+
+def build_hollow_king():
+    """About 4.2 m tall: gaunt and regal, a gold crown, glowing green eyes, a tattered cape, long clawed arms."""
+    m = Mesh()
+    # Legs under a long robe
+    m.box(-0.50, 0.0, -0.30, -0.16, 0.30, 0.40, "king_skin")
+    m.box(0.16, 0.0, -0.30, 0.50, 0.30, 0.40, "king_skin")
+    m.box(-0.70, 0.30, -0.40, 0.70, 1.90, 0.40, "king_robe")
+    # Gaunt torso, ribs, shoulders
+    m.box(-0.55, 1.90, -0.30, 0.55, 3.00, 0.34, "king_skin")
+    for y in (2.15, 2.40, 2.65):
+        m.box(-0.45, y, 0.34, 0.45, y + 0.08, 0.40, "bone")
+    m.box(-0.95, 2.85, -0.34, 0.95, 3.25, 0.38, "king_robe")    # mantle
+    m.box(-0.90, 0.40, -0.52, 0.90, 3.15, -0.40, "king_robe")   # cape
+    # Long arms reaching down to the knees, bone claws
+    m.box(-1.25, 1.10, -0.14, -0.95, 3.05, 0.20, "king_skin")
+    m.box(0.95, 1.10, -0.14, 1.25, 3.05, 0.20, "king_skin")
+    m.box(-1.30, 0.70, -0.08, -0.90, 1.10, 0.40, "bone")
+    m.box(0.90, 0.70, -0.08, 1.30, 1.10, 0.40, "bone")
+    # Skull-like head, glowing eyes, jaw, crown
+    m.box(-0.34, 3.20, -0.24, 0.34, 3.86, 0.40, "bone")
+    m.box(-0.22, 3.52, 0.40, -0.06, 3.62, 0.41, "ghost_eye")
+    m.box(0.06, 3.52, 0.40, 0.22, 3.62, 0.41, "ghost_eye")
+    m.box(-0.24, 3.12, 0.00, 0.24, 3.24, 0.38, "bone")
+    m.box(-0.38, 3.86, -0.28, 0.38, 3.98, 0.44, "gold")
+    for x, z in ((-0.30, 0.34), (0.0, 0.40), (0.30, 0.34), (-0.30, -0.20), (0.30, -0.20)):
+        m.pyramid(x - 0.08, 3.98, z - 0.08, x + 0.08, 3.98, z + 0.08, (x, 4.22, z), "gold")
+    return m
+
+
+def build_ring(inner, outer, colour, segments=48, y=0.0):
+    """A flat ring (annulus) on the ground, facing up."""
+    import math
+    m = Mesh()
+    for i in range(segments):
+        a0 = 2 * math.pi * i / segments
+        a1 = 2 * math.pi * (i + 1) / segments
+        p0 = (math.cos(a0) * inner, y, math.sin(a0) * inner)
+        p1 = (math.cos(a0) * outer, y, math.sin(a0) * outer)
+        p2 = (math.cos(a1) * outer, y, math.sin(a1) * outer)
+        p3 = (math.cos(a1) * inner, y, math.sin(a1) * inner)
+        # Counter-clockwise seen from above (+Y): inner0 -> inner1 -> outer1 -> outer0
+        m.quad(p0, p3, p2, p1, (0, 1, 0), colour)
+    return m
+
+
+def build_disc(colour, segments=48, y=0.0):
+    import math
+    m = Mesh()
+    for i in range(segments):
+        a0 = 2 * math.pi * i / segments
+        a1 = 2 * math.pi * (i + 1) / segments
+        centre = (0.0, y, 0.0)
+        p0 = (math.cos(a0), y, math.sin(a0))
+        p1 = (math.cos(a1), y, math.sin(a1))
+        base = len(m.positions)
+        uv = swatch_uv(colour)
+        for p in (centre, p1, p0):
+            m.positions.append(p)
+            m.normals.append((0, 1, 0))
+            m.uvs.append(uv)
+        m.indices += [base, base + 1, base + 2]
+    return m
+
+
+def build_lane():
+    """A lunge's path: an outline 1.6 m wide, 7.2 m long, from the origin along +Z, with cross-bars along it."""
+    m = Mesh()
+    w, length, edge = 0.8, 7.2, 0.12
+    up = (0, 1, 0)
+
+    def flat(x0, z0, x1, z1, colour):
+        m.quad((x0, 0.0, z1), (x1, 0.0, z1), (x1, 0.0, z0), (x0, 0.0, z0), up, colour)
+
+    flat(-w, 0.0, w, length, "warn_dark")
+    flat(-w, 0.0, -w + edge, length, "warn")
+    flat(w - edge, 0.0, w, length, "warn")
+    flat(-w, length - edge, w, length, "warn")
+    for z in (1.8, 3.6, 5.4):
+        flat(-w + edge, z, w - edge, z + edge, "warn")
+    return m
+
+
 def png_bytes():
     width, height = SWATCH * len(COLOURS), SWATCH
     row = b"".join(bytes(PALETTE[c]) * SWATCH for c in COLOURS)
@@ -239,7 +368,10 @@ def write_glb(mesh, path):
 
 
 if __name__ == "__main__":
-    for name, build in (("ranger_placeholder.glb", build_ranger), ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul), ("xp_gem_placeholder.glb", build_xp_gem)):
+    for name, build in (("ranger_placeholder.glb", build_ranger), ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul), ("xp_gem_placeholder.glb", build_xp_gem),
+                        ("brute_placeholder.glb", build_brute), ("hollow_king_placeholder.glb", build_hollow_king),
+                        ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
+                        ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock"))):
         mesh = build()
         write_glb(mesh, MODELS / name)
         print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")

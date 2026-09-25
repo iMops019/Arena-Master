@@ -2,14 +2,15 @@ using ArenaMaster.Game.Combat;
 using ArenaMaster.Game.Ranger;
 using ArenaMaster.Game.Ui;
 using CEngine.Core;
+using Silk.NET.Input;
 using Silk.NET.Maths;
 
 namespace ArenaMaster.Game;
 
 /// <summary>
-/// Arena Master's side of the engine seam. For now: a small test map (rolling hills, some trees and rocks to run around and jump onto), the Ranger in third person with an
-/// auto-firing bow, ghouls that keep coming, and a run's worth of levelling: experience gems, level-ups that pause for a pick of three upgrades, and a restart on death
-/// (build-order steps 1 to 3 in DESIGN.md).
+/// Arena Master's side of the engine seam. For now: a small test map (rolling hills, some trees and rocks to run around and jump onto) and a full 30-minute run as
+/// the Ranger - an auto-firing bow, a director that grows the ghoul horde over time, elite brutes and the Hollow King with telegraphed attacks, experience gems,
+/// level-ups that pause for a pick of three upgrades, and a win at 30:00 or a restart on death (build-order steps 1 to 4 in DESIGN.md).
 /// </summary>
 public sealed class ArenaMasterContent : IGameContent
 {
@@ -19,27 +20,42 @@ public sealed class ArenaMasterContent : IGameContent
     private const float TerrainHeightScale = 60f;
     private const float BaseHeight = TerrainHeightScale * 0.3f;   // where the height-based palette is grass
 
-    /// <summary>How long the "slain" message shows before a new run starts.</summary>
-    private const float RespawnDelay = 3f;
+    /// <summary>How long the end-of-run screen shows before a new run starts: a death, and a win.</summary>
+    private const float SlainScreenSeconds = 3f;
+    private const float VictoryScreenSeconds = 6f;
+
+    /// <summary>How much tougher the final boss is than the director's scaling alone would make it.</summary>
+    private const float FinalBossHealthBonus = 1.5f;
+
+    private const float AnnouncementSeconds = 3f;
 
     private readonly Random _random = new();
     private readonly RangerStats _stats = new();
     private readonly RangerController _ranger = new();
     private readonly RangerBow _bow;
     private readonly PlayerHealth _health = new(RangerStats.BaseMaxHealth);
+    private readonly PlayerCondition _condition = new();
     private readonly Experience _experience = new();
+    private readonly RunDirector _director = new();
     private readonly EnemyField _enemies;
     private readonly EnemyView _enemyView = new();
     private readonly XpGemField _gems = new();
     private readonly XpGemView _gemView = new();
     private readonly DamageNumbers _numbers = new();
     private readonly LevelUpScreen _levelUp = new();
+    private readonly HashSet<Key> _keysDown = new();
     private EngineWindow? _window;
     private bool _started;
-    private float _respawnIn;
     private float _runSeconds;
     private int _pendingLevels;
+
+    /// <summary>Seconds left on the end-of-run screen; 0 while a run is being played.</summary>
+    private float _endIn;
+    private bool _won;
     private (int Kills, int Level, float Seconds) _lastRun;
+
+    private string _announcement = "";
+    private float _announcementLeft;
 
     public ArenaMasterContent()
     {
@@ -111,14 +127,17 @@ public sealed class ArenaMasterContent : IGameContent
 
         float? GroundAt(float x, float z) => terrain.TryGetHeight(x, z, out float height) ? height : null;
 
-        _ranger.Update(window, deltaSeconds, _stats);
+        _ranger.Update(window, deltaSeconds, _stats, _condition.IsStunned);
         _health.Update(deltaSeconds);
+        _condition.Update(deltaSeconds);
         _numbers.Update(deltaSeconds);
+        _announcementLeft = MathF.Max(0f, _announcementLeft - deltaSeconds);
+        window.PlayerPush = _ranger.DashVelocity + _condition.Knockback;
 
-        if (_respawnIn > 0f)
+        if (_endIn > 0f)
         {
-            _respawnIn -= deltaSeconds;
-            if (_respawnIn <= 0f)
+            _endIn -= deltaSeconds;
+            if (_endIn <= 0f)
             {
                 StartRun();
             }
@@ -126,16 +145,29 @@ public sealed class ArenaMasterContent : IGameContent
             return;
         }
 
+        DevKeys(window, GroundAt);
         _runSeconds += deltaSeconds;
+        if (RunDirector.IsWon(_runSeconds))
+        {
+            EndRun(window, won: true);
+            return;
+        }
 
-        _bow.Update(window, deltaSeconds, _stats, _enemies, _numbers, GroundAt);
-        var gone = _enemies.Update(deltaSeconds, window.PlayerFeet, GroundAt, _health);
+        FollowOrders(_director.Update(_runSeconds, _enemies), window.PlayerFeet, GroundAt);
+
+        _bow.Update(window, deltaSeconds, _stats, _enemies, _numbers, GroundAt, canFire: !_condition.IsStunned);
+        var player = new PlayerTarget(window.PlayerFeet, window.PlayerGrounded, _health, _condition);
+        var gone = _enemies.Update(deltaSeconds, player, GroundAt);
         foreach (var killed in _enemies.TakeNewlyKilled())
         {
             _gems.Drop(killed.Position, killed.Kind.Experience);
+            if (killed.Kind.Tier == EnemyTier.Boss)
+            {
+                Announce($"{killed.Kind.Name} has fallen!");
+            }
         }
 
-        _enemyView.Sync(window, _enemies, gone, deltaSeconds);
+        _enemyView.Sync(window, _enemies, gone, deltaSeconds, GroundAt);
 
         var collected = new List<XpGem>();
         _pendingLevels += _experience.Add(_gems.Update(deltaSeconds, window.PlayerFeet, _stats.PickupRadius, collected));
@@ -143,7 +175,7 @@ public sealed class ArenaMasterContent : IGameContent
 
         if (_health.IsDead)
         {
-            Slain(window);
+            EndRun(window, won: false);
         }
         else if (_pendingLevels > 0 && !_levelUp.IsOpen)
         {
@@ -174,6 +206,7 @@ public sealed class ArenaMasterContent : IGameContent
     {
         var white = new Vector4D<float>(1f, 1f, 1f, 0.9f);
         var gold = new Vector4D<float>(1f, 0.84f, 0.35f, 1f);
+        var red = new Vector4D<float>(0.95f, 0.3f, 0.3f, 1f);
         var shade = new Vector4D<float>(0f, 0f, 0f, 0.45f);
 
         if (_window?.Camera is { } camera)
@@ -186,8 +219,16 @@ public sealed class ArenaMasterContent : IGameContent
         hud.Bar(HudAnchor.TopLeft, new Vector2D<float>(24f, 14f), new Vector2D<float>(width, 12f), _experience.Progress,
             new Vector4D<float>(0.35f, 0.8f, 0.95f, 0.95f), shade);
         hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 32f), $"LV {_experience.Level}", gold, 1f);
-        hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 32f), Clock(_runSeconds), white, 1.1f);
+        hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 32f), $"{Clock(_runSeconds)} / {Clock(RunDirector.RunLength)}", white, 1.1f);
         hud.Text(HudAnchor.TopRight, new Vector2D<float>(-26f, 32f), $"Kills  {_enemies.Kills}", white, 0.9f);
+
+        // The boss's health, under the clock, while one is on the field.
+        if (_enemies.Boss is { } boss)
+        {
+            hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 64f), boss.Kind.Name.ToUpperInvariant(), red, 0.9f);
+            hud.Bar(HudAnchor.TopCenter, new Vector2D<float>(0f, 88f), new Vector2D<float>(520f, 16f), boss.Health / boss.MaxHealth,
+                new Vector4D<float>(0.75f, 0.15f, 0.2f, 0.95f), shade);
+        }
 
         // Health, bottom left, flashing red when hit.
         float health = _health.Current / _health.Max;
@@ -205,12 +246,100 @@ public sealed class ArenaMasterContent : IGameContent
         hud.Bar(HudAnchor.BottomCenter, new Vector2D<float>(0f, -40f), new Vector2D<float>(160f, 8f), ready, fill, shade);
         hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -54f), "DASH  [Shift]", new Vector4D<float>(1f, 1f, 1f, ready >= 1f ? 0.85f : 0.45f), 0.7f);
 
-        if (_respawnIn > 0f)
+        if (_condition.IsStunned)
         {
-            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, -40f), "YOU WERE SLAIN", new Vector4D<float>(0.95f, 0.3f, 0.3f, 1f), 1.8f);
-            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 10f), $"Survived {Clock(_lastRun.Seconds)}     Level {_lastRun.Level}     Kills {_lastRun.Kills}", white, 0.9f);
-            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 44f), $"New run in {MathF.Ceiling(_respawnIn)}...", white, 0.8f);
+            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 60f), "STUNNED", new Vector4D<float>(1f, 0.85f, 0.3f, 1f), 1.2f);
         }
+
+        if (_announcementLeft > 0f && _endIn <= 0f)
+        {
+            float alpha = MathF.Min(1f, _announcementLeft);
+            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, -120f), _announcement, new Vector4D<float>(red.X, red.Y, red.Z, alpha), 1.4f);
+        }
+
+        if (_endIn > 0f)
+        {
+            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, -40f), _won ? "VICTORY" : "YOU WERE SLAIN", _won ? gold : red, 1.8f);
+            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 10f), $"Survived {Clock(_lastRun.Seconds)}     Level {_lastRun.Level}     Kills {_lastRun.Kills}", white, 0.9f);
+            hud.Text(HudAnchor.Center, new Vector2D<float>(0f, 44f), $"New run in {MathF.Ceiling(_endIn)}...", white, 0.8f);
+        }
+    }
+
+    /// <summary>Spawns what the director asked for: a wave of elites, a boss.</summary>
+    private void FollowOrders(DirectorOrders orders, Vector3D<float> playerFeet, Func<float, float, float?> groundAt)
+    {
+        for (int i = 0; i < orders.Elites; i++)
+        {
+            _enemies.SpawnAround(EnemyKind.Brute, playerFeet, groundAt);
+        }
+
+        if (orders.Elites > 0)
+        {
+            Announce(orders.Elites == 1 ? "A Ghoul Brute approaches" : $"{orders.Elites} Ghoul Brutes approach");
+        }
+
+        if (orders.Boss)
+        {
+            SpawnBoss(playerFeet, groundAt, orders.FinalBoss);
+        }
+    }
+
+    private void SpawnBoss(Vector3D<float> playerFeet, Func<float, float, float?> groundAt, bool final)
+    {
+        var scaling = _enemies.Scaling;
+        if (final)
+        {
+            _enemies.Scaling = scaling with { Health = scaling.Health * FinalBossHealthBonus };
+        }
+
+        _enemies.SpawnAround(EnemyKind.HollowKing, playerFeet, groundAt);
+        _enemies.Scaling = scaling;
+        Announce(final ? "The Hollow King returns, in full fury" : "The Hollow King rises");
+    }
+
+    private void Announce(string text)
+    {
+        _announcement = text;
+        _announcementLeft = AnnouncementSeconds;
+    }
+
+    /// <summary>
+    /// Testing shortcuts, for now: F5 skips a minute ahead on the run clock, F6 brings in an elite, F7 brings in the boss. They go before a real release.
+    /// </summary>
+    private void DevKeys(EngineWindow window, Func<float, float, float?> groundAt)
+    {
+        if (Pressed(window, Key.F5))
+        {
+            _runSeconds = MathF.Min(_runSeconds + 60f, RunDirector.RunLength - 1f);
+        }
+
+        if (Pressed(window, Key.F6))
+        {
+            _enemies.SpawnAround(EnemyKind.Brute, window.PlayerFeet, groundAt);
+            Announce("A Ghoul Brute approaches");
+        }
+
+        if (Pressed(window, Key.F7))
+        {
+            SpawnBoss(window.PlayerFeet, groundAt, final: false);
+        }
+    }
+
+    /// <summary>True on the frame <paramref name="key"/> goes down.</summary>
+    private bool Pressed(EngineWindow window, Key key)
+    {
+        bool down = window.Keyboard?.IsKeyPressed(key) == true;
+        bool wasDown = _keysDown.Contains(key);
+        if (down)
+        {
+            _keysDown.Add(key);
+        }
+        else
+        {
+            _keysDown.Remove(key);
+        }
+
+        return down && !wasDown;
     }
 
     /// <summary>Pauses the world and offers three upgrades for the next level still to be picked for.</summary>
@@ -236,9 +365,10 @@ public sealed class ArenaMasterContent : IGameContent
         }
     }
 
-    /// <summary>The Ranger went down: clear the field, remember how the run went, and start over after a moment.</summary>
-    private void Slain(EngineWindow window)
+    /// <summary>The run is over - won at 30:00, or lost on death: clear the field, remember how it went, and start over after a moment.</summary>
+    private void EndRun(EngineWindow window, bool won)
     {
+        _won = won;
         _lastRun = (_enemies.Kills, _experience.Level, _runSeconds);
         foreach (var enemy in _enemies.Clear())
         {
@@ -250,17 +380,19 @@ public sealed class ArenaMasterContent : IGameContent
         _numbers.Clear();
         _levelUp.Close();
         _pendingLevels = 0;
+        _condition.Clear();
         window.GamePaused = false;
-        _respawnIn = RespawnDelay;
+        _endIn = won ? VictoryScreenSeconds : SlainScreenSeconds;
     }
 
-    /// <summary>A fresh run: level 1, no upgrades, full health, the clock back at zero.</summary>
+    /// <summary>A fresh run: level 1, no upgrades, full health, the clock and the director back at zero.</summary>
     private void StartRun()
     {
         _stats.Reset();
         _experience.Reset();
         _health.Reset(_stats.MaxHealth);
         _enemies.ResetKills();
+        _director.Reset();
         _runSeconds = 0f;
     }
 
