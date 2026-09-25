@@ -11,4 +11,4 @@ A game built on C-Engine. The engine is the git submodule in `engine/` (repo: iM
 
 ## Status
 
-Scaffold only: `ArenaMasterContent` starts from the engine's blank slate (flat grass, no vegetation, no water). The game design hasn't been decided yet.
+The game is a 3D fantasy survivor-like (Megabonk-style), single player. **Read `DESIGN.md` first**: it has the design, the ground rules (nothing from ConnEngine-Game; one class at a time, starting with the Ranger; classes share nothing), the build order and the open questions. `ArenaMasterContent` is still the engine's blank slate; build-order step 1 hasn't started.
