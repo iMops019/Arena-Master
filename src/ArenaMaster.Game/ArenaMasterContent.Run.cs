@@ -126,7 +126,7 @@ public sealed partial class ArenaMasterContent
 
         var collected = new List<XpGem>();
         GainExperience(_gems.Update(deltaSeconds, window.PlayerFeet, _stats.PickupRadius, collected));
-        _gemView.Sync(window, _gems, collected, deltaSeconds);
+        _gemView.Sync(window, _gems, deltaSeconds);
 
         var goneChests = new List<Chest>();
         var gonePickups = new List<ItemPickup>();
@@ -163,7 +163,10 @@ public sealed partial class ArenaMasterContent
             _enemyView.Remove(window, enemy);
         }
 
-        _gemView.Sync(window, _gems, _gems.Clear(), 0f);
+        _enemyView.Sync(window, _enemies, Array.Empty<Enemy>(), 0f, (_, _) => null);   // an empty field: every enemy crowd drawn empty
+
+        _gems.Clear();
+        _gemView.Sync(window, _gems, 0f);
         var goneChests = new List<Chest>();
         var gonePickups = new List<ItemPickup>();
         _loot.Clear(goneChests, gonePickups);

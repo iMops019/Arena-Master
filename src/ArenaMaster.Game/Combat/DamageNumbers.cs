@@ -9,9 +9,22 @@ internal sealed class DamageNumbers
     private const float Lifetime = 0.8f;
     private const float RiseSpeed = 1.6f;   // metres per second
 
+    /// <summary>At most this many numbers are up at once; past it the oldest goes first, so a swarm's hits can't flood the screen.</summary>
+    public const int MaxShown = 60;
+
     private readonly List<(Vector3D<float> Position, int Amount, bool Kill, bool Crit, float Age)> _numbers = new();
 
-    public void Add(Vector3D<float> position, float amount, bool kill, bool crit = false) => _numbers.Add((position, (int)MathF.Round(amount), kill, crit, 0f));
+    public int Count => _numbers.Count;
+
+    public void Add(Vector3D<float> position, float amount, bool kill, bool crit = false)
+    {
+        if (_numbers.Count >= MaxShown)
+        {
+            _numbers.RemoveAt(0);
+        }
+
+        _numbers.Add((position, (int)MathF.Round(amount), kill, crit, 0f));
+    }
 
     public void Update(float deltaSeconds)
     {

@@ -101,10 +101,18 @@ internal sealed class EnemyField
     /// <summary>Enemies further than this from the player are moved back into the spawn ring rather than left stranded.</summary>
     public const float LeashDistance = 75f;
 
+    /// <summary>The widest enemy's radius (the boss's), so grid lookups reach far enough to find any body that could touch.</summary>
+    private const float MaxEnemyRadius = 1.5f;
+
+    /// <summary>At most this many fodder spawn in one frame, however far below the target count the field is.</summary>
+    private const int MaxSpawnsPerFrame = 6;
+
     private readonly List<Enemy> _enemies = new();
     private readonly List<Enemy> _newlyKilled = new();
     private readonly List<(EnemyKind Kind, Vector3D<float> Position)> _summoned = new();
+    private readonly EnemyGrid _grid = new();
     private readonly Random _random;
+    private bool _gridStale = true;
     private int _nextId = 1;
     private float _spawnTimer;
 
@@ -141,6 +149,7 @@ internal sealed class EnemyField
         var enemy = new Enemy(_nextId++, kind ?? Kind, position, Scaling) { Phase = (float)_random.NextDouble() * MathF.Tau };
         enemy.AttackCooldown = enemy.Kind.AttackCooldown * 0.5f;   // a short breather after arriving
         _enemies.Add(enemy);
+        _gridStale = true;
         return enemy;
     }
 
@@ -155,6 +164,7 @@ internal sealed class EnemyField
     public List<Enemy> Update(float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
     {
         SpawnTowardTarget(deltaSeconds, player.Feet, groundAt);
+        RefreshGrid();
 
         foreach (var enemy in _enemies)
         {
@@ -178,6 +188,7 @@ internal sealed class EnemyField
 
         var gone = _enemies.Where(e => !e.IsAlive && e.DeadFor >= DeathDuration).ToList();
         _enemies.RemoveAll(e => !e.IsAlive && e.DeadFor >= DeathDuration);
+        _gridStale = true;   // everyone has moved
         return gone;
     }
 
@@ -220,7 +231,8 @@ internal sealed class EnemyField
         Enemy? best = null;
         along = float.MaxValue;
 
-        foreach (var enemy in _enemies)
+        RefreshGrid();
+        foreach (var enemy in _grid.AlongSegment(from, to, radius + MaxEnemyRadius))
         {
             if (!enemy.IsAlive || skip?.Contains(enemy) == true)
             {
@@ -248,7 +260,18 @@ internal sealed class EnemyField
         _newlyKilled.Clear();
         _summoned.Clear();
         _spawnTimer = 0f;
+        _gridStale = true;
         return all;
+    }
+
+    /// <summary>Files the enemies in the grid again if any have moved, arrived or gone since it was last done.</summary>
+    private void RefreshGrid()
+    {
+        if (_gridStale)
+        {
+            _grid.Rebuild(_enemies);
+            _gridStale = false;
+        }
     }
 
     public void ResetKills() => Kills = 0;
@@ -256,15 +279,20 @@ internal sealed class EnemyField
     private void SpawnTowardTarget(float deltaSeconds, Vector3D<float> playerFeet, Func<float, float, float?> groundAt)
     {
         _spawnTimer -= deltaSeconds;
-        if (_spawnTimer > 0f || AliveCount >= TargetCount)
+        int alive = AliveCount;
+        for (int spawned = 0; _spawnTimer <= 0f && alive < TargetCount && spawned < MaxSpawnsPerFrame; spawned++)
         {
-            return;
+            _spawnTimer += SpawnInterval;
+            if (TryPickSpawnPoint(playerFeet, groundAt, out var point))
+            {
+                Spawn(point);
+                alive++;
+            }
         }
 
-        _spawnTimer = SpawnInterval;
-        if (TryPickSpawnPoint(playerFeet, groundAt, out var point))
+        if (alive >= TargetCount)
         {
-            Spawn(point);
+            _spawnTimer = MathF.Max(_spawnTimer, 0f);   // no stored-up burst once the field is full
         }
     }
 
@@ -320,7 +348,7 @@ internal sealed class EnemyField
         // Walk at the player, eased off by any other enemy close enough to crowd it, so a pack spreads around the player instead of stacking into one. The bigger of two
         // enemies gives way less.
         var step = toPlayer * enemy.Speed;
-        foreach (var other in _enemies)
+        foreach (var other in _grid.Near(enemy.Position.X, enemy.Position.Z, kind.Radius + MaxEnemyRadius + 0.15f))
         {
             if (other == enemy || !other.IsAlive)
             {

@@ -31,7 +31,7 @@ internal sealed class RangerBow
 
     private readonly RangerArrows _arrows;
     private readonly Random _random;
-    private readonly Dictionary<Arrow, int> _props = new();
+    private readonly List<CrowdInstance> _copies = new();
     private readonly BowCadence _cadence = new();
     private readonly List<(float Delay, Vector3D<float> Origin, Vector3D<float> Direction)> _rain = new();
     private float _cooldown;
@@ -87,36 +87,22 @@ internal sealed class RangerBow
             numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
         }
 
-        foreach (var arrow in gone)
-        {
-            RemoveProp(window, arrow);
-        }
-
+        _copies.Clear();
         foreach (var arrow in _arrows.Arrows)
         {
             var (yaw, pitch) = Geometry.YawPitch(arrow.Heading);
-            var placement = new PropPlacement(ArrowModel, arrow.Position, yaw, arrow.Scale, pitch);
-            if (_props.TryGetValue(arrow, out int id))
-            {
-                window.SetPlacedProp(id, placement);
-            }
-            else
-            {
-                _props[arrow] = window.PlaceProp(placement);
-            }
+            _copies.Add(new CrowdInstance(arrow.Position, yaw, arrow.Scale, pitch));
         }
 
+        window.SetCrowd(ArrowModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_copies));
         return hits;
     }
 
     /// <summary>Takes every arrow out of the world (a restart).</summary>
     public void Clear(EngineWindow window)
     {
-        foreach (var arrow in _arrows.Clear())
-        {
-            RemoveProp(window, arrow);
-        }
-
+        _arrows.Clear();
+        window.SetCrowd(ArrowModel, ReadOnlySpan<CrowdInstance>.Empty);
         _rain.Clear();
         _cadence.Reset();
     }
@@ -266,14 +252,6 @@ internal sealed class RangerBow
         }
 
         return (target, onSomething);
-    }
-
-    private void RemoveProp(EngineWindow window, Arrow arrow)
-    {
-        if (_props.Remove(arrow, out int id))
-        {
-            window.RemovePlacedProp(id);
-        }
     }
 
     private static Vector3D<float> Flat(Vector3D<float> v)

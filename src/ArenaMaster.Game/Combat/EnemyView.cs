@@ -4,9 +4,10 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Combat;
 
 /// <summary>
-/// Puts the <see cref="EnemyField"/> on screen as engine props: one placed prop per enemy, with a shambling bob while it walks, a flinch when it is hit, a crouch or
-/// a rearing-up as it winds up an attack, and a sink into the ground as it dies. Attacks show their telegraphs on the ground: a red lane for a lunge, a red circle
-/// filling up for a leap slam's landing, a ring spreading out for a shockwave. There are no animations yet; the stand-in models are rigid.
+/// Puts the <see cref="EnemyField"/> on screen: every enemy of a kind drawn as one engine crowd (one instanced draw however many there are), with a shambling bob
+/// while it walks, a flinch and a flash when it is hit, a crouch or a rearing-up as it winds up an attack, and a sink into the ground as it dies. Attacks show their
+/// telegraphs on the ground as placed props: a red lane for a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave. There
+/// are no animations yet; the stand-in models are rigid.
 /// </summary>
 internal sealed class EnemyView
 {
@@ -23,8 +24,8 @@ internal sealed class EnemyView
         Shockwave,
     }
 
-    private readonly Dictionary<int, int> _props = new();                     // enemy id -> placed prop id
     private readonly Dictionary<(int Enemy, Marker Marker), int> _markers = new();   // telegraph -> placed prop id
+    private readonly Dictionary<string, List<CrowdInstance>> _crowds = new();       // model -> this frame's copies
     private float _time;
 
     public void Sync(EngineWindow window, EnemyField field, IEnumerable<Enemy> gone, float deltaSeconds, Func<float, float, float?> groundAt)
@@ -36,10 +37,21 @@ internal sealed class EnemyView
             Remove(window, enemy);
         }
 
+        foreach (var list in _crowds.Values)
+        {
+            list.Clear();
+        }
+
         var shown = new HashSet<(int, Marker)>();
         foreach (var enemy in field.Enemies)
         {
-            Place(window, _props, enemy.Id, Pose(enemy));
+            if (!_crowds.TryGetValue(enemy.Kind.Model, out var copies))
+            {
+                copies = new List<CrowdInstance>();
+                _crowds[enemy.Kind.Model] = copies;
+            }
+
+            copies.Add(Pose(enemy));
             if (enemy.IsAlive)
             {
                 foreach (var (marker, placement) in Telegraphs(enemy, groundAt))
@@ -55,15 +67,16 @@ internal sealed class EnemyView
             window.RemovePlacedProp(_markers[key]);
             _markers.Remove(key);
         }
+
+        foreach (var (model, copies) in _crowds)
+        {
+            window.SetCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(copies));   // an empty list clears a kind that is gone
+        }
     }
 
+    /// <summary>Takes away an enemy's ground telegraphs (its body goes with the next <see cref="Sync"/>).</summary>
     public void Remove(EngineWindow window, Enemy enemy)
     {
-        if (_props.Remove(enemy.Id, out int propId))
-        {
-            window.RemovePlacedProp(propId);
-        }
-
         foreach (var key in _markers.Keys.Where(k => k.Enemy == enemy.Id).ToList())
         {
             window.RemovePlacedProp(_markers[key]);
@@ -84,7 +97,7 @@ internal sealed class EnemyView
         }
     }
 
-    private PropPlacement Pose(Enemy enemy)
+    private CrowdInstance Pose(Enemy enemy)
     {
         var position = enemy.Position;
         float scale = 1f + 0.12f * enemy.HitFlash * (enemy.Kind.Tier == EnemyTier.Fodder ? 1f : 0.3f);   // a quick swell on a hit; big ones barely
@@ -94,7 +107,7 @@ internal sealed class EnemyView
         {
             float t = Math.Clamp(enemy.DeadFor / EnemyField.DeathDuration, 0f, 1f);
             position.Y -= t * enemy.Kind.Height * 0.8f;   // sinks into the ground
-            return new PropPlacement(enemy.Kind.Model, position, enemy.Yaw, scale * (1f - 0.4f * t), pitch + 0.9f * t);
+            return new CrowdInstance(position, enemy.Yaw, scale * (1f - 0.4f * t), pitch + 0.9f * t);
         }
 
         if (enemy.Attack is { } attack)
@@ -129,7 +142,7 @@ internal sealed class EnemyView
             pitch += 0.08f * MathF.Sin(_time * 3.5f + enemy.Phase);
         }
 
-        return new PropPlacement(enemy.Kind.Model, position, enemy.Yaw, scale, pitch);
+        return new CrowdInstance(position, enemy.Yaw, scale, pitch, Flash: enemy.HitFlash);
     }
 
     /// <summary>What an enemy's current attack shows on the ground.</summary>

@@ -158,8 +158,9 @@ public class RunDirectorTests
     [Fact]
     public void TheHordeGrows_AndToughensOverTheRun()
     {
-        Assert.Equal(14, RunDirector.FodderCount(0f));
-        Assert.InRange(RunDirector.FodderCount(RunDirector.RunLength), 65, 80);
+        Assert.Equal(16, RunDirector.FodderCount(0f));
+        Assert.InRange(RunDirector.FodderCount(10f * 60f), 50, 80);
+        Assert.InRange(RunDirector.FodderCount(RunDirector.RunLength), 280, RunDirector.MaxFodder);
         Assert.True(RunDirector.SpawnInterval(20f * 60f) < RunDirector.SpawnInterval(0f));
         Assert.Equal(1f, RunDirector.ScalingAt(0f).Health);
         Assert.True(RunDirector.ScalingAt(20f * 60f).Health > 3f);

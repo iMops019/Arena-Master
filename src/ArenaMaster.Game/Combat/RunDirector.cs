@@ -19,11 +19,21 @@ internal sealed class RunDirector
     private float _nextElite = FirstEliteAt;
     private int _nextBoss;
 
-    /// <summary>How many fodder enemies to keep on the field at <paramref name="seconds"/> into the run: 14 at the start, about 70 by the end.</summary>
-    public static int FodderCount(float seconds) => (int)MathF.Min(80f, 14f + 1.9f * seconds / 60f);
+    /// <summary>The most fodder the field ever holds - the swarm at the end of a run.</summary>
+    public const int MaxFodder = 300;
 
-    /// <summary>How often to top the field up at <paramref name="seconds"/>: every 0.5 s at first, quicker as the field grows.</summary>
-    public static float SpawnInterval(float seconds) => MathF.Max(0.08f, 0.5f - 0.014f * seconds / 60f);
+    /// <summary>
+    /// How many fodder enemies to keep on the field at <paramref name="seconds"/> into the run: 16 at the start, climbing slowly and then steeply - about 75 at 10:00,
+    /// 170 at 20:00, and the full swarm of <see cref="MaxFodder"/> by 30:00.
+    /// </summary>
+    public static int FodderCount(float seconds)
+    {
+        float minutes = seconds / 60f;
+        return (int)MathF.Min(MaxFodder, MathF.Round(16f + 4f * minutes + 0.18f * minutes * minutes));
+    }
+
+    /// <summary>How often to top the field up at <paramref name="seconds"/>: every 0.5 s at first, down to about 30 a second by the end so the swarm keeps up.</summary>
+    public static float SpawnInterval(float seconds) => MathF.Max(0.03f, 0.5f - 0.016f * seconds / 60f);
 
     /// <summary>How much tougher than base everything spawns at <paramref name="seconds"/>: health climbs steeply, damage and speed gently.</summary>
     public static EnemyScaling ScalingAt(float seconds)

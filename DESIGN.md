@@ -32,7 +32,7 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 ## Enemies and pacing (built, first pass)
 
 **What's built** (numbers in `Combat/EnemyKind.cs` and `Combat/RunDirector.cs`):
-- **The director:** fodder grows from 14 to about 70 over the 30 minutes and spawns faster. Health scales +12% per minute, damage +5%/min, speed +1%/min.
+- **The director:** fodder grows from 16 to a swarm of 300 over the 30 minutes (about 75 at 10:00 and 170 at 20:00), and spawns faster to keep up (up to 6 a frame). Health scales +12% per minute, damage +5%/min, speed +1%/min.
 - **Ghoul (fodder):** 30 HP, 3.6 m/s, claws on contact for 8.
 - **Ghoul Brute (elite):** first at 3:00, then every 2.5 min, 1 per wave (2 after 10:00, 3 after 20:00). 260 HP, 12 XP. Two telegraphed attacks:
   - *Lunge:* crouches for 0.75 s over a red lane, then charges 7.2 m down it. 22 damage plus knock-back.
@@ -117,8 +117,8 @@ Each step should be playable before the next one starts. **[engine]** means the 
 3. *(Done; the user is happy with the feel.)* **Levelling up:** XP drops and pickup, the level-up pause with 3 choices, the first handful of stacking upgrades, and a HUD (HP, XP bar, timer, level). [game]
 4. *(Done; the user is happy with the feel.)* **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] (The engine steering turned out not to be needed yet: the game's own separation handles about 80 enemies. Revisit with the swarm renderer in step 7.)
 5. *(Done; reworked in step 6 so items persist.)* **Items:** drops, chests, bonuses and multipliers. [game]
-6. *(Done; the "coming soon" majors were then built too, waiting for the user to try them.)* **Camp, save file, persistent items and loadouts, and the Sharpshooter passive tree.** [game] [engine: TeleportPlayer, pause-menu buttons, MapsMenu switch]
-7. **Swarms:** a batched crowd renderer for hundreds of animated enemies. [engine]
+6. *(Done.)* **Camp, save file, persistent items and loadouts, and the Sharpshooter passive tree.** [game] [engine: TeleportPlayer, pause-menu buttons, MapsMenu switch]
+7. *(Built; waiting for the user to try it.)* **Swarms:** a batched crowd renderer for hundreds of enemies. [engine: `SetCrowd`, instanced props] [game: enemies, arrows and gems drawn as crowds; an enemy grid for spacing and hits; the director ramps to 300 fodder; gems merge past 400; damage numbers capped at 60]. The enemies are rigid stand-ins. Animated crowds (baked animation) wait for rigged enemy models.
 8. **Meta progression:** unlocks, currency. (The save file came in step 6.) [game]
 9. Iterate on the Ranger until it feels right, then design class #2.
 

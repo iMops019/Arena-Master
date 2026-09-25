@@ -17,7 +17,7 @@ internal sealed class XpGem
 
     public Vector3D<float> Position { get; set; }
 
-    public int Value { get; }
+    public int Value { get; set; }
 
     /// <summary>Once the player has come within pickup range the gem is theirs: it flies to them however far they go.</summary>
     public bool Attracted { get; set; }
@@ -41,6 +41,12 @@ internal sealed class XpGemField
     /// <summary>Where on the player gems fly to: this high above the feet.</summary>
     public const float ChestHeight = 1.0f;
 
+    /// <summary>
+    /// Past this many gems on the ground, a new drop is added to the oldest resting gem instead of making another (it grows to match): a swarm's drops can't pile
+    /// up without limit, and the experience isn't lost.
+    /// </summary>
+    public const int MaxGems = 400;
+
     private const float StartSpeed = 6f;
     private const float Acceleration = 30f;
 
@@ -51,6 +57,12 @@ internal sealed class XpGemField
 
     public XpGem Drop(Vector3D<float> groundPosition, int value)
     {
+        if (_gems.Count >= MaxGems && _gems.FirstOrDefault(g => !g.Attracted) is { } oldest)
+        {
+            oldest.Value += value;
+            return oldest;
+        }
+
         var gem = new XpGem(_nextId++, groundPosition + new Vector3D<float>(0f, FloatHeight, 0f), value);
         _gems.Add(gem);
         return gem;
@@ -99,25 +111,18 @@ internal sealed class XpGemField
     }
 }
 
-/// <summary>Draws the <see cref="XpGemField"/> as spinning, bobbing crystals.</summary>
+/// <summary>Draws the <see cref="XpGemField"/> as spinning, bobbing crystals - one engine crowd, however many are on the ground.</summary>
 internal sealed class XpGemView
 {
     public const string Model = "xp_gem_placeholder.glb";
 
-    private readonly Dictionary<int, int> _props = new();   // gem id -> placed prop id
+    private readonly List<CrowdInstance> _copies = new();
     private float _time;
 
-    public void Sync(EngineWindow window, XpGemField field, IEnumerable<XpGem> gone, float deltaSeconds)
+    public void Sync(EngineWindow window, XpGemField field, float deltaSeconds)
     {
         _time += deltaSeconds;
-
-        foreach (var gem in gone)
-        {
-            if (_props.Remove(gem.Id, out int propId))
-            {
-                window.RemovePlacedProp(propId);
-            }
-        }
+        _copies.Clear();
 
         foreach (var gem in field.Gems)
         {
@@ -127,16 +132,10 @@ internal sealed class XpGemView
                 position.Y += 0.08f * MathF.Sin(_time * 3f + gem.Id);
             }
 
-            float size = 1f + 0.35f * MathF.Log2(MathF.Max(1, gem.Value));   // bigger gems for bigger enemies
-            var placement = new PropPlacement(Model, position, _time * 2.5f + gem.Id, size);
-            if (_props.TryGetValue(gem.Id, out int id))
-            {
-                window.SetPlacedProp(id, placement);
-            }
-            else
-            {
-                _props[gem.Id] = window.PlaceProp(placement);
-            }
+            float size = MathF.Min(3f, 1f + 0.35f * MathF.Log2(MathF.Max(1, gem.Value)));   // bigger gems for bigger enemies (and merged drops)
+            _copies.Add(new CrowdInstance(position, _time * 2.5f + gem.Id, size));
         }
+
+        window.SetCrowd(Model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_copies));
     }
 }
