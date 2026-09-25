@@ -39,7 +39,7 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
 
 ## First class: Ranger
 
-- **Basic attack:** a bow that auto-fires arrows where the camera aims.
+- **Basic attack:** a bow that auto-fires arrows where the camera aims. The arrows converge on whatever the crosshair is on. Current numbers: 1 shot per 0.5 s, 12 damage, 50 m/s, 60 m range, straight flight.
 - **Level-up pool (draft):**
   - Stats: damage, attack speed, projectile count, pierce, crit chance/damage, projectile speed, move speed, pickup radius, max HP, regen.
   - Abilities: Volley (fan of arrows), Piercing Shot, Rain of Arrows (area), Traps, Poison or Fire Arrows (damage over time), Hawk companion.
@@ -64,8 +64,8 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
 
 Each step should be playable before the next one starts. **[engine]** means the work goes in C-Engine (commit and push there, then `./update-engine.ps1` here). **[game]** means the work goes in this repo.
 
-1. *(Built; tuning in progress.)* **Third-person Ranger movement:** follow camera, WASD, jump, dash, on a test map with a placeholder character. [engine: general follow camera] [game: Ranger controller]
-2. **Shooting and killing:** an auto-firing bow, arrow projectiles, one basic chaser enemy, hit detection, damage, death. [engine: general projectile/hitbox/damage helpers] [game: the bow, the enemy]
+1. *(Done; the user is happy with the feel.)* **Third-person Ranger movement:** follow camera, WASD, jump, dash, on a test map with a placeholder character. [engine: general follow camera] [game: Ranger controller]
+2. *(Built; waiting for the user to try it.)* **Shooting and killing:** an auto-firing bow, arrow projectiles, one basic chaser enemy, hit detection, damage, death. [engine: general projectile/hitbox/damage helpers] [game: the bow, the enemy]
 3. **Levelling up:** XP drops and pickup, the level-up pause with 3 choices, the first handful of stacking upgrades, and a HUD (HP, XP bar, timer, level). [game]
 4. **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] [engine: basic steering/avoidance for many enemies]
 5. **Items:** drops, chests, bonuses and multipliers. [game]

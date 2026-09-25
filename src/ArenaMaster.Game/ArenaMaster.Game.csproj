@@ -10,4 +10,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- The tests exercise the game's internal simulation classes directly. -->
+    <InternalsVisibleTo Include="ArenaMaster.Game.Tests" />
+  </ItemGroup>
+
 </Project>

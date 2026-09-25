@@ -1,11 +1,13 @@
-"""Writes assets/models/ranger_placeholder.glb: a blocky stand-in Ranger (tunic, hood, cape, bow, quiver)
-to use until a real model is made. Plain Python, no dependencies.
+"""Writes blocky stand-in models to assets/models/ until real ones are made. Plain Python, no dependencies:
+  ranger_placeholder.glb  the Ranger (tunic, hood, cape, bow, quiver)
+  arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
+  ghoul_placeholder.glb   the first enemy: a hunched ghoul with long arms and red eyes
 
 The engine's model conventions: one mesh, one primitive, colours from one base-colour texture (vertex colours are
 ignored), facing +Z, feet at y = 0, metres. The texture is a strip of flat colour swatches and each face's UVs point
 at the middle of its swatch.
 
-    python tools/make_placeholder_ranger.py
+    python tools/make_placeholder_models.py
 """
 
 import json
@@ -13,7 +15,7 @@ import struct
 import zlib
 from pathlib import Path
 
-OUTPUT = Path(__file__).resolve().parent.parent / "assets" / "models" / "ranger_placeholder.glb"
+MODELS = Path(__file__).resolve().parent.parent / "assets" / "models"
 
 SWATCH = 8  # pixels per colour, so filtering never blends neighbours
 PALETTE = {
@@ -25,6 +27,11 @@ PALETTE = {
     "trousers": (72, 62, 50),
     "fletching": (232, 230, 218),
     "dark": (28, 24, 20),
+    "steel": (176, 180, 186),
+    "ghoul_skin": (112, 128, 100),
+    "ghoul_rags": (66, 54, 70),
+    "ghoul_eye": (235, 40, 28),
+    "bone": (214, 204, 176),
 }
 COLOURS = list(PALETTE)
 
@@ -117,6 +124,45 @@ def build_ranger():
     return m
 
 
+def build_arrow():
+    m = Mesh()
+    m.box(-0.012, -0.012, -0.40, 0.012, 0.012, 0.34, "wood")                     # shaft
+    tip, left, right = (0.0, 0.0, 0.48), (-0.04, 0.0, 0.34), (0.04, 0.0, 0.34)
+    for y in (0.012, -0.012):
+        top = (0.0, y, 0.36)
+        m.tri(left, top, tip, "steel")
+        m.tri(top, right, tip, "steel")
+        m.tri(left, right, top, "steel")
+    m.box(-0.002, -0.05, -0.40, 0.002, 0.05, -0.26, "fletching")   # vertical vane
+    m.box(-0.05, -0.002, -0.40, 0.05, 0.002, -0.26, "fletching")   # horizontal vane
+    return m
+
+
+def build_ghoul():
+    m = Mesh()
+    # Crooked legs and feet
+    m.box(-0.20, 0.0, -0.06, -0.06, 0.10, 0.16, "ghoul_skin")
+    m.box(0.06, 0.0, -0.06, 0.20, 0.10, 0.16, "ghoul_skin")
+    m.box(-0.18, 0.10, -0.06, -0.07, 0.62, 0.06, "ghoul_skin")
+    m.box(0.07, 0.10, -0.06, 0.18, 0.62, 0.06, "ghoul_skin")
+    # Ragged loincloth and a hunched torso leaning forward
+    m.box(-0.22, 0.52, -0.12, 0.22, 0.72, 0.12, "ghoul_rags")
+    m.box(-0.24, 0.70, -0.10, 0.24, 1.10, 0.20, "ghoul_skin")
+    m.box(-0.22, 1.00, 0.02, 0.22, 1.28, 0.32, "ghoul_skin")
+    m.box(-0.08, 0.86, -0.14, 0.08, 1.20, -0.10, "bone")          # spine ridge
+    # Long arms reaching forward and down, with claws
+    m.box(-0.38, 0.62, 0.10, -0.26, 1.24, 0.24, "ghoul_skin")
+    m.box(0.26, 0.62, 0.10, 0.38, 1.24, 0.24, "ghoul_skin")
+    m.box(-0.39, 0.50, 0.14, -0.27, 0.62, 0.34, "bone")
+    m.box(0.27, 0.50, 0.14, 0.39, 0.62, 0.34, "bone")
+    # Head thrust forward, red eyes, jaw
+    m.box(-0.13, 1.14, 0.28, 0.13, 1.40, 0.52, "ghoul_skin")
+    m.box(-0.10, 1.27, 0.52, -0.03, 1.32, 0.525, "ghoul_eye")
+    m.box(0.03, 1.27, 0.52, 0.10, 1.32, 0.525, "ghoul_eye")
+    m.box(-0.10, 1.10, 0.32, 0.10, 1.16, 0.50, "bone")
+    return m
+
+
 def png_bytes():
     width, height = SWATCH * len(COLOURS), SWATCH
     row = b"".join(bytes(PALETTE[c]) * SWATCH for c in COLOURS)
@@ -152,10 +198,10 @@ def write_glb(mesh, path):
     mins = [min(p[i] for p in mesh.positions) for i in range(3)]
     maxs = [max(p[i] for p in mesh.positions) for i in range(3)]
     gltf = {
-        "asset": {"version": "2.0", "generator": "Arena Master make_placeholder_ranger.py"},
+        "asset": {"version": "2.0", "generator": "Arena Master make_placeholder_models.py"},
         "scene": 0,
         "scenes": [{"nodes": [0]}],
-        "nodes": [{"mesh": 0, "name": "RangerPlaceholder"}],
+        "nodes": [{"mesh": 0, "name": path.stem}],
         "meshes": [{"primitives": [{"attributes": {"POSITION": 0, "NORMAL": 1, "TEXCOORD_0": 2}, "indices": 3, "material": 0}]}],
         "materials": [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}, "metallicFactor": 0.0, "roughnessFactor": 1.0}}],
         "textures": [{"source": 0, "sampler": 0}],
@@ -178,6 +224,7 @@ def write_glb(mesh, path):
 
 
 if __name__ == "__main__":
-    ranger = build_ranger()
-    write_glb(ranger, OUTPUT)
-    print(f"Wrote {OUTPUT} ({len(ranger.positions)} vertices, {len(ranger.indices) // 3} triangles)")
+    for name, build in (("ranger_placeholder.glb", build_ranger), ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul)):
+        mesh = build()
+        write_glb(mesh, MODELS / name)
+        print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")

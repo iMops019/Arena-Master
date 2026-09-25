@@ -4,6 +4,9 @@
     <Project Path="src/ArenaMaster.Editor/ArenaMaster.Editor.csproj" />
     <Project Path="src/ArenaMaster.Play/ArenaMaster.Play.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ArenaMaster.Game.Tests/ArenaMaster.Game.Tests.csproj" />
+  </Folder>
   <Folder Name="/engine/">
     <Project Path="engine/src/CEngine.Core/CEngine.Core.csproj" />
   </Folder>
