@@ -1,5 +1,6 @@
 using System.Numerics;
 using ArenaMaster.Game.Items;
+using ArenaMaster.Game.Progression;
 using ImGuiNET;
 
 namespace ArenaMaster.Game.Ui;
@@ -21,7 +22,9 @@ internal sealed record RunSummary(
     long TreeExperience,
     int TreeLevelsGained,
     int TreeLevel,
-    string TreeName);
+    string TreeName,
+    long Silver,
+    IReadOnlyList<Bounty> Bounties);
 
 /// <summary>The screen at the end of a run - won, slain, or back to camp early: the run's numbers, the items found, what the tree earned. Then back to camp.</summary>
 internal sealed class RunSummaryScreen : GameScreen
@@ -44,7 +47,7 @@ internal sealed class RunSummaryScreen : GameScreen
 
         MarkDrawn();
         float scale = UiTheme.Scale;
-        UiTheme.BeginScreen("##summary", 0.5f, 0.72f);
+        UiTheme.BeginScreen("##summary", 0.5f, 0.8f);
         var origin = ImGui.GetCursorScreenPos();
         float width = ImGui.GetContentRegionAvail().X;
         float font = ImGui.GetFontSize();
@@ -68,10 +71,18 @@ internal sealed class RunSummaryScreen : GameScreen
         Row("Survived", $"{(int)s.Seconds / 60:00}:{(int)s.Seconds % 60:00}", UiTheme.Ink);
         Row("Level reached", s.Level.ToString(), UiTheme.Ink);
         Row("Kills", s.Kills.ToString("N0"), UiTheme.Ink);
+        Row("Silver", $"+{s.Silver:N0}", UiTheme.BrassHi);
         Row($"{s.TreeName} experience", $"+{s.TreeExperience:N0}", UiTheme.Teal);
         if (s.TreeLevelsGained > 0)
         {
             Row($"{s.TreeName} level", $"{s.TreeLevel}  (+{s.TreeLevelsGained}, spend at the target)", UiTheme.BrassHi);
+        }
+
+        foreach (var bounty in s.Bounties)
+        {
+            string unlock = bounty.UnlocksItem is { } id ? $"  ·  unlocks {ItemCatalog.All.First(i => i.Id == id).Name}" : "";
+            UiTheme.Text(new Vector2(origin.X, y), $"Bounty done: {bounty.Name}  (+{bounty.Silver:N0} silver{unlock})", UiTheme.BrassHi, 0.8f, width);
+            y += font * 1.05f;
         }
 
         y += font * 0.4f;

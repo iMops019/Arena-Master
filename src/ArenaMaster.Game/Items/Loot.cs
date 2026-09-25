@@ -76,6 +76,12 @@ internal sealed class LootField
 
     public IReadOnlyList<ItemPickup> Pickups => _pickups;
 
+    /// <summary>Which items chests and drops can give (the ones unlocked so far). All, unless set.</summary>
+    public Func<RunItem, bool> Available { get; set; } = _ => true;
+
+    /// <summary>What a source's odds become before a roll (the Quartermaster's Lucky Charm). Unchanged, unless set.</summary>
+    public Func<RarityWeights, RarityWeights> Luck { get; set; } = weights => weights;
+
     public Chest DropChest(Vector3D<float> position, RarityWeights weights)
     {
         var chest = new Chest(_nextId++, position, weights);
@@ -86,7 +92,7 @@ internal sealed class LootField
     /// <summary>Drops an item rolled from the world's odds at <paramref name="position"/>.</summary>
     public ItemPickup DropItem(Vector3D<float> position)
     {
-        var pickup = new ItemPickup(_nextId++, position, ItemCatalog.Roll(_random, RarityWeights.World));
+        var pickup = new ItemPickup(_nextId++, position, ItemCatalog.Roll(_random, Luck(RarityWeights.World), Available));
         _pickups.Add(pickup);
         return pickup;
     }
@@ -125,7 +131,7 @@ internal sealed class LootField
             else if (Touching(chest.Position, playerFeet, ChestReach))
             {
                 chest.Opened = true;
-                obtained.Add(ItemCatalog.Roll(_random, chest.Weights));
+                obtained.Add(ItemCatalog.Roll(_random, Luck(chest.Weights), Available));
             }
         }
 

@@ -6,7 +6,8 @@ using Silk.NET.Input;
 
 namespace ArenaMaster.Game;
 
-// Camp: walking up to a station and pressing E opens its screen - the item chest, the passive tree, or the loadout at the departure gate, which is where a run begins.
+// Camp: walking up to a station and pressing E opens its screen - the item chest, the passive tree, the bounty board, the quartermaster, or the loadout at the
+// departure gate, which is where a run begins.
 // A screen pauses the world (the engine's GamePaused) and frees the cursor until it is closed.
 public sealed partial class ArenaMasterContent
 {
@@ -14,6 +15,8 @@ public sealed partial class ArenaMasterContent
     private readonly PassiveTreeScreen _treeScreen = new();
     private readonly LoadoutScreen _loadoutScreen = new();
     private readonly RunSummaryScreen _summaryScreen = new();
+    private readonly BountyBoardScreen _bountyScreen = new();
+    private readonly QuartermasterScreen _shopScreen = new();
 
     /// <summary>The station the player is standing at, if any, and what pressing E there does.</summary>
     private (CampStation Station, string Prompt)? _nearStation;
@@ -46,6 +49,12 @@ public sealed partial class ArenaMasterContent
                 Loadout.Sanitize(_profile);
                 _loadoutScreen.Open();
                 break;
+            case CampStation.Bounties:
+                _bountyScreen.Open();
+                break;
+            case CampStation.Quartermaster:
+                _shopScreen.Open();
+                break;
         }
 
         window.GamePaused = true;
@@ -71,6 +80,33 @@ public sealed partial class ArenaMasterContent
             {
                 _treeScreen.Changed = false;
                 _stats.Tree = SharpshooterBonuses.From(_tree.Save.Ranks);
+                SaveProfile();
+            }
+
+            if (closed)
+            {
+                CloseScreen(window);
+            }
+
+            return true;
+        }
+
+        if (_bountyScreen.IsOpen)
+        {
+            if (_bountyScreen.Draw(_profile))
+            {
+                CloseScreen(window);
+            }
+
+            return true;
+        }
+
+        if (_shopScreen.IsOpen)
+        {
+            bool closed = _shopScreen.Draw(_profile);
+            if (_shopScreen.Changed)
+            {
+                _shopScreen.Changed = false;
                 SaveProfile();
             }
 

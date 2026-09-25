@@ -5,10 +5,16 @@ using ImGuiNET;
 
 namespace ArenaMaster.Game.Ui;
 
-/// <summary>What choosing a loadout means: at most <see cref="MaxItems"/> different items, each brought with every copy owned.</summary>
+/// <summary>
+/// What choosing a loadout means: at most <see cref="Limit"/> different items - <see cref="MaxItems"/>, plus any slots bought from the Quartermaster - each brought with
+/// every copy owned.
+/// </summary>
 internal static class Loadout
 {
+    /// <summary>How many different items a loadout holds before any are bought.</summary>
     public const int MaxItems = 5;
+
+    public static int Limit(Profile profile) => MaxItems + Shop.ExtraLoadoutSlots(profile);
 
     /// <summary>Drops anything from the saved loadout that isn't an item, isn't owned any more, or is past the limit.</summary>
     public static void Sanitize(Profile profile)
@@ -16,7 +22,7 @@ internal static class Loadout
         profile.Loadout = profile.Loadout
             .Where(id => ItemCatalog.All.Any(i => i.Id == id) && profile.CountOf(id) > 0)
             .Distinct()
-            .Take(MaxItems)
+            .Take(Limit(profile))
             .ToList();
     }
 
@@ -28,7 +34,7 @@ internal static class Loadout
             return true;
         }
 
-        if (profile.Loadout.Count >= MaxItems || profile.CountOf(id) <= 0)
+        if (profile.Loadout.Count >= Limit(profile) || profile.CountOf(id) <= 0)
         {
             return false;
         }
@@ -168,7 +174,7 @@ internal sealed class ItemChestScreen : GameScreen
 }
 
 /// <summary>
-/// The loadout screen at the departure gate: pick up to <see cref="Loadout.MaxItems"/> different items from the chest to bring on the run, each with every copy
+/// The loadout screen at the departure gate: pick up to <see cref="Loadout.Limit"/> different items from the chest to bring on the run, each with every copy
 /// owned, then begin. The choice is remembered for next time.
 /// </summary>
 internal sealed class LoadoutScreen : GameScreen
@@ -190,7 +196,7 @@ internal sealed class LoadoutScreen : GameScreen
         MarkDrawn();
         float scale = UiTheme.Scale;
         UiTheme.BeginScreen("##loadout", 0.78f, 0.84f);
-        UiTheme.Header("Camp · Departure gate", "Choose your loadout", $"{profile.Loadout.Count} / {Loadout.MaxItems} items");
+        UiTheme.Header("Camp · Departure gate", "Choose your loadout", $"{profile.Loadout.Count} / {Loadout.Limit(profile)} items");
 
         DrawSlots(profile);
 
@@ -248,16 +254,17 @@ internal sealed class LoadoutScreen : GameScreen
         return result;
     }
 
-    /// <summary>The five loadout slots across the top: what is chosen, and how many copies come with it.</summary>
+    /// <summary>The loadout slots across the top (five, and any bought): what is chosen, and how many copies come with it.</summary>
     private static void DrawSlots(Profile profile)
     {
         float scale = UiTheme.Scale;
         var origin = ImGui.GetCursorScreenPos();
         float width = ImGui.GetContentRegionAvail().X;
         float gap = 10f * scale, height = 54f * scale;
-        float slotWidth = (width - gap * (Loadout.MaxItems - 1)) / Loadout.MaxItems;
+        int slots = Loadout.Limit(profile);
+        float slotWidth = (width - gap * (slots - 1)) / slots;
 
-        for (int i = 0; i < Loadout.MaxItems; i++)
+        for (int i = 0; i < slots; i++)
         {
             var min = origin + new Vector2(i * (slotWidth + gap), 0f);
             var max = min + new Vector2(slotWidth, height);

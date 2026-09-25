@@ -117,12 +117,30 @@ internal static class ItemCatalog
         }),
     };
 
-    /// <summary>A random item from a source with <paramref name="weights"/>: first the rarity, then an item of that rarity.</summary>
-    public static RunItem Roll(Random random, RarityWeights weights)
+    /// <summary>
+    /// A random item from a source with <paramref name="weights"/>: first the rarity, then an item of that rarity from those <paramref name="available"/> allows (all, if
+    /// not given). If no item of the rolled rarity is available yet (still locked), the next rarity down is tried, then up - so a roll always gives something.
+    /// </summary>
+    public static RunItem Roll(Random random, RarityWeights weights, Func<RunItem, bool>? available = null)
     {
         var rarity = weights.Roll(random);
-        var pool = All.Where(i => i.Rarity == rarity).ToList();
-        return pool[random.Next(pool.Count)];
+        var candidates = available is null ? All : All.Where(available).ToList();
+        if (candidates.Count == 0)
+        {
+            candidates = All;   // everything locked: the lock can't leave a chest empty
+        }
+
+        for (int step = 0; step <= (int)ItemRarity.Legendary; step++)
+        {
+            var down = candidates.Where(i => i.Rarity == rarity - step).ToList();
+            if (down.Count > 0)
+            {
+                return down[random.Next(down.Count)];
+            }
+        }
+
+        var up = candidates.Where(i => i.Rarity > rarity).OrderBy(i => i.Rarity).ToList();
+        return up[random.Next(up.Count(i => i.Rarity == up[0].Rarity))];
     }
 }
 

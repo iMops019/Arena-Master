@@ -41,6 +41,7 @@ public sealed partial class ArenaMasterContent
         hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 52f), tree, free > 0 ? Teal : White, 0.85f);
         int owned = _profile.Stash.Values.Sum();
         hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 78f), $"Item chest  ·  {owned} item{(owned == 1 ? "" : "s")}", White, 0.8f);
+        hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 102f), $"Silver  ·  {_profile.Silver:N0}", Gold, 0.8f);
 
         if (_nearStation is { } near)
         {
@@ -49,7 +50,7 @@ public sealed partial class ArenaMasterContent
         else
         {
             hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -120f),
-                "Chest on the left, passive tree at the target on the right, the gate ahead starts a run", new Vector4D<float>(1f, 1f, 1f, 0.6f), 0.8f);
+                "Chest and quartermaster on the left, tree target and bounty board on the right, the gate ahead starts a run", new Vector4D<float>(1f, 1f, 1f, 0.6f), 0.8f);
         }
 
         DrawDash(hud);

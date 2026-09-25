@@ -1,6 +1,7 @@
 using ArenaMaster.Game.Camp;
 using ArenaMaster.Game.Combat;
 using ArenaMaster.Game.Items;
+using ArenaMaster.Game.Progression;
 using ArenaMaster.Game.Ranger;
 using ArenaMaster.Game.Ui;
 using CEngine.Core;
@@ -52,6 +53,14 @@ public sealed partial class ArenaMasterContent
     private int _runTreeLevels;
     private float _saveIn;
 
+    /// <summary>What the Quartermaster's upgrades give this run on the level-up screen, and what has been banished so far.</summary>
+    private int _rerollsLeft;
+    private int _banishesLeft;
+    private readonly HashSet<RangerUpgrade> _banished = new();
+    private List<UpgradeChoice> _levelUpChoices = new();
+    private int _elitesKilled;
+    private int _bossesKilled;
+
     private string _announcement = "";
     private float _announcementLeft;
 
@@ -77,6 +86,11 @@ public sealed partial class ArenaMasterContent
         _runTreeExperience = 0;
         _runTreeLevels = 0;
         _saveIn = RunSaveInterval;
+        _rerollsLeft = Shop.RerollsPerRun(_profile);
+        _banishesLeft = Shop.BanishesPerRun(_profile);
+        _banished.Clear();
+        _elitesKilled = 0;
+        _bossesKilled = 0;
 
         if (window.Terrain is { } terrain)
         {
@@ -170,10 +184,16 @@ public sealed partial class ArenaMasterContent
         _levelUp.Close();
         _pendingLevels = 0;
         _condition.Clear();
+
+        // What lasts: silver for the run, and any bounties it (or the lifetime totals) completed.
+        var record = new RunRecord(_enemies.Kills, _elitesKilled, _bossesKilled, _runSeconds, ending == RunEnding.Won, _experience.Level);
+        long silver = RunRewards.Silver(record);
+        _profile.Silver += silver;
+        var bounties = Bounties.Settle(record, _profile, _tree);
         SaveProfile();
 
         _summaryScreen.Open(new RunSummary(ending, _runSeconds, _experience.Level, _enemies.Kills, _items.Found.ToList(),
-            _runTreeExperience, _runTreeLevels, _tree.Level, _tree.Tree.Name));
+            _runTreeExperience, _runTreeLevels, _tree.Level, _tree.Tree.Name, silver, bounties));
         _mode = GameMode.Summary;
         window.GamePaused = true;
     }
@@ -188,10 +208,12 @@ public sealed partial class ArenaMasterContent
         switch (killed.Kind.Tier)
         {
             case EnemyTier.Boss:
+                _bossesKilled++;
                 _loot.DropChest(killed.Position, RarityWeights.Boss);
                 Announce($"{killed.Kind.Name} has fallen!");
                 break;
             case EnemyTier.Elite:
+                _elitesKilled++;
                 _loot.DropChest(killed.Position, RarityWeights.Elite);
                 break;
             case EnemyTier.Fodder when _loot.RollFodderDrop():
@@ -338,7 +360,28 @@ public sealed partial class ArenaMasterContent
 
     private void DrawLevelUp(EngineWindow window)
     {
-        if (_levelUp.Draw() is not { } choice)
+        if (_levelUp.Draw() is not { } action)
+        {
+            return;
+        }
+
+        if (action.Reroll && _rerollsLeft > 0)
+        {
+            _rerollsLeft--;
+            _levelUp.Refresh(RangerUpgrades.Roll(_stats, _random, excluded: _banished), _rerollsLeft, _banishesLeft);
+            return;
+        }
+
+        if (action.Banish is { } index && _banishesLeft > 0 && _levelUpChoices[index].Upgrade is { } banished)
+        {
+            _banishesLeft--;
+            _banished.Add(banished);
+            _levelUpChoices = RangerUpgrades.Replace(_levelUpChoices, index, _stats, _random, _banished);
+            _levelUp.Refresh(_levelUpChoices, _rerollsLeft, _banishesLeft);
+            return;
+        }
+
+        if (action.Take is not { } choice)
         {
             return;
         }
@@ -359,7 +402,8 @@ public sealed partial class ArenaMasterContent
     private void OpenLevelUp(EngineWindow window)
     {
         int reached = _experience.Level - _pendingLevels + 1;
-        _levelUp.Open(RangerUpgrades.Roll(_stats, _random), reached);
+        _levelUpChoices = RangerUpgrades.Roll(_stats, _random, excluded: _banished);
+        _levelUp.Open(_levelUpChoices, reached, _rerollsLeft, _banishesLeft);
         window.GamePaused = true;
     }
 

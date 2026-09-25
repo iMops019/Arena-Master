@@ -44,10 +44,13 @@ internal static class RangerUpgrades
 
     public static RangerUpgradeInfo Info(RangerUpgrade upgrade) => All.First(u => u.Upgrade == upgrade);
 
-    /// <summary>Up to <paramref name="count"/> different upgrades that aren't maxed yet, picked at random - or a heal, if every one is.</summary>
-    public static List<UpgradeChoice> Roll(RangerStats stats, Random random, int count = 3)
+    /// <summary>
+    /// Up to <paramref name="count"/> different upgrades that aren't maxed yet and aren't in <paramref name="excluded"/> (banished this run), picked at random - or a
+    /// heal, if none is left.
+    /// </summary>
+    public static List<UpgradeChoice> Roll(RangerStats stats, Random random, int count = 3, IReadOnlySet<RangerUpgrade>? excluded = null)
     {
-        var open = All.Where(u => stats.LevelOf(u.Upgrade) < u.MaxLevel).ToList();
+        var open = All.Where(u => stats.LevelOf(u.Upgrade) < u.MaxLevel && excluded?.Contains(u.Upgrade) != true).ToList();
         if (open.Count == 0)
         {
             return new List<UpgradeChoice> { new(null, "Second Wind", $"Heal {SecondWindHeal:0} health", 0, 0) };
@@ -58,5 +61,19 @@ internal static class RangerUpgrades
             .Take(count)
             .Select(u => new UpgradeChoice(u.Upgrade, u.Name, u.Description, stats.LevelOf(u.Upgrade) + 1, u.MaxLevel))
             .ToList();
+    }
+
+    /// <summary>
+    /// The choices with the one at <paramref name="index"/> struck (a banish) and, if the pool has one to spare, a fresh upgrade in its place - never one already offered
+    /// or in <paramref name="excluded"/>.
+    /// </summary>
+    public static List<UpgradeChoice> Replace(IReadOnlyList<UpgradeChoice> choices, int index, RangerStats stats, Random random, IReadOnlySet<RangerUpgrade> excluded)
+    {
+        var keep = choices.Where((_, i) => i != index).ToList();
+        var skip = new HashSet<RangerUpgrade>(excluded);
+        skip.UnionWith(keep.Where(c => c.Upgrade is not null).Select(c => c.Upgrade!.Value));
+        var fresh = Roll(stats, random, 1, skip).Where(c => c.Upgrade is not null).ToList();
+        keep.InsertRange(Math.Min(index, keep.Count), fresh);
+        return keep.Count > 0 ? keep : Roll(stats, random, 1, skip);   // nothing left at all: the heal
     }
 }

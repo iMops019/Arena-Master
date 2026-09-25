@@ -14,11 +14,17 @@ internal enum CampStation
 
     /// <summary>The departure gate: choose a loadout and start a run.</summary>
     Gate,
+
+    /// <summary>The bounty board: the one-time challenges, done and still to do.</summary>
+    Bounties,
+
+    /// <summary>The quartermaster's stall: permanent upgrades bought with silver.</summary>
+    Quartermaster,
 }
 
 /// <summary>
 /// Where camp is and what is in it: a clearing of packed earth in a corner of the map (painted with the engine's bed colour, which keeps trees and plants off it),
-/// a fire in the middle, a tent, and the three stations. Runs are played around the middle of the map, well away from it.
+/// a fire in the middle, a tent, and the five stations. Runs are played around the middle of the map, well away from it.
 /// </summary>
 internal static class CampLayout
 {
@@ -43,6 +49,8 @@ internal static class CampLayout
         (CampStation.Stash, "camp_stash.glb", new(-6.5f, 2f), "Open the item chest"),
         (CampStation.Tree, "camp_target.glb", new(6.5f, 2f), "Passive tree"),
         (CampStation.Gate, "camp_gate.glb", new(0f, 11f), "Choose a loadout and set out"),
+        (CampStation.Bounties, "camp_board.glb", new(8.5f, -5f), "Read the bounty board"),
+        (CampStation.Quartermaster, "camp_stall.glb", new(-9.5f, -3f), "Visit the quartermaster"),
     };
 
     /// <summary>Scenery with no use: the tent and the fire pit.</summary>

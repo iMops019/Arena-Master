@@ -33,7 +33,23 @@ internal sealed class Profile
     /// <summary>"class/tree" -> that tree's progress.</summary>
     public Dictionary<string, TreeSave> Trees { get; set; } = new();
 
+    /// <summary>Silver: the currency earned at the end of every run and spent at the Quartermaster.</summary>
+    public long Silver { get; set; }
+
+    /// <summary>Shop upgrade id -> ranks bought (see <see cref="Shop"/>).</summary>
+    public Dictionary<string, int> Shop { get; set; } = new();
+
+    /// <summary>The ids of the bounties completed so far (see <see cref="Bounties"/>). Each pays out once.</summary>
+    public List<string> Bounties { get; set; } = new();
+
+    /// <summary>Lifetime totals the bounties read, kept across runs.</summary>
+    public LifetimeRecord Lifetime { get; set; } = new();
+
     public int CountOf(string itemId) => Stash.GetValueOrDefault(itemId);
+
+    public int ShopRank(string upgradeId) => Shop.GetValueOrDefault(upgradeId);
+
+    public bool HasBounty(string bountyId) => Bounties.Contains(bountyId);
 
     public void AddToStash(string itemId, int count = 1) => Stash[itemId] = CountOf(itemId) + count;
 

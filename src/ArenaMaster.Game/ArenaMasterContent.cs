@@ -66,7 +66,11 @@ public sealed partial class ArenaMasterContent : IGameContent
         _stats.Tree = SharpshooterBonuses.From(_tree.Save.Ranks);
         _bow = new RangerBow(_random);
         _enemies = new EnemyField(_random);
-        _loot = new LootField(_random);
+        _loot = new LootField(_random)
+        {
+            Available = item => Bounties.IsUnlocked(item, _profile),   // locked items don't come out of chests or drops until their bounty is done
+            Luck = weights => Shop.Lucky(weights, _profile),
+        };
     }
 
     public string AssetsRoot => Path.Combine(EngineAssets.RepoRoot, "assets");

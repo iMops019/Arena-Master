@@ -103,10 +103,24 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
   - **Departure gate** -> loadout (pick up to 5 items), then Begin run.
 - Progress is saved to `%AppData%/ArenaMaster/profile.json` (stash, loadout, trees). It saves on every change at camp, every 20 s in a run, when the tree levels, and at the end of a run.
 
-## Meta progression (like Megabonk)
+## Meta progression (built, first pass)
 
-- Between runs the player unlocks things permanently (new items added to the drop pool, new abilities, later new classes) by completing challenges and spending a currency earned in runs.
-- The details are **(open)** until the Ranger loop feels good.
+All in `Progression/MetaProgress.cs`; all numbers are a starting point to tune.
+- **Silver**, earned at the end of every run, win or lose: 1 per 10 kills, 5 per elite, 60 per boss, 3 per minute survived, +250 for a win. Shown at camp and in the run summary.
+- **The Quartermaster** (camp stall) sells permanent upgrades with silver:
+  - *Bigger Pack:* +1 loadout slot, 3 ranks (5 -> 8 items).
+  - *Second Thoughts:* +1 reroll per run on the level-up screen, 5 ranks. A reroll swaps all three cards (R).
+  - *Clear Mind:* +1 banish per run, 3 ranks. A banish strikes one card's upgrade from the pool for the rest of the run and replaces the card.
+  - *Lucky Charm:* 5 ranks. Each makes rares 15%, epics 30% and legendaries 50% likelier (relative to commons) from chests and drops.
+- **The Bounty Board** (camp) has 10 one-time challenges, checked at the end of every run. Each pays silver once, and five unlock an item into the drop pool. **The epics and legendaries start locked** (items already owned stay owned):
+  - Brute Force (kill a Brute) -> Ironbark Totem
+  - Holding On (survive 10 min) -> Swiftwind Sigil
+  - Regicide (kill the Hollow King) -> Hunter's Moon
+  - The Long Night (survive 20 min) -> Dragon Heart
+  - Massacre (1,000 kills in a run) -> Rune of Might
+  - Silver only: First Hunt, Collector, Deep Roots, A Thousand Cuts (lifetime), Champion (win).
+  - While a rarity's items are all locked, a roll of that rarity falls back to the next one down.
+- Later: unlocking a second class, more trees, cosmetic or camp upgrades.
 
 ## Build order
 
@@ -118,8 +132,8 @@ Each step should be playable before the next one starts. **[engine]** means the 
 4. *(Done; the user is happy with the feel.)* **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] (The engine steering turned out not to be needed yet: the game's own separation handles about 80 enemies. Revisit with the swarm renderer in step 7.)
 5. *(Done; reworked in step 6 so items persist.)* **Items:** drops, chests, bonuses and multipliers. [game]
 6. *(Done.)* **Camp, save file, persistent items and loadouts, and the Sharpshooter passive tree.** [game] [engine: TeleportPlayer, pause-menu buttons, MapsMenu switch]
-7. *(Built; waiting for the user to try it.)* **Swarms:** a batched crowd renderer for hundreds of enemies. [engine: `SetCrowd`, instanced props] [game: enemies, arrows and gems drawn as crowds; an enemy grid for spacing and hits; the director ramps to 300 fodder; gems merge past 400; damage numbers capped at 60]. The enemies are rigid stand-ins. Animated crowds (baked animation) wait for rigged enemy models.
-8. **Meta progression:** unlocks, currency. (The save file came in step 6.) [game]
+7. *(Done.)* **Swarms:** a batched crowd renderer for hundreds of enemies. [engine: `SetCrowd`, instanced props] [game: enemies, arrows and gems drawn as crowds; an enemy grid for spacing and hits; the director ramps to 300 fodder; gems merge past 400; damage numbers capped at 60]. The enemies are rigid stand-ins. Animated crowds (baked animation) wait for rigged enemy models.
+8. *(Built, first pass; waiting for the user to try it.)* **Meta progression:** silver, the Quartermaster, the Bounty Board, locked items. (The save file came in step 6.) [game]
 9. Iterate on the Ranger until it feels right, then design class #2.
 
 ## Open questions

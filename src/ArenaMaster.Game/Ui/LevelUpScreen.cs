@@ -4,9 +4,13 @@ using ImGuiNET;
 
 namespace ArenaMaster.Game.Ui;
 
+/// <summary>What the player did on the level-up screen: took a card, rerolled the lot, or banished one (by its place in the row).</summary>
+internal sealed record LevelUpAction(UpgradeChoice? Take = null, bool Reroll = false, int? Banish = null);
+
 /// <summary>
 /// The level-up screen: the world is paused behind it (the content sets <c>EngineWindow.GamePaused</c>), and the player picks one of the offered upgrades by clicking
-/// its card or pressing 1, 2 or 3. Drawn with ImGui from <c>IGameContent.DrawOverlay</c>.
+/// its card or pressing 1, 2 or 3 - or, with rerolls and banishes bought from the Quartermaster, rerolls all three (R) or banishes one. Drawn with ImGui from
+/// <c>IGameContent.DrawOverlay</c>.
 /// </summary>
 internal sealed class LevelUpScreen
 {
@@ -17,23 +21,36 @@ internal sealed class LevelUpScreen
 
     private IReadOnlyList<UpgradeChoice> _choices = Array.Empty<UpgradeChoice>();
     private int _level;
+    private int _rerolls;
+    private int _banishes;
     private double _openedAt = double.NegativeInfinity;
     private bool _stampOpenTime;
 
     public bool IsOpen { get; private set; }
 
-    public void Open(IReadOnlyList<UpgradeChoice> choices, int level)
+    /// <summary>Shows <paramref name="choices"/> for <paramref name="level"/>, with <paramref name="rerolls"/> and <paramref name="banishes"/> left this run.</summary>
+    public void Open(IReadOnlyList<UpgradeChoice> choices, int level, int rerolls = 0, int banishes = 0)
     {
         _choices = choices;
         _level = level;
+        _rerolls = rerolls;
+        _banishes = banishes;
         IsOpen = true;
         _stampOpenTime = true;
     }
 
+    /// <summary>New choices on the open screen (after a reroll or a banish), with what is left of each.</summary>
+    public void Refresh(IReadOnlyList<UpgradeChoice> choices, int rerolls, int banishes)
+    {
+        _choices = choices;
+        _rerolls = rerolls;
+        _banishes = banishes;
+    }
+
     public void Close() => IsOpen = false;
 
-    /// <summary>Draws the screen and returns the choice the player took this frame, if any (the screen closes itself when one is taken).</summary>
-    public UpgradeChoice? Draw()
+    /// <summary>Draws the screen and returns what the player did this frame, if anything. Taking a card closes it; a reroll or banish leaves it open for <see cref="Refresh"/>.</summary>
+    public LevelUpAction? Draw()
     {
         if (!IsOpen)
         {
@@ -56,7 +73,8 @@ internal sealed class LevelUpScreen
         float cardHeight = 190f * scale;
         float gap = 24f * scale;
         float totalWidth = _choices.Count * cardWidth + (_choices.Count - 1) * gap;
-        var windowSize = new Vector2(totalWidth + 48f * scale, cardHeight + 150f * scale);
+        bool extras = _rerolls > 0 || _banishes > 0;
+        var windowSize = new Vector2(MathF.Max(totalWidth, 3 * 250f * scale + 48f * scale) + 48f * scale, cardHeight + (extras ? 215f : 150f) * scale);
 
         ImGui.SetNextWindowPos(display * 0.5f, ImGuiCond.Always, new Vector2(0.5f, 0.5f));
         ImGui.SetNextWindowSize(windowSize, ImGuiCond.Always);
@@ -69,8 +87,9 @@ internal sealed class LevelUpScreen
         CenteredText($"Level {_level}  -  choose one", 1f, scale, new Vector4(0.85f, 0.88f, 0.85f, 1f));
         ImGui.Dummy(new Vector2(0f, 10f * scale));
 
-        UpgradeChoice? taken = null;
-        ImGui.SetCursorPosX((ImGui.GetWindowWidth() - totalWidth) * 0.5f);
+        LevelUpAction? action = null;
+        float rowStart = (ImGui.GetWindowWidth() - totalWidth) * 0.5f;
+        ImGui.SetCursorPosX(rowStart);
         for (int i = 0; i < _choices.Count; i++)
         {
             if (i > 0)
@@ -80,21 +99,59 @@ internal sealed class LevelUpScreen
 
             if (DrawCard(i, _choices[i], new Vector2(cardWidth, cardHeight), scale, armed))
             {
-                taken = _choices[i];
+                action = new LevelUpAction(Take: _choices[i]);
+            }
+        }
+
+        // A banish button under each card that can be banished (not the heal), while there are banishes left.
+        if (_banishes > 0)
+        {
+            ImGui.SetCursorPosX(rowStart);
+            for (int i = 0; i < _choices.Count; i++)
+            {
+                if (i > 0)
+                {
+                    ImGui.SameLine(0f, gap);
+                }
+
+                ImGui.PushID(100 + i);
+                bool canBanish = _choices[i].Upgrade is not null && armed;
+                if (UiTheme.Button("Banish", new Vector2(cardWidth, 30f * scale), enabled: canBanish))
+                {
+                    action = new LevelUpAction(Banish: i);
+                }
+
+                ImGui.PopID();
             }
         }
 
         ImGui.Dummy(new Vector2(0f, 8f * scale));
-        CenteredText("Click a card, or press 1 / 2 / 3", 0.8f, scale, new Vector4(0.6f, 0.65f, 0.6f, 1f));
+        if (_rerolls > 0)
+        {
+            float rerollWidth = 220f * scale;
+            ImGui.SetCursorPosX((ImGui.GetWindowWidth() - rerollWidth) * 0.5f);
+            if (UiTheme.Button($"Reroll  [R]  ·  {_rerolls} left", new Vector2(rerollWidth, 34f * scale), enabled: armed))
+            {
+                action = new LevelUpAction(Reroll: true);
+            }
+        }
 
-        if (armed && taken is null)
+        string hint = "Click a card, or press 1 / 2 / 3" + (_banishes > 0 ? $"   ·   {_banishes} banish{(_banishes == 1 ? "" : "es")} left: strikes it from this run" : "");
+        CenteredText(hint, 0.8f, scale, new Vector4(0.6f, 0.65f, 0.6f, 1f));
+
+        if (armed && action is null)
         {
             for (int i = 0; i < _choices.Count && i < NumberKeys.Length; i++)
             {
                 if (ImGui.IsKeyPressed(NumberKeys[i], false))
                 {
-                    taken = _choices[i];
+                    action = new LevelUpAction(Take: _choices[i]);
                 }
+            }
+
+            if (_rerolls > 0 && ImGui.IsKeyPressed(ImGuiKey.R, false))
+            {
+                action = new LevelUpAction(Reroll: true);
             }
         }
 
@@ -102,12 +159,12 @@ internal sealed class LevelUpScreen
         ImGui.PopStyleVar();
         ImGui.PopStyleColor();
 
-        if (taken is not null)
+        if (action?.Take is not null)
         {
             IsOpen = false;
         }
 
-        return taken;
+        return action;
     }
 
     /// <summary>One card: the number key, the upgrade's name, its level, what it does. The whole card is the button.</summary>
