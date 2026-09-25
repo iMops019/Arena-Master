@@ -14,20 +14,21 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 
 ## The core loop
 
-0. At **camp**, check the item chest, spend passive tree points, and choose a loadout of up to 5 items at the departure gate.
+0. At **camp**, check the item chest, spend passive tree points, read the bounty board, buy upgrades from the quartermaster with silver, and choose a loadout of up to 5 items (more with Bigger Pack) at the departure gate.
 1. Start a 30-minute run as a class.
 2. Move and aim. Attacks fire automatically in the direction the camera faces (Megabonk-style), so positioning and aim matter but you never click to attack.
 3. Kill monsters, which drop XP. Collect it to level up.
 4. On level up the game pauses and offers **3 choices**: new abilities, upgrades to owned abilities, or stat boosts. Choices stack and can come up again.
-5. Monsters and chests drop **items** that give passive bonuses and multipliers for the rest of the run.
+5. Monsters and chests drop **items**. They go to the chest at camp and give their bonuses on a later run that brings them, not the one they were found in.
 6. Survive the escalating waves, elites and bosses to the 30-minute mark.
-7. The run ends in victory, death, or "Return to Camp" from the pause menu. Items found are already in the stash, and the passive tree has banked its experience. Back at camp, spend it.
+7. The run ends in victory, death, or "Return to Camp" from the pause menu. A summary shows what it earned: silver, bounties completed, tree experience, items found. Back at camp, spend it.
 
-## Camera and controls (draft)
+## Camera and controls (built)
 
 - Third-person follow camera behind the player. The mouse orbits the camera and sets the aim direction.
 - WASD to move (7 m/s), Space to jump, Shift to dash (a 0.18 s burst with a 1.2 s cooldown).
-- Esc pauses. The level-up screen is its own pause.
+- Esc pauses (Return to Camp is in the pause menu). The level-up screen is its own pause. E uses a camp station and closes camp screens.
+- The title screen has Play (continue the save) and **New Game** (start over, behind a confirmation; the old save is copied to `profile.backup-<date-time>.json`, never deleted).
 
 ## Enemies and pacing (built, first pass)
 
@@ -41,23 +42,22 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
   - *Leap slam:* 6 m circle, 35 damage, 1 s stun.
   - *Shockwave:* a ring spreads 18 m along the ground; jump over it or take 25.
   - *Summon:* 8 ghouls around itself.
-- **Win:** survive to 30:00. **Lose:** death. Either way, a summary shows and a new run starts.
-- **Dev keys (remove before release):** F5 skips a minute, F6 spawns a brute, F7 spawns the king.
+- **Win:** survive to 30:00. **Lose:** death. Either way, a summary shows and then it's back to camp.
+- **Dev keys (remove before release):** in a run, F5 skips a minute, F6 spawns a brute, F7 spawns the king. At camp, F8 gives the passive tree a level.
 
-**The design intent this came from:**
+**The design intent this came from** (the user chose the hybrid map):
 
-The map-style decision is **(open)**: one big arena or a large Megabonk-style map. The recommendation is a hybrid:
-
-- **Fodder swarms** that keep growing over the run, so the player's power growth is visible. This needs the engine's crowd renderer (see the build order).
+- **Fodder swarms** that keep growing over the run, so the player's power growth is visible. Drawn with the engine's crowds (step 7).
 - **Elite packs** on a timer: few enemies, dangerous, with telegraphed attacks (lunges, jump slams, stuns, charges). Clear wind-ups so they're fair. This is where dodging and skill matter.
 - **Bosses** at set times, with a final one near 30:00.
-- **A bounded map**, mid-to-large, with edges (Megabonk-style levels, not an open world).
+- **A bounded map**, mid-to-large, with edges (Megabonk-style levels, not an open world). The current map is a 512 m test map; the real one is still to be made.
 
 ## First class: Ranger
 
 - **Basic attack:** a bow that auto-fires arrows where the camera aims. The arrows converge on whatever the crosshair is on. Current numbers: 1 shot per 0.5 s, 12 damage, 50 m/s, 60 m range, straight flight.
 - **Levelling:** each ghoul drops a 1 XP gem. Level n to n+1 takes 5n XP. Gems within the pickup radius (3 m base) fly to the player. Each level pauses the game and offers 3 random upgrades from the pool below; maxed ones drop out, and once all are maxed the offer is a heal (Second Wind, 30 HP). A death ends the run and resets level, upgrades and clock.
 - **Level-up pool (built, first pass):** Sharpened Tips (+20% damage, x5), Quick Draw (+15% attack speed, x5), Split Shot (+1 arrow fanned 7 degrees apart, x4), Piercing Arrows (+1 pierce, x3), Deadeye (+8% crit, crits x2, base 5%, x5), Fletching (+20% arrow speed and +15% range, x3), Fleet Foot (+8% move speed, x5), Vitality (+20 max HP and heal, x5), Scavenger (+35% pickup range, x4).
+- **Rerolls and banishes** on the level-up screen come from the Quartermaster (see Meta progression).
 - **Ideas for later levels of the pool (draft):** Rain of Arrows (area), Traps, Poison or Fire Arrows (damage over time), Hawk companion, health regen.
 - **Passive trees:** a class has several trees; the player picks one to be active. The active tree earns the run's experience (its base amount, before item bonuses) and levels during runs, but points are only spent at camp. Respec is free (for now). Cap: tree level 50, one point per level. Levelling is slow on purpose: level n to n+1 takes 200 + 60 x n^1.6 experience.
 - **First tree: Sharpshooter** (`Ranger/SharpshooterTree.cs`, built): 34 nodes in 7 tiers opening at tree levels 1, 3, 6, 10, 15, 21, 28, in three lanes (Precision, Volley, Trickshot). Two starting nodes: Steady Hands and Honed Draw (+10% damage and attack speed per rank, x5). Nine majors (one rank each). Chain Projectiles is a tier 2 major (user's request). A node needs its tier's level and a ranked parent.
@@ -77,7 +77,7 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
 
 - Dropped by monsters (elites and bosses more likely) and found in chests.
 - Give passive bonuses and multipliers. They stack.
-- **Items are kept between runs** (changed by the user after step 5). Everything found goes into the stash at camp. Before a run, the player picks up to **5 different items** to bring, and each comes with every copy owned. The limit of 5 is a starting point to tune while playing.
+- **Items are kept between runs** (changed by the user after step 5). Everything found goes into the stash at camp. Before a run, the player picks up to **5 different items** to bring (up to 8 with the Quartermaster's Bigger Pack), and each comes with every copy owned. The limit is a starting point to tune while playing.
 - Rarity tiers: common, rare, epic, legendary.
 
 **What's built** (`src/ArenaMaster.Game/Items/`):
@@ -97,11 +97,13 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
 
 ## Camp (built)
 
-- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle. A fire, a tent, and three stations; walk up and press E:
+- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle. A fire, a tent, and five stations; walk up and press E:
   - **Stash chest** -> Item Chest: every item, how many owned, and which are still undiscovered.
   - **Archery target** -> the passive tree (the in-game version of the mockup).
-  - **Departure gate** -> loadout (pick up to 5 items), then Begin run.
-- Progress is saved to `%AppData%/ArenaMaster/profile.json` (stash, loadout, trees). It saves on every change at camp, every 20 s in a run, when the tree levels, and at the end of a run.
+  - **Bounty board** -> the bounties, done and to do.
+  - **Quartermaster's stall** -> upgrades for silver.
+  - **Departure gate** -> loadout (pick up to 5 items, more if bought), then Begin run.
+- Progress is saved to `%AppData%/ArenaMaster/profile.json` (stash, loadout, trees, silver, upgrades, bounties, lifetime totals). It saves on every change at camp, every 20 s in a run, when the tree levels, and at the end of a run.
 
 ## Meta progression (built, first pass)
 
@@ -133,12 +135,13 @@ Each step should be playable before the next one starts. **[engine]** means the 
 5. *(Done; reworked in step 6 so items persist.)* **Items:** drops, chests, bonuses and multipliers. [game]
 6. *(Done.)* **Camp, save file, persistent items and loadouts, and the Sharpshooter passive tree.** [game] [engine: TeleportPlayer, pause-menu buttons, MapsMenu switch]
 7. *(Done.)* **Swarms:** a batched crowd renderer for hundreds of enemies. [engine: `SetCrowd`, instanced props] [game: enemies, arrows and gems drawn as crowds; an enemy grid for spacing and hits; the director ramps to 300 fodder; gems merge past 400; damage numbers capped at 60]. The enemies are rigid stand-ins. Animated crowds (baked animation) wait for rigged enemy models.
-8. *(Built, first pass; waiting for the user to try it.)* **Meta progression:** silver, the Quartermaster, the Bounty Board, locked items. (The save file came in step 6.) [game]
+8. *(Built, first pass; the user is starting a fresh save to try it.)* **Meta progression:** silver, the Quartermaster, the Bounty Board, locked items, and a New Game button on the title screen. (The save file came in step 6.) [game] [engine: title-screen buttons]
 9. Iterate on the Ranger until it feels right, then design class #2.
 
 ## Open questions
 
-- One big arena or a large Megabonk-style map? (Leaning toward the hybrid described above.)
 - Should item experience bonuses (Old Tome) also speed up the passive tree? (Left for later; currently they don't.)
-- Items stack for good across runs. With no cap on copies, a 5-item loadout will keep getting stronger; watch the balance while playing.
+- Items stack for good across runs. With no cap on copies, a loadout keeps getting stronger; watch the balance while playing.
+- Meta progression numbers (silver rates, prices, which items are locked behind which bounty) are a first guess.
+- The real map: size, layout and look (the hybrid: bounded, mid-to-large).
 - Respec is free for now. Keep it free, or give it a cost later?
