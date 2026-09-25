@@ -18,6 +18,7 @@ Already cloned without it? Run `git submodule update --init`.
 | `src/ArenaMaster.Game` | The game itself: `ArenaMasterContent` implements the engine's `IGameContent`. |
 | `src/ArenaMaster.Editor` | Launches the engine Editor with Arena Master's content. |
 | `src/ArenaMaster.Play` | Launches the game in Play mode. |
+| `tools/` | Helper scripts, e.g. `make_placeholder_ranger.py` (builds the stand-in Ranger model). |
 | `assets/` | Arena Master's own models, textures, sounds, and saved `terrain.dat` / `scene.json`. |
 
 ## Running

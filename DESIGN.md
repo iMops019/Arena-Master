@@ -25,7 +25,7 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 ## Camera and controls (draft)
 
 - Third-person follow camera behind the player. The mouse orbits the camera and sets the aim direction.
-- WASD to move, Space to jump, and a dodge or dash with a cooldown.
+- WASD to move (7 m/s), Space to jump, Shift to dash (a 0.18 s burst with a 1.2 s cooldown).
 - Esc pauses. The level-up screen is its own pause.
 
 ## Enemies and pacing (draft, based on the recommended hybrid)
@@ -64,7 +64,7 @@ The map-style decision is **(open)**: one big arena or a large Megabonk-style ma
 
 Each step should be playable before the next one starts. **[engine]** means the work goes in C-Engine (commit and push there, then `./update-engine.ps1` here). **[game]** means the work goes in this repo.
 
-1. **Third-person Ranger movement:** follow camera, WASD, jump, dash, on a test map with a placeholder character. [engine: general follow camera] [game: Ranger controller]
+1. *(Built; tuning in progress.)* **Third-person Ranger movement:** follow camera, WASD, jump, dash, on a test map with a placeholder character. [engine: general follow camera] [game: Ranger controller]
 2. **Shooting and killing:** an auto-firing bow, arrow projectiles, one basic chaser enemy, hit detection, damage, death. [engine: general projectile/hitbox/damage helpers] [game: the bow, the enemy]
 3. **Levelling up:** XP drops and pickup, the level-up pause with 3 choices, the first handful of stacking upgrades, and a HUD (HP, XP bar, timer, level). [game]
 4. **A full run:** a 30-minute spawn director, one elite with telegraphed attacks, one boss, win/lose screens. [game] [engine: basic steering/avoidance for many enemies]
