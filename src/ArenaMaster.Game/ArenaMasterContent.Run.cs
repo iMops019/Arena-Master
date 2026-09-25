@@ -166,6 +166,24 @@ public sealed partial class ArenaMasterContent
     /// <summary>The run is over: clear the field, save, and show how it went. The summary's button returns to camp.</summary>
     private void EndRun(EngineWindow window, RunEnding ending)
     {
+        ClearField(window);
+
+        // What lasts: silver for the run, and any bounties it (or the lifetime totals) completed.
+        var record = new RunRecord(_enemies.Kills, _elitesKilled, _bossesKilled, _runSeconds, ending == RunEnding.Won, _experience.Level);
+        long silver = RunRewards.Silver(record);
+        _profile.Silver += silver;
+        var bounties = Bounties.Settle(record, _profile, _tree);
+        SaveProfile();
+
+        _summaryScreen.Open(new RunSummary(ending, _runSeconds, _experience.Level, _enemies.Kills, _items.Found.ToList(),
+            _runTreeExperience, _runTreeLevels, _tree.Level, _tree.Tree.Name, silver, bounties));
+        _mode = GameMode.Summary;
+        window.GamePaused = true;
+    }
+
+    /// <summary>Takes everything of a run out of the world - enemies, gems, loot, arrows, numbers, a level-up in progress - with no rewards.</summary>
+    private void ClearField(EngineWindow window)
+    {
         foreach (var enemy in _enemies.Clear())
         {
             _enemyView.Remove(window, enemy);
@@ -184,18 +202,6 @@ public sealed partial class ArenaMasterContent
         _levelUp.Close();
         _pendingLevels = 0;
         _condition.Clear();
-
-        // What lasts: silver for the run, and any bounties it (or the lifetime totals) completed.
-        var record = new RunRecord(_enemies.Kills, _elitesKilled, _bossesKilled, _runSeconds, ending == RunEnding.Won, _experience.Level);
-        long silver = RunRewards.Silver(record);
-        _profile.Silver += silver;
-        var bounties = Bounties.Settle(record, _profile, _tree);
-        SaveProfile();
-
-        _summaryScreen.Open(new RunSummary(ending, _runSeconds, _experience.Level, _enemies.Kills, _items.Found.ToList(),
-            _runTreeExperience, _runTreeLevels, _tree.Level, _tree.Tree.Name, silver, bounties));
-        _mode = GameMode.Summary;
-        window.GamePaused = true;
     }
 
     /// <summary>What a kill leaves behind: its experience gem, and loot - an elite's or a boss's chest, or now and then an item from fodder.</summary>

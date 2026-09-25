@@ -39,8 +39,8 @@ public sealed partial class ArenaMasterContent : IGameContent
 
     private readonly Random _random = new();
     private readonly string _profilePath;
-    private readonly Profile _profile;
-    private readonly TreeProgress _tree;
+    private Profile _profile;
+    private TreeProgress _tree;
     private readonly RangerStats _stats = new();
     private readonly RangerController _ranger = new();
     private readonly PlayerHealth _health = new(RangerStats.BaseMaxHealth);
@@ -50,6 +50,7 @@ public sealed partial class ArenaMasterContent : IGameContent
     private bool _started;
     private GameMode _mode = GameMode.Camp;
     private string? _saveProblem;
+    private bool _newGameRequested;
 
     public ArenaMasterContent()
         : this(ProfileStore.DefaultPath)
@@ -74,6 +75,12 @@ public sealed partial class ArenaMasterContent : IGameContent
     }
 
     public string AssetsRoot => Path.Combine(EngineAssets.RepoRoot, "assets");
+
+    /// <summary>
+    /// Asks for a new game - everything that lasts between runs back to nothing - behind a confirmation screen, shown on the next frame of play. The Play host wires
+    /// this to the title screen's New Game button.
+    /// </summary>
+    public void RequestNewGame() => _newGameRequested = true;
 
     public Terrain CreateInitialTerrain()
     {
@@ -138,6 +145,14 @@ public sealed partial class ArenaMasterContent : IGameContent
 
         float? GroundAt(float x, float z) => terrain.TryGetHeight(x, z, out float height) ? height : null;
 
+        if (_newGameRequested)
+        {
+            _newGameRequested = false;
+            _newGameScreen.Open();
+            window.GamePaused = true;
+            return;
+        }
+
         _ranger.Update(window, deltaSeconds, _stats, _condition.IsStunned);
         _health.Update(deltaSeconds);
         _condition.Update(deltaSeconds);
@@ -160,6 +175,21 @@ public sealed partial class ArenaMasterContent : IGameContent
     /// <summary>The game's own screens, over the world: whichever is open takes the frame.</summary>
     public void DrawOverlay(EngineWindow window)
     {
+        if (_newGameScreen.IsOpen)
+        {
+            switch (_newGameScreen.Draw())
+            {
+                case ConfirmScreen.Answer.Confirm:
+                    StartNewGame(window);
+                    break;
+                case ConfirmScreen.Answer.Cancel:
+                    window.GamePaused = _levelUp.IsOpen || _summaryScreen.IsOpen;   // back to whatever was up before
+                    break;
+            }
+
+            return;
+        }
+
         if (_summaryScreen.IsOpen)
         {
             if (_summaryScreen.Draw())
@@ -196,6 +226,35 @@ public sealed partial class ArenaMasterContent : IGameContent
             }
         });
         _started = true;
+    }
+
+    /// <summary>
+    /// A new game: the old save is copied aside (never deleted), then everything that lasts between runs starts again from nothing - the chest, the loadout, the tree,
+    /// silver, bounties and upgrades - and the player is back at camp. A run in progress ends without paying out.
+    /// </summary>
+    private void StartNewGame(EngineWindow window)
+    {
+        if (_mode != GameMode.Camp)
+        {
+            ClearField(window);
+        }
+
+        _summaryScreen.Close();
+        CloseCampScreens();
+
+        try
+        {
+            ProfileStore.Backup(_profilePath);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            _saveProblem = $"Couldn't back up the old save: {e.Message}";
+        }
+
+        _profile = new Profile();
+        _tree = new TreeProgress(SharpshooterTree.Tree, _profile.Tree(SharpshooterTree.ClassId, SharpshooterTree.TreeId));
+        SaveProfile();
+        ReturnToCamp(window);
     }
 
     /// <summary>Writes the profile. A failure is shown on the HUD rather than stopping the game.</summary>

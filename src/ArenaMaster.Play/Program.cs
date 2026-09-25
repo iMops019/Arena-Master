@@ -1,6 +1,7 @@
 using ArenaMaster.Game;
 using CEngine.Core;
 
+var content = new ArenaMasterContent();
 var window = new EngineWindow
 {
     Title = "Arena Master",
@@ -10,7 +11,8 @@ var window = new EngineWindow
     StartOnTitleScreen = true,
     BuiltInPanels = false,   // no survival inventory, build menu or player menu in this game
     MapsMenu = false,        // the world is the game's own; an engine map would replace it
-    GameContent = new ArenaMasterContent(),
+    GameContent = content,
 };
 
+window.AddTitleMenuButton("New Game", content.RequestNewGame);   // start over from nothing, behind a confirmation
 window.Run();

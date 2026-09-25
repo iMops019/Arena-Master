@@ -52,6 +52,28 @@ public class ProfileStoreTests : IDisposable
     }
 
     [Fact]
+    public void ABackup_CopiesTheSaveAside_AndLeavesItInPlace()
+    {
+        var profile = new Profile { Silver = 1234 };
+        ProfileStore.Save(profile, ProfilePath);
+
+        string? first = ProfileStore.Backup(ProfilePath);
+        string? second = ProfileStore.Backup(ProfilePath);   // twice in the same second: a second copy, not an overwrite
+
+        Assert.NotNull(first);
+        Assert.NotNull(second);
+        Assert.NotEqual(first, second);
+        Assert.Equal(1234, ProfileStore.Load(first!).Silver);
+        Assert.True(File.Exists(ProfilePath));
+    }
+
+    [Fact]
+    public void BackingUp_NothingSaved_DoesNothing()
+    {
+        Assert.Null(ProfileStore.Backup(ProfilePath));
+    }
+
+    [Fact]
     public void AnUnreadableFile_IsSetAside_NotLost()
     {
         Directory.CreateDirectory(_directory);

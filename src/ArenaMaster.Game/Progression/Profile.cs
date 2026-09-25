@@ -100,6 +100,29 @@ internal static class ProfileStore
         return new Profile();
     }
 
+    /// <summary>
+    /// Copies the save at <paramref name="path"/> aside as <c>profile.backup-&lt;date-time&gt;.json</c> in the same folder, and returns the copy's path - or null if there
+    /// is no save to copy. Nothing is ever deleted: a new game starts over, but the old one can still be put back by hand.
+    /// </summary>
+    public static string? Backup(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        string directory = Path.GetDirectoryName(path) ?? ".";
+        string name = Path.GetFileNameWithoutExtension(path);
+        string backup = Path.Combine(directory, $"{name}.backup-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+        for (int n = 2; File.Exists(backup); n++)
+        {
+            backup = Path.Combine(directory, $"{name}.backup-{DateTime.Now:yyyyMMdd-HHmmss}-{n}.json");
+        }
+
+        File.Copy(path, backup);
+        return backup;
+    }
+
     /// <summary>Writes the profile through a temp file, so a crash mid-write can't leave half a save.</summary>
     public static void Save(Profile profile, string path)
     {

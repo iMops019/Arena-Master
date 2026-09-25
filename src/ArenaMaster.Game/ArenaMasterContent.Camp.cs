@@ -17,6 +17,10 @@ public sealed partial class ArenaMasterContent
     private readonly RunSummaryScreen _summaryScreen = new();
     private readonly BountyBoardScreen _bountyScreen = new();
     private readonly QuartermasterScreen _shopScreen = new();
+    private readonly ConfirmScreen _newGameScreen = new(
+        "New game",
+        "Start over from nothing? Your item chest, loadout, passive tree, silver, bounties and quartermaster upgrades all go back to the start. Your current save is kept as a backup copy next to it.",
+        "Start a new game");
 
     /// <summary>The station the player is standing at, if any, and what pressing E there does.</summary>
     private (CampStation Station, string Prompt)? _nearStation;
@@ -135,6 +139,16 @@ public sealed partial class ArenaMasterContent
         }
 
         return false;
+    }
+
+    /// <summary>Closes every camp screen at once (a new game starting over them).</summary>
+    private void CloseCampScreens()
+    {
+        _chestScreen.Close();
+        _treeScreen.Close();
+        _loadoutScreen.Close();
+        _bountyScreen.Close();
+        _shopScreen.Close();
     }
 
     private void CloseScreen(EngineWindow window)
