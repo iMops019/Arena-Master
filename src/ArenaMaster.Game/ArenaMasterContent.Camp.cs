@@ -22,6 +22,13 @@ public sealed partial class ArenaMasterContent
     {
         _health.Reset(_stats.MaxHealth);   // camp is safe
         _nearStation = CampLayout.StationNear(window.PlayerFeet);
+
+        // Testing shortcut, like the run's F5-F7: F8 at camp gives the active tree one level, to try deep nodes without the runs. Goes before a real release.
+        if (Pressed(window, Key.F8) && _tree.Level < Progression.TreeProgress.MaxLevel)
+        {
+            _tree.AddExperience(Progression.TreeProgress.RequiredFor(_tree.Level) - _tree.IntoLevel);
+            SaveProfile();
+        }
         if (_nearStation is not { } near || !Pressed(window, Key.E))
         {
             return;
