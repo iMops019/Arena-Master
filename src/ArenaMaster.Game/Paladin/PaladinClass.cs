@@ -33,6 +33,9 @@ internal sealed class PaladinClass : IHeroClass
     private float _blockedShown;
     private float _vowShown;
 
+    /// <summary>Unbroken Vow's last stand, not yet used this run. Any other last stand (an item's) is the content's to answer.</summary>
+    private int _vowLeft;
+
     public PaladinClass(Random random) => _light = new HolyLight(random);
 
     public PaladinStats Stats { get; } = new();
@@ -60,6 +63,8 @@ internal sealed class PaladinClass : IHeroClass
     /// <summary>Certain while Shield of Faith is up; otherwise the shield's chance, with standing still and Sanctuary counted.</summary>
     public float BlockChance => FaithReady ? 1f : Stats.BlockChance(_still, InCircle);
 
+    public bool KeepsOwnBarrier => false;
+
     public string DashLabel => "SHIELD RUSH";
 
     public float DashReadiness => _controller.RushReadiness;
@@ -82,7 +87,8 @@ internal sealed class PaladinClass : IHeroClass
         Stats.Items = items;
         health.Reset(Stats.MaxHealth);
         _health = health;
-        health.LastStands = Stats.Tree.UnbrokenVow ? 1 : 0;
+        _vowLeft = Stats.Tree.UnbrokenVow ? 1 : 0;
+        health.LastStands = _vowLeft;
         _banished.Clear();
         _light.Reset();
         _circlesAround = 0;
@@ -163,8 +169,9 @@ internal sealed class PaladinClass : IHeroClass
             }
         }
 
-        if (health.TakeLastStand())
+        if (_vowLeft > 0 && health.TakeLastStand())
         {
+            _vowLeft--;
             health.Heal(health.Max * PaladinStats.VowHeal);   // Unbroken Vow
             _vowShown = VowShown;
         }

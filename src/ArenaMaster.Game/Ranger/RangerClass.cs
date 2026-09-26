@@ -43,7 +43,9 @@ internal sealed class RangerClass : IHeroClass
 
     public float DamageTaken => Stats.DamageTaken;
 
-    public float BlockChance => 0f;
+    public float BlockChance => Stats.BlockChance;
+
+    public bool KeepsOwnBarrier => false;
 
     public string DashLabel => "DASH";
 
@@ -72,7 +74,7 @@ internal sealed class RangerClass : IHeroClass
 
     public void Attack(RunFrame frame)
     {
-        while (_recentKills.Count > 0 && _recentKills.Peek() < frame.RunSeconds - MomentumWindow)
+        while (_recentKills.Count > 0 && _recentKills.Peek() < frame.RunSeconds - MomentumWindow - Stats.Items.Duration)
         {
             _recentKills.Dequeue();
         }

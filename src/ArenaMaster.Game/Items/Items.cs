@@ -1,3 +1,5 @@
+using ArenaMaster.Game.Combat;
+
 namespace ArenaMaster.Game.Items;
 
 internal enum ItemRarity
@@ -14,6 +16,10 @@ internal enum ItemRarity
 ///
 /// Two kinds of number: the <b>bonuses</b> (percentages as fractions, 0.08 = +8%, and flat amounts) add together with each other and with a class's own
 /// upgrades; the <b>multipliers</b> (from epics and legendaries) multiply on top of everything, so they stack hard.
+///
+/// Who reads what: a class's stats read the ones that change its own attacks (damage, attack speed, area, duration, projectiles, block, dash recharge...);
+/// <see cref="EnemyField"/>'s hit effects apply the ones that change every hit whoever lands it (chill, freeze, damage to chilled, frozen and elite enemies); and
+/// <see cref="ItemEffects"/> runs the ones that act on their own during a run (thorns, the ward, life from damage, paying blows back, the Aegis burst, the Phoenix).
 /// </summary>
 internal sealed class ItemBonuses
 {
@@ -40,6 +46,81 @@ internal sealed class ItemBonuses
 
     /// <summary>What damage taken is multiplied by (below 1 is less damage).</summary>
     public float DamageTaken = 1f;
+
+    /// <summary>Block chance added (any class can block with it), and what the whole block chance is multiplied by.</summary>
+    public float BlockChance;
+    public float BlockMultiplier = 1f;
+
+    /// <summary>Thorns: damage to each enemy touching the player, every half second.</summary>
+    public float Thorns;
+
+    /// <summary>Bigger areas: the Paladin's nova and circles, the Mage's blasts and blizzard, the Ranger's Rain of Arrows.</summary>
+    public float Area;
+
+    /// <summary>Seconds longer for lingering effects: holy circles, chill, the Frost Shield, Momentum.</summary>
+    public float Duration;
+
+    /// <summary>Every hit chills (this much slower, for <see cref="ItemEffects.ChillSeconds"/>); the Mage's own chill gets this much stronger too.</summary>
+    public float ChillOnHit;
+
+    /// <summary>Extra projectiles (arrows, bolts); a class without them turns each into <see cref="ProjectileFallback"/> more damage. And what each projectile's damage is multiplied by.</summary>
+    public int Projectiles;
+    public float ProjectileDamage = 1f;
+
+    /// <summary>What each extra projectile is worth to a class that has none (the Paladin): this much more damage.</summary>
+    public const float ProjectileFallback = 0.12f;
+
+    public float ProjectileSpeed;
+    public float Range;
+
+    /// <summary>A ward: a barrier of this many points every so often (see <see cref="ItemEffects"/>). A Mage with the Frost Shield gets its shield stronger by <see cref="WardShield"/> instead.</summary>
+    public float Ward;
+    public float WardShield;
+
+    /// <summary>Damage to elites and bosses: a multiplier on every hit on them.</summary>
+    public float EliteDamage = 1f;
+
+    /// <summary>What every hit on a chilled (or frozen) enemy is multiplied by, and on a frozen one on top of that.</summary>
+    public float ChilledDamage = 1f;
+    public float FrozenDamage = 1f;
+
+    /// <summary>The chance for any hit to freeze a non-boss enemy.</summary>
+    public float FreezeChance;
+
+    /// <summary>The Shift move recharges this much faster.</summary>
+    public float DashRecharge;
+
+    /// <summary>Health back for each point of damage dealt.</summary>
+    public float LifePerDamage;
+
+    public float SilverGain;
+    public float SilverMultiplier = 1f;
+    public float ExperienceMultiplier = 1f;
+
+    /// <summary>Extra level-up rerolls per run.</summary>
+    public int Rerolls;
+
+    /// <summary>Attack speed added at no health left, scaling with the share of health missing (Berserker's Band).</summary>
+    public float Berserk;
+
+    /// <summary>The share of max health missing right now (0 to 1), kept up to date during a run by <see cref="ItemEffects"/> for <see cref="Berserk"/>.</summary>
+    public float MissingHealth;
+
+    /// <summary>Attack speed as it stands this moment: the flat bonus plus Berserk's share. Classes read this, not <see cref="AttackSpeed"/>.</summary>
+    public float AttackSpeedNow => AttackSpeed + Berserk * MissingHealth;
+
+    /// <summary>Enemies spawn with this much more health (Cursed Idol).</summary>
+    public float EnemyHealth;
+
+    /// <summary>Times a killing blow brings the player back (Phoenix Feather).</summary>
+    public int LastStands;
+
+    /// <summary>The share of every blow that reaches the player paid back to the attacker, and the share of max health healed each time.</summary>
+    public float Retaliation;
+    public float HealPerBlow;
+
+    /// <summary>Damage of the burst of light every block releases (Aegis of the Dawn).</summary>
+    public float BlockBurst;
 }
 
 /// <summary>One item: its name, rarity, what one of it does in words, and what one of it does to the bonuses. Stacks apply it once per copy.</summary>
@@ -95,6 +176,42 @@ internal static class ItemCatalog
         new("vampire_fang", "Vampire Fang", ItemRarity.Rare, "Heal 1 health per kill", b => b.HealOnKill += 1f),
         new("serrated_edge", "Serrated Edge", ItemRarity.Rare, "Critical hits deal +30% more", b => b.CritDamage += 0.30f),
 
+        // Paladin-leaning: block, thorns, area, lingering effects. Every class gets something from each.
+        new("iron_buckler", "Iron Buckler", ItemRarity.Common, "+4% block chance (any class can block with it)", b => b.BlockChance += 0.04f),
+        new("thorned_bracers", "Thorned Bracers", ItemRarity.Common, "Thorns: 4 damage to enemies touching you every 0.5 s", b => b.Thorns += 4f),
+        new("pilgrims_censer", "Pilgrim's Censer", ItemRarity.Rare, "+20% area: nova, circles, blasts, blizzard, rain", b => b.Area += 0.20f),
+        new("blessed_reliquary", "Blessed Reliquary", ItemRarity.Rare, "Lingering effects last 1 s longer: circles, chill, shields, Momentum", b => b.Duration += 1f),
+
+        // Mage-leaning: projectiles, cold, wards.
+        new("rime_charm", "Rime Charm", ItemRarity.Common, "Your hits chill: 10% slower for 1 s (the Mage's chill +10%)", b => b.ChillOnHit += 0.10f),
+        new("prism_shard", "Prism Shard", ItemRarity.Rare, "+1 projectile (the Paladin: +12% nova damage)", b => b.Projectiles += 1),
+        new("warding_crystal", "Warding Crystal", ItemRarity.Rare, "Every 15 s a 20-point ward holds for 5 s (with Frost Shield: shield +25%)", b =>
+        {
+            b.Ward += 20f;
+            b.WardShield += 0.25f;
+        }),
+        new("lens_of_clarity", "Lens of Clarity", ItemRarity.Rare, "+20% projectile speed and range, +5% critical chance", b =>
+        {
+            b.ProjectileSpeed += 0.20f;
+            b.Range += 0.20f;
+            b.CritChance += 0.05f;
+        }),
+
+        // For everyone.
+        new("merchants_purse", "Merchant's Purse", ItemRarity.Common, "+15% silver from runs", b => b.SilverGain += 0.15f),
+        new("headsmans_axe", "Headsman's Axe", ItemRarity.Rare, "+25% damage to elites and bosses", b => b.EliteDamage *= 1.25f),
+        new("windwalker_boots", "Wind-Walker Boots", ItemRarity.Rare, "Dash recharges 25% faster, +5% move speed", b =>
+        {
+            b.DashRecharge += 0.25f;
+            b.MoveSpeed += 0.05f;
+        }),
+        new("bloodstone", "Bloodstone", ItemRarity.Rare, "Heal 1 health for every 60 damage you deal", b => b.LifePerDamage += 1f / 60f),
+        new("hourglass", "Hourglass of Chances", ItemRarity.Rare, "+1 level-up reroll per run, +5% experience", b =>
+        {
+            b.Rerolls += 1;
+            b.ExperienceGain += 0.05f;
+        }),
+
         // Epic: multipliers.
         new("rune_of_might", "Rune of Might", ItemRarity.Epic, "x1.2 damage", b => b.DamageMultiplier *= 1.2f),
         new("swiftwind_sigil", "Swiftwind Sigil", ItemRarity.Epic, "x1.15 attack speed", b => b.AttackSpeedMultiplier *= 1.15f),
@@ -102,6 +219,24 @@ internal static class ItemCatalog
         {
             b.DamageTaken *= 0.85f;
             b.MaxHealth += 20f;
+        }),
+        new("bulwark_sigil", "Bulwark Sigil", ItemRarity.Epic, "x1.25 block chance, x0.9 damage taken", b =>
+        {
+            b.BlockMultiplier *= 1.25f;
+            b.DamageTaken *= 0.9f;
+        }),
+        new("heart_of_winter", "Heart of Winter", ItemRarity.Epic, "x1.25 damage to slowed or frozen enemies", b => b.ChilledDamage *= 1.25f),
+        new("glass_pendant", "Glass Pendant", ItemRarity.Epic, "x1.35 damage, but x1.2 damage taken", b =>
+        {
+            b.DamageMultiplier *= 1.35f;
+            b.DamageTaken *= 1.2f;
+        }),
+        new("berserkers_band", "Berserker's Band", ItemRarity.Epic, "Up to +35% attack speed as your health drops", b => b.Berserk += 0.35f),
+        new("cursed_idol", "Cursed Idol", ItemRarity.Epic, "+40% experience and silver, but enemies have +15% health", b =>
+        {
+            b.ExperienceGain += 0.40f;
+            b.SilverGain += 0.40f;
+            b.EnemyHealth += 0.15f;
         }),
 
         // Legendary: big multipliers.
@@ -114,6 +249,33 @@ internal static class ItemCatalog
         {
             b.DamageMultiplier *= 1.35f;
             b.CritChance += 0.10f;
+        }),
+        new("martyrs_crown", "Martyr's Crown", ItemRarity.Legendary, "Blows that reach you are paid back at 150%, and heal you 1% each", b =>
+        {
+            b.Retaliation += 1.5f;
+            b.HealPerBlow += 0.01f;
+        }),
+        new("aegis_of_dawn", "Aegis of the Dawn", ItemRarity.Legendary, "+12% block chance; every block bursts with light for 25 damage", b =>
+        {
+            b.BlockChance += 0.12f;
+            b.BlockBurst += 25f;
+        }),
+        new("staff_of_long_night", "Staff of the Long Night", ItemRarity.Legendary, "Hits have a 5% chance to freeze (not bosses); frozen take x1.4", b =>
+        {
+            b.FreezeChance += 0.05f;
+            b.FrozenDamage *= 1.4f;
+        }),
+        new("splintered_crown", "Splintered Crown", ItemRarity.Legendary, "+2 projectiles, each 15% weaker (the Paladin: +24% nova damage)", b =>
+        {
+            b.Projectiles += 2;
+            b.ProjectileDamage *= 0.85f;
+        }),
+        new("phoenix_feather", "Phoenix Feather", ItemRarity.Legendary, "Once per run, a killing blow brings you back at 50% health", b => b.LastStands += 1),
+        new("crown_of_plenty", "Crown of Plenty", ItemRarity.Legendary, "x1.2 damage, experience and silver", b =>
+        {
+            b.DamageMultiplier *= 1.2f;
+            b.ExperienceMultiplier *= 1.2f;
+            b.SilverMultiplier *= 1.2f;
         }),
     };
 

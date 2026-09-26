@@ -119,6 +119,22 @@ internal readonly record struct PlayerTarget(Vector3D<float> Feet, bool Grounded
 internal readonly record struct Strike(Enemy Attacker, float Damage, bool Blocked);
 
 /// <summary>
+/// What every hit the player lands does besides its damage, whichever class lands it (from the items carried): multipliers on chilled, frozen and elite enemies,
+/// a chill, and a chance to freeze a non-boss enemy.
+/// </summary>
+internal sealed record HitEffects(
+    float ChilledMultiplier = 1f,
+    float FrozenMultiplier = 1f,
+    float EliteMultiplier = 1f,
+    float ChillSlow = 0f,
+    float ChillSeconds = 0f,
+    float FreezeChance = 0f,
+    float FreezeSeconds = 0f)
+{
+    public static readonly HitEffects None = new();
+}
+
+/// <summary>
 /// Every enemy on the map: keeping the field topped up with fodder around the player, moving them (straight at the player, kept apart from each other and off the
 /// player), contact damage, the elites' and bosses' telegraphed attacks, taking hits and dying. Pure simulation - no engine calls - so it can be tested;
 /// <see cref="EnemyView"/> puts it on screen.
@@ -160,6 +176,15 @@ internal sealed class EnemyField
     /// <summary>How much tougher than base the next spawns are (the run director raises it over time).</summary>
     public EnemyScaling Scaling { get; set; } = EnemyScaling.None;
 
+    /// <summary>What every hit the player lands does besides its damage (see <see cref="HitEffects"/>). Set at the start of a run.</summary>
+    public HitEffects HitEffects { get; set; } = HitEffects.None;
+
+    /// <summary>Enemies spawn with this much more health than <see cref="Scaling"/> alone gives them (a cursed item).</summary>
+    public float HealthBonus { get; set; }
+
+    /// <summary>All the damage the player has dealt since <see cref="ResetKills"/>, after every multiplier.</summary>
+    public float DamageDealt { get; private set; }
+
     /// <summary>How many live fodder enemies the field keeps topped up to. Elites and bosses don't count.</summary>
     public int TargetCount { get; set; } = 14;
 
@@ -183,7 +208,8 @@ internal sealed class EnemyField
     /// <summary>Puts an enemy (of <see cref="Kind"/> unless <paramref name="kind"/> says otherwise, at the current <see cref="Scaling"/>) at <paramref name="position"/>, its feet.</summary>
     public Enemy Spawn(Vector3D<float> position, EnemyKind? kind = null)
     {
-        var enemy = new Enemy(_nextId++, kind ?? Kind, position, Scaling) { Phase = (float)_random.NextDouble() * MathF.Tau };
+        var scaling = HealthBonus != 0f ? Scaling with { Health = Scaling.Health * (1f + HealthBonus) } : Scaling;
+        var enemy = new Enemy(_nextId++, kind ?? Kind, position, scaling) { Phase = (float)_random.NextDouble() * MathF.Tau };
         enemy.AttackCooldown = enemy.Kind.AttackCooldown * 0.5f;   // a short breather after arriving
         _enemies.Add(enemy);
         _gridStale = true;
@@ -230,7 +256,10 @@ internal sealed class EnemyField
         return gone;
     }
 
-    /// <summary>Hurts <paramref name="enemy"/>. True if this was the killing blow.</summary>
+    /// <summary>
+    /// Hurts <paramref name="enemy"/>: <paramref name="amount"/>, raised by <see cref="HitEffects"/> for a chilled, frozen or elite enemy; then, if it lives, the
+    /// hit's chill and chance to freeze. True if this was the killing blow.
+    /// </summary>
     public bool Damage(Enemy enemy, float amount)
     {
         if (!enemy.IsAlive)
@@ -238,10 +267,37 @@ internal sealed class EnemyField
             return false;
         }
 
+        var effects = HitEffects;
+        if (enemy.IsChilled || enemy.IsFrozen)
+        {
+            amount *= effects.ChilledMultiplier;
+        }
+
+        if (enemy.IsFrozen)
+        {
+            amount *= effects.FrozenMultiplier;
+        }
+
+        if (enemy.Kind.Tier != EnemyTier.Fodder)
+        {
+            amount *= effects.EliteMultiplier;
+        }
+
         enemy.Health -= amount;
         enemy.HitFlash = 1f;
+        DamageDealt += MathF.Max(0f, amount + MathF.Min(0f, enemy.Health));   // no credit for overkill
         if (enemy.IsAlive)
         {
+            if (effects.ChillSlow > 0f)
+            {
+                enemy.Chill(effects.ChillSeconds, effects.ChillSlow);
+            }
+
+            if (effects.FreezeChance > 0f && enemy.Kind.Tier != EnemyTier.Boss && _random.NextDouble() < effects.FreezeChance)
+            {
+                enemy.Freeze(effects.FreezeSeconds);
+            }
+
             return false;
         }
 
@@ -336,7 +392,11 @@ internal sealed class EnemyField
         }
     }
 
-    public void ResetKills() => Kills = 0;
+    public void ResetKills()
+    {
+        Kills = 0;
+        DamageDealt = 0f;
+    }
 
     private void SpawnTowardTarget(float deltaSeconds, Vector3D<float> playerFeet, Func<float, float, float?> groundAt)
     {

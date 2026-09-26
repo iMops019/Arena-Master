@@ -109,17 +109,18 @@ internal sealed class PaladinStats
     }
 
     public float NovaDamage =>
-        BaseNovaDamage * (1f + 0.20f * LevelOf(PaladinUpgrade.HolyWrath) + Items.Damage + Tree.NovaDamage) * Items.DamageMultiplier;
+        BaseNovaDamage * (1f + 0.20f * LevelOf(PaladinUpgrade.HolyWrath) + Items.Damage + Tree.NovaDamage + ItemBonuses.ProjectileFallback * Items.Projectiles)
+        * Items.DamageMultiplier;
 
     public float NovaInterval =>
         BaseNovaInterval
-        / (MathF.Max(0.2f, 1f + 0.12f * LevelOf(PaladinUpgrade.QuickenedPrayer) + Items.AttackSpeed + Tree.NovaFrequency) * Items.AttackSpeedMultiplier);
+        / (MathF.Max(0.2f, 1f + 0.12f * LevelOf(PaladinUpgrade.QuickenedPrayer) + Items.AttackSpeedNow + Tree.NovaFrequency) * Items.AttackSpeedMultiplier);
 
-    public float NovaRadius => BaseNovaRadius * (1f + 0.10f * LevelOf(PaladinUpgrade.Radiance) + Tree.NovaRadius);
+    public float NovaRadius => BaseNovaRadius * (1f + 0.10f * LevelOf(PaladinUpgrade.Radiance) + Tree.NovaRadius + Items.Area);
 
-    public float CircleRadius => BaseCircleRadius * (1f + 0.10f * LevelOf(PaladinUpgrade.Radiance) + Tree.CircleRadius);
+    public float CircleRadius => BaseCircleRadius * (1f + 0.10f * LevelOf(PaladinUpgrade.Radiance) + Tree.CircleRadius + Items.Area);
 
-    public float CircleDuration => BaseCircleDuration + 0.5f * LevelOf(PaladinUpgrade.Consecration) + Tree.CircleDuration;
+    public float CircleDuration => BaseCircleDuration + 0.5f * LevelOf(PaladinUpgrade.Consecration) + Tree.CircleDuration + Items.Duration;
 
     /// <summary>A circle's damage per second to each enemy in it.</summary>
     public float CircleDps =>
@@ -138,9 +139,13 @@ internal sealed class PaladinStats
 
     /// <summary>The chance to block a blow, capped at <see cref="MaxBlockChance"/>. Braced Stance adds more standing still, Sanctuary more in a holy circle.</summary>
     public float BlockChance(bool standingStill, bool inCircle) => MathF.Min(MaxBlockChance,
-        BaseBlockChance + 0.04f * LevelOf(PaladinUpgrade.ShieldTraining) + Tree.BlockChance
-        + (standingStill ? Tree.StillBlock : 0f)
-        + (inCircle && Tree.Sanctuary ? SanctuaryBlock : 0f));
+        (BaseBlockChance + 0.04f * LevelOf(PaladinUpgrade.ShieldTraining) + Tree.BlockChance + Items.BlockChance
+         + (standingStill ? Tree.StillBlock : 0f)
+         + (inCircle && Tree.Sanctuary ? SanctuaryBlock : 0f))
+        * Items.BlockMultiplier);
+
+    /// <summary>Seconds for the shield rush to recharge.</summary>
+    public float RushCooldown => BaseRushCooldown / (1f + Items.DashRecharge);
 
     public bool HasThorns => Tree.CrownOfThorns;
 

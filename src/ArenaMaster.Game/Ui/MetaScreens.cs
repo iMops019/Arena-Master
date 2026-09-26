@@ -5,7 +5,10 @@ using ImGuiNET;
 
 namespace ArenaMaster.Game.Ui;
 
-/// <summary>The bounty board at camp: every bounty, what it asks, what it pays and unlocks, and which are done.</summary>
+/// <summary>
+/// The bounty board at camp: every bounty, what it asks, what it pays and unlocks, and which are done - the open ones first, in a list that scrolls when they
+/// don't all fit.
+/// </summary>
 internal sealed class BountyBoardScreen : GameScreen
 {
     /// <summary>Draws the board. Returns true when the player closes it.</summary>
@@ -22,15 +25,21 @@ internal sealed class BountyBoardScreen : GameScreen
         int done = Bounties.All.Count(b => profile.HasBounty(b.Id));
         UiTheme.Header("Camp · Bounty board", "Bounties", $"{done} of {Bounties.All.Count} done  ·  {profile.Silver:N0} silver");
 
-        var origin = ImGui.GetCursorScreenPos();
-        float width = ImGui.GetContentRegionAvail().X;
+        var listStart = ImGui.GetCursorScreenPos();
+        float fullWidth = ImGui.GetContentRegionAvail().X;
         float buttonHeight = 40f * scale;
-        float rowHeight = MathF.Min(58f * scale, (ImGui.GetContentRegionAvail().Y - buttonHeight - 20f * scale) / Bounties.All.Count);
-        float font = ImGui.GetFontSize();
+        float listHeight = ImGui.GetContentRegionAvail().Y - buttonHeight - 16f * scale;
+        ImGui.BeginChild("##bountylist", new Vector2(fullWidth, listHeight), ImGuiChildFlags.None, ImGuiWindowFlags.None);
 
-        for (int i = 0; i < Bounties.All.Count; i++)
+        var origin = ImGui.GetCursorScreenPos();
+        float width = ImGui.GetContentRegionAvail().X - 14f * scale;   // room for the scrollbar
+        float rowHeight = 58f * scale;
+        float font = ImGui.GetFontSize();
+        var ordered = Bounties.All.OrderBy(b => profile.HasBounty(b.Id)).ToList();   // stable: the board's own order within open and done
+
+        for (int i = 0; i < ordered.Count; i++)
         {
-            var bounty = Bounties.All[i];
+            var bounty = ordered[i];
             bool complete = profile.HasBounty(bounty.Id);
             var min = origin + new Vector2(0f, i * rowHeight);
             var max = min + new Vector2(width, rowHeight - 6f * scale);
@@ -51,12 +60,16 @@ internal sealed class BountyBoardScreen : GameScreen
             UiTheme.Text(new Vector2(max.X - pad - UiTheme.TextWidth(status, 0.8f), min.Y + pad * 0.6f), status, statusColor, 0.8f);
         }
 
-        ImGui.SetCursorScreenPos(origin + new Vector2(0f, Bounties.All.Count * rowHeight + 8f * scale));
+        ImGui.SetCursorScreenPos(origin + new Vector2(0f, ordered.Count * rowHeight));
+        ImGui.Dummy(new Vector2(width, 1f));
+        ImGui.EndChild();
+
+        ImGui.SetCursorScreenPos(listStart + new Vector2(0f, listHeight + 10f * scale));
         var start = ImGui.GetCursorScreenPos();
         float closeWidth = 150f * scale;
-        UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.3f), "Bounties are checked at the end of every run, win or lose. Each pays once.", UiTheme.Muted, 0.8f,
-            width - closeWidth - 20f * scale);
-        ImGui.SetCursorScreenPos(start + new Vector2(width - closeWidth, 0f));
+        UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.3f), "Bounties are checked at the end of every run, win or lose. Each pays once. Scroll for more.",
+            UiTheme.Muted, 0.8f, fullWidth - closeWidth - 20f * scale);
+        ImGui.SetCursorScreenPos(start + new Vector2(fullWidth - closeWidth, 0f));
         bool close = UiTheme.Button("Close  [E]", new Vector2(closeWidth, buttonHeight));
         UiTheme.EndScreen();
 

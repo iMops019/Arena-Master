@@ -36,6 +36,9 @@ internal sealed class MageClass : IHeroClass
     private float _shieldIn = FirstShield;
     private float _iceBlockShown;
 
+    /// <summary>Ice Block's last stand, not yet used this run. Any other last stand (an item's) is the content's to answer.</summary>
+    private int _iceBlockLeft;
+
     public MageClass(Random random) => _barrage = new FrostBarrage(random);
 
     public MageStats Stats { get; } = new();
@@ -63,7 +66,9 @@ internal sealed class MageClass : IHeroClass
 
     public float DamageTaken => Stats.DamageTaken;
 
-    public float BlockChance => 0f;
+    public float BlockChance => Stats.BlockChance;
+
+    public bool KeepsOwnBarrier => Stats.Tree.FrostShield;
 
     public string DashLabel => "BLINK";
 
@@ -80,7 +85,8 @@ internal sealed class MageClass : IHeroClass
         Stats.Reset();
         Stats.Items = items;
         health.Reset(Stats.MaxHealth);
-        health.LastStands = Stats.Tree.IceBlock ? 1 : 0;
+        _iceBlockLeft = Stats.Tree.IceBlock ? 1 : 0;
+        health.LastStands = _iceBlockLeft;
         _banished.Clear();
         _barrage.Reset();
         _shieldUp = false;
@@ -104,7 +110,7 @@ internal sealed class MageClass : IHeroClass
         var feet = frame.Window.PlayerFeet;
         var aim = MageController.Facing(frame.Window);
         Fight(frame.DeltaSeconds, feet, aim, frame.Condition.IsStunned, frame.Enemies, frame.GroundAt, frame.Health, frame.Numbers);
-        _view.Sync(frame.Window, _barrage, feet, _shieldUp, Stats.Tree.Blizzard, frame.DeltaSeconds);
+        _view.Sync(frame.Window, _barrage, feet, _shieldUp, Stats.Tree.Blizzard, MageStats.BlizzardRadius * Stats.AreaScale, frame.DeltaSeconds);
     }
 
     public void Answer(RunFrame frame) => AfterBlows(frame.Window.PlayerFeet, frame.Enemies, frame.Health, frame.Numbers);
@@ -137,12 +143,13 @@ internal sealed class MageClass : IHeroClass
             EndShield(health);
             if (Stats.Tree.ShatteringWard)
             {
-                _barrage.Burst(feet, MageStats.WardBurstRadius, Stats.BoltDamage * MageStats.WardBurstShare, Stats, enemies, _hits, FrostSource.Ward);
+                _barrage.Burst(feet, MageStats.WardBurstRadius * Stats.AreaScale, Stats.BoltDamage * MageStats.WardBurstShare, Stats, enemies, _hits, FrostSource.Ward);
             }
         }
 
-        if (health.TakeLastStand())
+        if (_iceBlockLeft > 0 && health.TakeLastStand())
         {
+            _iceBlockLeft--;
             health.Heal(health.Max * MageStats.IceBlockHeal);   // Ice Block
             RaiseShield(health, health.Max * MageStats.IceBlockShield);
             _iceBlockShown = IceBlockShown;

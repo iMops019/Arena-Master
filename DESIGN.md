@@ -141,11 +141,16 @@ Everything below the brief is a first pass **(draft)**.
   - A boss drops a chest that is epic or better.
   - Fodder has a 1-in-200 chance to drop an item orb.
   - Walk into a chest or orb to take it. It goes into the chest at once (kept even if the run is lost) but **does nothing in the run it was found in**, not even as an extra copy of an item already brought. The run's bonuses are the loadout's, fixed when it sets out. To use a find, choose it for a later run.
-- **The 16 items:**
+- **The 40 items.** The first 16:
   - *Common:* Whetstone (+8% damage), Feather Charm (+8% attack speed), Worn Boots (+6% move speed), Troll Blood (+0.4 HP/s), Leather Brigandine (6% less damage taken), Lodestone (+20% pickup range), Old Tome (+8% XP).
   - *Rare:* Hawk Feather (+6% crit), Troll Heart (+25 max HP), Vampire Fang (heal 1 per kill), Serrated Edge (+30% crit damage).
   - *Epic:* Rune of Might (x1.2 damage), Swiftwind Sigil (x1.15 attack speed), Ironbark Totem (x0.85 damage taken, +20 max HP).
   - *Legendary:* Dragon Heart (+60 max HP, +1.5 HP/s), Hunter's Moon (x1.35 damage, +10% crit).
+- **The 24 added with the Paladin and the Mage** (the user asked for Paladin- and Mage-friendly items and general ones, Claude proposed these, the user took them all). Class-leaning items still give every class something; they just pay the most for the class they lean to:
+  - *Paladin-leaning:* Iron Buckler (common, +4% block chance: any class can block with it), Thorned Bracers (common, thorns: 4 damage every 0.5 s to what touches you, any class), Pilgrim's Censer (rare, +20% area: the Paladin's nova and circles, the Mage's blasts, blizzard and ward burst, the Ranger's Rain of Arrows patch), Blessed Reliquary (rare, +1 s to lingering effects: holy circles, chill, the Frost Shield, Momentum), Bulwark Sigil (epic, x1.25 block chance, x0.9 damage taken), Martyr's Crown (legendary, every blow that reaches you is paid back at 150% and heals 1% of max health), Aegis of the Dawn (legendary, +12% block, every block bursts for 25 damage within 3 m).
+  - *Mage-leaning:* Rime Charm (common, every hit chills 10% for 1 s; the Mage's own chill +10%), Prism Shard (rare, +1 projectile: an arrow or a bolt; the Paladin gets +12% nova damage instead), Warding Crystal (rare, every 15 s a 20-point ward for 5 s; a Mage with the Frost Shield gets a 25% stronger shield instead), Lens of Clarity (rare, +20% projectile speed and range, +5% crit), Heart of Winter (epic, x1.25 damage to chilled or frozen enemies), Staff of the Long Night (legendary, hits have a 5% chance to freeze a non-boss for 1 s, frozen enemies take x1.4), Splintered Crown (legendary, +2 projectiles each 15% weaker; the Paladin +24% nova damage).
+  - *For everyone:* Merchant's Purse (common, +15% silver), Headsman's Axe (rare, x1.25 damage to elites and bosses), Wind-Walker Boots (rare, the Shift move recharges 25% faster, +5% move speed), Bloodstone (rare, heal 1 per 60 damage dealt), Hourglass of Chances (rare, +1 level-up reroll per run, +5% XP), Glass Pendant (epic, x1.35 damage but x1.2 damage taken), Berserker's Band (epic, up to +35% attack speed as health drops), Cursed Idol (epic, +40% XP and silver, but enemies +15% health), Phoenix Feather (legendary, once per copy per run a killing blow brings you back at 50%; a class's own last stand, Unbroken Vow or Ice Block, is used first), Crown of Plenty (legendary, x1.2 damage, XP and silver).
+- **Where each effect lives:** a class's stats read what changes its own attacks (area, duration, projectiles, block, dash recharge, attack speed with Berserk). The enemy field's hit effects apply what changes every hit, whoever lands it (chill, freeze, damage to chilled, frozen and elite enemies). `Items/ItemEffects` runs what acts on its own (thorns, the ward, Bloodstone, Martyr's Crown, the Aegis burst, the Phoenix). The content applies silver, XP and rerolls.
 
 ## Camp (built)
 
@@ -167,12 +172,23 @@ All in `Progression/MetaProgress.cs`; all numbers are a starting point to tune.
   - *Second Thoughts:* +1 reroll per run on the level-up screen, 5 ranks. A reroll swaps all three cards (R).
   - *Clear Mind:* +1 banish per run, 3 ranks. A banish strikes one card's upgrade from the pool for the rest of the run and replaces the card.
   - *Lucky Charm:* 5 ranks. Each makes rares 15%, epics 30% and legendaries 50% likelier (relative to commons) from chests and drops.
-- **The Bounty Board** (camp) has 10 one-time challenges, checked at the end of every run. Each pays silver once, and five unlock an item into the drop pool. **The epics and legendaries start locked** (items already owned stay owned):
+- **The Bounty Board** (camp) has 21 one-time challenges, checked at the end of every run. Each pays silver once, and 16 unlock an item into the drop pool. **Every epic and legendary starts locked** (items already owned stay owned). The board lists the open ones first and scrolls:
   - Brute Force (kill a Brute) -> Ironbark Totem
   - Holding On (survive 10 min) -> Swiftwind Sigil
   - Regicide (kill the Hollow King) -> Hunter's Moon
   - The Long Night (survive 20 min) -> Dragon Heart
   - Massacre (1,000 kills in a run) -> Rune of Might
+  - Shieldbearer (survive 10 min as the Paladin) -> Bulwark Sigil
+  - Cold Snap (500 kills in a run as the Mage) -> Heart of Winter
+  - Glass Cannon (reach level 25 in a run) -> Glass Pendant
+  - Brute Hunter (5 Brutes in a run) -> Berserker's Band
+  - Dark Bargain (set out on 15 runs) -> Cursed Idol
+  - Martyr (defeat the Hollow King as the Paladin) -> Martyr's Crown
+  - Dawnbringer (win as the Paladin) -> Aegis of the Dawn
+  - Endless Winter (win as the Mage) -> Staff of the Long Night
+  - Deadeye's Prize (win as the Ranger) -> Splintered Crown
+  - Rise Again (survive 25 min) -> Phoenix Feather
+  - Hoarder (own 30 different items) -> Crown of Plenty
   - Silver only: First Hunt, Collector, Deep Roots, A Thousand Cuts (lifetime), Champion (win).
   - While a rarity's items are all locked, a roll of that rarity falls back to the next one down.
 - Later: unlocking a second class, more trees, cosmetic or camp upgrades.

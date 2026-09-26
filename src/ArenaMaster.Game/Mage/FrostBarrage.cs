@@ -358,7 +358,7 @@ internal sealed class FrostBarrage
 
         if (bolt.IsComet)
         {
-            Burst(enemy.Position, MageStats.CometRadius, dealt * MageStats.CometBlast, stats, enemies, hits, FrostSource.Blast, spare: enemy);
+            Burst(enemy.Position, MageStats.CometRadius * stats.AreaScale, dealt * MageStats.CometBlast, stats, enemies, hits, FrostSource.Blast, spare: enemy);
         }
         else if (stats.Tree.FrostBlast)
         {
@@ -448,7 +448,7 @@ internal sealed class FrostBarrage
 
         _blizzardIn = MathF.Max(0f, _blizzardIn + BlizzardTick);
         float damage = stats.BoltDamage * MageStats.BlizzardShare * BlizzardTick;
-        foreach (var enemy in enemies.Within(feet, MageStats.BlizzardRadius))
+        foreach (var enemy in enemies.Within(feet, MageStats.BlizzardRadius * stats.AreaScale))
         {
             Frost(enemy, damage, crit: false, FrostSource.Blizzard, stats, enemies, hits, out _);
         }

@@ -8,6 +8,7 @@
   frost_bolt.glb          a Frost Barrage bolt: a pale ice crystal, centred on its middle, pointing +Z
   frost_blast.glb         a flat pale-blue ring of radius 1, scaled as a burst of frost spreads
   frost_shard.glb         a small ice shard, centred on its middle (the Frost Shield's and the Blizzard's swirl)
+  aegis_burst.glb         a flat pale-gold ring of radius 1, scaled as the Aegis of the Dawn's burst spreads (an item's, any class)
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
   ghoul_placeholder.glb   the first enemy: a hunched ghoul with long arms and red eyes
   xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
@@ -687,6 +688,7 @@ if __name__ == "__main__":
                         ("holy_nova.glb", lambda: build_ring(0.88, 1.0, "holy")), ("holy_circle.glb", build_holy_circle),
                         ("mage_placeholder.glb", build_mage), ("frost_bolt.glb", build_frost_bolt),
                         ("frost_blast.glb", lambda: build_ring(0.86, 1.0, "ice_light")), ("frost_shard.glb", build_frost_shard),
+                        ("aegis_burst.glb", lambda: build_ring(0.9, 1.0, "holy_light")),
                         ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul), ("xp_gem_placeholder.glb", build_xp_gem),
                         ("brute_placeholder.glb", build_brute), ("hollow_king_placeholder.glb", build_hollow_king),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),

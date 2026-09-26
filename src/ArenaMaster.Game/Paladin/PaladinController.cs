@@ -22,9 +22,10 @@ internal sealed class PaladinController
     private float _cooldownLeft;
     private Vector3D<float> _rushDirection;
     private bool _rushKeyWasDown;
+    private float _cooldownLength = PaladinStats.BaseRushCooldown;
 
     /// <summary>0 while the rush is recharging, rising to 1 when it is ready again.</summary>
-    public float RushReadiness => 1f - _cooldownLeft / PaladinStats.BaseRushCooldown;
+    public float RushReadiness => 1f - _cooldownLeft / _cooldownLength;
 
     /// <summary>The rush's push this frame (metres per second, flat), zero when not rushing.</summary>
     public Vector3D<float> RushVelocity { get; private set; }
@@ -34,7 +35,7 @@ internal sealed class PaladinController
     {
         window.WalkSpeed = stunned ? 0f : stats.MoveSpeed;
         window.PlayerCanJump = !stunned;
-        UpdateRush(window, deltaSeconds, stunned);
+        UpdateRush(window, deltaSeconds, stats, stunned);
         UpdateBody(window, deltaSeconds);
     }
 
@@ -48,7 +49,7 @@ internal sealed class PaladinController
         }
     }
 
-    private void UpdateRush(EngineWindow window, float deltaSeconds, bool stunned)
+    private void UpdateRush(EngineWindow window, float deltaSeconds, PaladinStats stats, bool stunned)
     {
         _cooldownLeft = MathF.Max(0f, _cooldownLeft - deltaSeconds);
 
@@ -62,7 +63,8 @@ internal sealed class PaladinController
             // Rush the way the keys point, or straight ahead with none held.
             _rushDirection = window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : Facing(window);
             _rushTimeLeft = PaladinStats.RushDuration;
-            _cooldownLeft = PaladinStats.BaseRushCooldown;
+            _cooldownLength = stats.RushCooldown;
+            _cooldownLeft = _cooldownLength;
         }
 
         _rushTimeLeft -= deltaSeconds;

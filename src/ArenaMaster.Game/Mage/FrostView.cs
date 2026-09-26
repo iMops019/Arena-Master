@@ -22,7 +22,7 @@ internal sealed class FrostView
     private readonly List<CrowdInstance> _shards = new();
     private float _time;
 
-    public void Sync(EngineWindow window, FrostBarrage barrage, Vector3D<float> feet, bool shieldUp, bool blizzard, float deltaSeconds)
+    public void Sync(EngineWindow window, FrostBarrage barrage, Vector3D<float> feet, bool shieldUp, bool blizzard, float blizzardRadius, float deltaSeconds)
     {
         _time += deltaSeconds;
 
@@ -56,7 +56,7 @@ internal sealed class FrostView
         {
             for (int i = 0; i < BlizzardShards; i++)
             {
-                float radius = 1.5f + (MageStats.BlizzardRadius - 1.5f) * ((i * 7 % BlizzardShards) / (float)BlizzardShards);
+                float radius = 1.5f + (blizzardRadius - 1.5f) * ((i * 7 % BlizzardShards) / (float)BlizzardShards);
                 float angle = _time * (3.5f - radius * 0.35f) + MathF.Tau * i / BlizzardShards;
                 var at = feet + new Vector3D<float>(MathF.Sin(angle) * radius, 0.3f + 0.25f * (i % 4), MathF.Cos(angle) * radius);
                 _shards.Add(new CrowdInstance(at, angle + MathF.PI / 2f, 0.7f, 0.6f));

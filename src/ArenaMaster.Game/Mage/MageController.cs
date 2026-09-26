@@ -22,9 +22,10 @@ internal sealed class MageController
     private float _cooldownLeft;
     private Vector3D<float> _blinkDirection;
     private bool _blinkKeyWasDown;
+    private float _cooldownLength = MageStats.BlinkCooldown;
 
     /// <summary>0 while the blink is recharging, rising to 1 when it is ready again.</summary>
-    public float BlinkReadiness => 1f - _cooldownLeft / MageStats.BlinkCooldown;
+    public float BlinkReadiness => 1f - _cooldownLeft / _cooldownLength;
 
     /// <summary>The blink's push this frame (metres per second, flat), zero when not blinking.</summary>
     public Vector3D<float> BlinkVelocity { get; private set; }
@@ -34,7 +35,7 @@ internal sealed class MageController
     {
         window.WalkSpeed = stunned ? 0f : stats.MoveSpeed;
         window.PlayerCanJump = !stunned;
-        UpdateBlink(window, deltaSeconds, stunned);
+        UpdateBlink(window, deltaSeconds, stats, stunned);
         UpdateBody(window, deltaSeconds);
     }
 
@@ -48,7 +49,7 @@ internal sealed class MageController
         }
     }
 
-    private void UpdateBlink(EngineWindow window, float deltaSeconds, bool stunned)
+    private void UpdateBlink(EngineWindow window, float deltaSeconds, MageStats stats, bool stunned)
     {
         _cooldownLeft = MathF.Max(0f, _cooldownLeft - deltaSeconds);
 
@@ -62,7 +63,8 @@ internal sealed class MageController
             // Blink the way the keys point, or straight ahead with none held.
             _blinkDirection = window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : Facing(window);
             _blinkTimeLeft = MageStats.BlinkDuration;
-            _cooldownLeft = MageStats.BlinkCooldown;
+            _cooldownLength = stats.BlinkRecharge;
+            _cooldownLeft = _cooldownLength;
         }
 
         _blinkTimeLeft -= deltaSeconds;

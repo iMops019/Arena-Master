@@ -15,8 +15,8 @@ internal sealed class LifetimeRecord
     public float LongestRun { get; set; }
 }
 
-/// <summary>What one run did, as the rewards and bounties see it at its end.</summary>
-internal sealed record RunRecord(int Kills, int ElitesKilled, int BossesKilled, float Seconds, bool Won, int Level);
+/// <summary>What one run did, as the rewards and bounties see it at its end. <paramref name="ClassId"/> is the class it was played as.</summary>
+internal sealed record RunRecord(int Kills, int ElitesKilled, int BossesKilled, float Seconds, bool Won, int Level, string ClassId = "");
 
 /// <summary>The silver a run earns, win or lose: a little per kill, more for elites and bosses, some for every minute survived, and a bonus for winning.</summary>
 internal static class RunRewards
@@ -115,7 +115,7 @@ internal sealed record Bounty(string Id, string Name, string Task, long Silver, 
 
 /// <summary>
 /// The Bounty Board at camp: one-time challenges checked at the end of every run. Each pays silver once; some unlock an item into what chests and drops can give.
-/// The epics and legendaries start locked, one bounty each - an item already owned stays owned either way.
+/// Every epic and legendary starts locked, one bounty each - an item already owned stays owned either way. Some ask for a run as a given class.
 /// </summary>
 internal static class Bounties
 {
@@ -131,7 +131,25 @@ internal static class Bounties
         new("deep_roots", "Deep Roots", "Reach passive tree level 10.", 300, null, (_, _, tree) => tree.Level >= 10),
         new("thousand_cuts", "A Thousand Cuts", "Kill 10,000 enemies over all your runs.", 400, null, (_, profile, _) => profile.Lifetime.Kills >= 10_000),
         new("champion", "Champion", "Survive to 30:00 and win a run.", 1000, null, (run, _, _) => run.Won),
+
+        // The newer epics.
+        new("shieldbearer", "Shieldbearer", "Survive 10 minutes as the Paladin.", 200, "bulwark_sigil", (run, _, _) => run.ClassId == Paladin && run.Seconds >= 600f),
+        new("cold_snap", "Cold Snap", "Kill 500 enemies in one run as the Mage.", 200, "heart_of_winter", (run, _, _) => run.ClassId == Mage && run.Kills >= 500),
+        new("glass_cannon", "Glass Cannon", "Reach level 25 in one run.", 250, "glass_pendant", (run, _, _) => run.Level >= 25),
+        new("brute_hunter", "Brute Hunter", "Kill 5 Ghoul Brutes in one run.", 250, "berserkers_band", (run, _, _) => run.ElitesKilled >= 5),
+        new("dark_bargain", "Dark Bargain", "Set out on 15 runs.", 250, "cursed_idol", (_, profile, _) => profile.Lifetime.Runs >= 15),
+
+        // The newer legendaries.
+        new("martyr", "Martyr", "Defeat the Hollow King as the Paladin.", 400, "martyrs_crown", (run, _, _) => run.ClassId == Paladin && run.BossesKilled >= 1),
+        new("dawnbringer", "Dawnbringer", "Win a run as the Paladin.", 800, "aegis_of_dawn", (run, _, _) => run.ClassId == Paladin && run.Won),
+        new("endless_winter", "Endless Winter", "Win a run as the Mage.", 800, "staff_of_long_night", (run, _, _) => run.ClassId == Mage && run.Won),
+        new("deadeye_prize", "Deadeye's Prize", "Win a run as the Ranger.", 800, "splintered_crown", (run, _, _) => run.ClassId == Ranger && run.Won),
+        new("rise_again", "Rise Again", "Survive 25 minutes in one run.", 500, "phoenix_feather", (run, _, _) => run.Seconds >= 1500f),
+        new("hoarder", "Hoarder", "Own 30 different items.", 600, "crown_of_plenty", (_, profile, _) => profile.Stash.Count(kv => kv.Value > 0) >= 30),
     };
+
+    // The class ids the class bounties ask for (the classes' own ids, kept here as text so the board doesn't reach into any class's code).
+    private const string Ranger = "ranger", Paladin = "paladin", Mage = "mage";
 
     /// <summary>Whether <paramref name="item"/> can come out of chests and drops: yes unless a bounty not yet done unlocks it.</summary>
     public static bool IsUnlocked(RunItem item, Profile profile) =>

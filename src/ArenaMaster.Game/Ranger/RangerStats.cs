@@ -84,17 +84,18 @@ internal sealed class RangerStats
         MomentumStacks = 0;
     }
 
-    public int ArrowsPerShot => 1 + LevelOf(RangerUpgrade.SplitShot) + (Tree.TwinShot ? 1 : 0);
+    public int ArrowsPerShot => 1 + LevelOf(RangerUpgrade.SplitShot) + (Tree.TwinShot ? 1 : 0) + Items.Projectiles;
 
     public float Damage =>
         BaseDamage
         * (1f + 0.20f * LevelOf(RangerUpgrade.SharpenedTips) + Items.Damage + Tree.Damage + Tree.DamagePerExtraArrow * (ArrowsPerShot - 1))
         * Items.DamageMultiplier
+        * Items.ProjectileDamage
         * (Tree.TwinShot ? TwinShotDamage : 1f);
 
     public float FireInterval =>
         BaseFireInterval
-        / (MathF.Max(0.2f, 1f + 0.15f * LevelOf(RangerUpgrade.QuickDraw) + Items.AttackSpeed + Tree.AttackSpeed + Tree.MomentumPerKill * MomentumStacks)
+        / (MathF.Max(0.2f, 1f + 0.15f * LevelOf(RangerUpgrade.QuickDraw) + Items.AttackSpeedNow + Tree.AttackSpeed + Tree.MomentumPerKill * MomentumStacks)
            * Items.AttackSpeedMultiplier);
 
     /// <summary>How many enemies an arrow passes through before it stops (0: it stops at the first).</summary>
@@ -110,9 +111,9 @@ internal sealed class RangerStats
     /// <summary>How many times normal damage a critical hit does.</summary>
     public float CritMultiplier => (Tree.Deadeye ? 3f : BaseCritMultiplier) + Items.CritDamage + Tree.CritDamage;
 
-    public float ArrowSpeed => BaseArrowSpeed * (1f + 0.20f * LevelOf(RangerUpgrade.Fletching) + Tree.ArrowSpeed);
+    public float ArrowSpeed => BaseArrowSpeed * (1f + 0.20f * LevelOf(RangerUpgrade.Fletching) + Tree.ArrowSpeed + Items.ProjectileSpeed);
 
-    public float Range => BaseRange * (1f + 0.15f * LevelOf(RangerUpgrade.Fletching) + Tree.Range);
+    public float Range => BaseRange * (1f + 0.15f * LevelOf(RangerUpgrade.Fletching) + Tree.Range + Items.Range);
 
     public float MoveSpeed => BaseMoveSpeed * (1f + 0.08f * LevelOf(RangerUpgrade.FleetFoot) + Items.MoveSpeed + Tree.MoveSpeed);
 
@@ -120,7 +121,7 @@ internal sealed class RangerStats
 
     public float PickupRadius => BasePickupRadius * (1f + 0.35f * LevelOf(RangerUpgrade.Scavenger) + Items.Pickup);
 
-    public float DashCooldown => BaseDashCooldown / (1f + Tree.DashRecharge);
+    public float DashCooldown => BaseDashCooldown / (1f + Tree.DashRecharge + Items.DashRecharge);
 
     /// <summary>The dash's push. A dash lasts the same time, so a faster push goes further.</summary>
     public float DashSpeed => BaseDashSpeed * (1f + Tree.DashDistance);
@@ -130,6 +131,12 @@ internal sealed class RangerStats
     public float DamageTaken => Items.DamageTaken * Tree.DamageTaken;
 
     public int RainArrows => Tree.RainOfArrows ? BaseRainArrows + Tree.RainArrows : 0;
+
+    /// <summary>How wide the patch Rain of Arrows covers: wider with an item's area.</summary>
+    public float RainPatch => RainRadius * (1f + Items.Area);
+
+    /// <summary>The block chance items give (the Ranger has no shield).</summary>
+    public float BlockChance => MathF.Min(0.6f, Items.BlockChance * Items.BlockMultiplier);
 
     public HitRules HitRules => new(Tree.EliteDamage, Tree.HealthyDamage, Tree.ExecuteChance, Tree.ChainedDamage, Tree.CascadeDamage,
         Fork: Tree.Fork, Splinters: Tree.StormOfSplinters, FirstHitCrits: Tree.OneShotOneKill);

@@ -37,6 +37,9 @@ public sealed partial class ArenaMasterContent
     private readonly RunItems _items = new();
     private readonly LootField _loot;
     private readonly LootView _lootView = new();
+    private readonly ItemEffects _itemEffects = new();
+    private readonly ItemEffectsView _itemEffectsView = new();
+    private readonly List<ItemHit> _itemHits = new();
     private readonly Queue<RunItem> _itemToasts = new();
     private float _itemToastLeft;
 
@@ -62,7 +65,12 @@ public sealed partial class ArenaMasterContent
     {
         _hero.UseTree(_tree.Save.Ranks);
         _items.Begin(Loadout.ItemsToBring(_profile));   // the loadout as it stands now: finds made on this run won't join it
-        _hero.BeginRun(_items.Carried.Bonuses, _health);
+        var bonuses = _items.Carried.Bonuses;
+        _hero.BeginRun(bonuses, _health);
+        _health.LastStands += bonuses.LastStands;   // the Phoenix Feather's, on top of any the class has
+        _enemies.HitEffects = ItemEffects.HitEffectsOf(bonuses);
+        _enemies.HealthBonus = bonuses.EnemyHealth;
+        _itemEffects.Begin();
         _health.DamageTaken = _hero.DamageTaken;
         _condition.Clear();
         _experience.Reset();
@@ -76,7 +84,7 @@ public sealed partial class ArenaMasterContent
         _runTreeExperience = 0;
         _runTreeLevels = 0;
         _saveIn = RunSaveInterval;
-        _rerollsLeft = Shop.RerollsPerRun(_profile);
+        _rerollsLeft = Shop.RerollsPerRun(_profile) + bonuses.Rerolls;
         _banishesLeft = Shop.BanishesPerRun(_profile);
         _elitesKilled = 0;
         _bossesKilled = 0;
@@ -106,10 +114,19 @@ public sealed partial class ArenaMasterContent
         bool standingStill = window.PlayerMoveDirection == Vector3D<float>.Zero && _hero.DashVelocity == Vector3D<float>.Zero && _condition.Knockback == Vector3D<float>.Zero;
         var frame = new RunFrame(window, deltaSeconds, _runSeconds, _enemies, _numbers, groundAt, _health, _condition, standingStill);
         _hero.Attack(frame);
+        _itemHits.Clear();
+        _itemEffects.Update(deltaSeconds, window.PlayerFeet, _items.Carried.Bonuses, _enemies, _health, _hero.KeepsOwnBarrier, _itemHits);
         _health.DamageTaken = _hero.DamageTaken;
         var player = new PlayerTarget(window.PlayerFeet, window.PlayerGrounded, _health, _condition, _hero.BlockChance);
         var gone = _enemies.Update(deltaSeconds, player, groundAt);
         _hero.Answer(frame);
+        _itemEffects.Answer(_enemies.Strikes, window.PlayerFeet, _items.Carried.Bonuses, _enemies, _health, _itemHits);
+        foreach (var hit in _itemHits)
+        {
+            _numbers.Add(hit.Position, hit.Damage, hit.Killed);
+        }
+
+        _itemEffectsView.Sync(window, _itemEffects);
         foreach (var killed in _enemies.TakeNewlyKilled())
         {
             OnKill(killed);
@@ -154,8 +171,9 @@ public sealed partial class ArenaMasterContent
         ClearField(window);
 
         // What lasts: silver for the run, and any bounties it (or the lifetime totals) completed.
-        var record = new RunRecord(_enemies.Kills, _elitesKilled, _bossesKilled, _runSeconds, ending == RunEnding.Won, _experience.Level);
-        long silver = RunRewards.Silver(record);
+        var record = new RunRecord(_enemies.Kills, _elitesKilled, _bossesKilled, _runSeconds, ending == RunEnding.Won, _experience.Level, _hero.Id);
+        var carried = _items.Carried.Bonuses;
+        long silver = (long)MathF.Round(RunRewards.Silver(record) * (1f + carried.SilverGain) * carried.SilverMultiplier);
         _profile.Silver += silver;
         var bounties = Bounties.Settle(record, _profile, _tree);
         SaveProfile();
@@ -183,6 +201,10 @@ public sealed partial class ArenaMasterContent
         _loot.Clear(goneChests, gonePickups);
         _lootView.Sync(window, _loot, goneChests, gonePickups, 0f);
         _hero.Clear(window);
+        _itemEffects.Begin();
+        _itemEffectsView.Clear(window);
+        _enemies.HitEffects = HitEffects.None;
+        _enemies.HealthBonus = 0f;
         _numbers.Clear();
         _levelUp.Close();
         _pendingLevels = 0;
@@ -224,7 +246,7 @@ public sealed partial class ArenaMasterContent
             return;
         }
 
-        _experienceCarry += amount * (1f + _items.Carried.Bonuses.ExperienceGain);
+        _experienceCarry += amount * (1f + _items.Carried.Bonuses.ExperienceGain) * _items.Carried.Bonuses.ExperienceMultiplier;
         int whole = (int)_experienceCarry;
         _experienceCarry -= whole;
         _pendingLevels += _experience.Add(whole);

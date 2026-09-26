@@ -47,8 +47,14 @@ internal interface IHeroClass
     /// <summary>What every hit's damage is multiplied by.</summary>
     float DamageTaken { get; }
 
-    /// <summary>The chance (0 to 1) an enemy's blow is turned aside completely.</summary>
+    /// <summary>The chance (0 to 1) an enemy's blow is turned aside completely (the class's own, and any the items give).</summary>
     float BlockChance { get; }
+
+    /// <summary>
+    /// Whether the class keeps a barrier of its own on the health (the Mage's Frost Shield): then an item's ward doesn't form, and makes the class's own stronger
+    /// instead.
+    /// </summary>
+    bool KeepsOwnBarrier { get; }
 
     /// <summary>What the Shift move is called on the HUD, and how charged it is (0 to 1).</summary>
     string DashLabel { get; }

@@ -145,7 +145,7 @@ internal sealed class RangerBow
     /// <summary>Lines up a Rain of Arrows over <paramref name="centre"/> (a spot on the ground): its arrows arrive over a moment rather than all at once.</summary>
     private void QueueRain(RangerStats stats, Vector3D<float> centre)
     {
-        foreach (var (origin, direction) in RainDrops(centre, stats.RainArrows, _random))
+        foreach (var (origin, direction) in RainDrops(centre, stats.RainArrows, _random, stats.RainPatch))
         {
             _rain.Add(((float)_random.NextDouble() * RainSpread, origin, direction));
         }
@@ -172,12 +172,13 @@ internal sealed class RangerBow
     /// Where each of <paramref name="count"/> raining arrows starts and which way it falls: spread over a patch <see cref="RangerStats.RainRadius"/> around
     /// <paramref name="centre"/>, starting high above it, falling steeply with a slight lean.
     /// </summary>
-    public static IEnumerable<(Vector3D<float> Origin, Vector3D<float> Direction)> RainDrops(Vector3D<float> centre, int count, Random random)
+    public static IEnumerable<(Vector3D<float> Origin, Vector3D<float> Direction)> RainDrops(Vector3D<float> centre, int count, Random random,
+        float radius = RangerStats.RainRadius)
     {
         for (int i = 0; i < count; i++)
         {
             float angle = (float)random.NextDouble() * MathF.Tau;
-            float distance = RangerStats.RainRadius * MathF.Sqrt((float)random.NextDouble());   // even over the patch, not bunched in the middle
+            float distance = radius * MathF.Sqrt((float)random.NextDouble());   // even over the patch, not bunched in the middle
             var landing = centre + new Vector3D<float>(MathF.Sin(angle) * distance, 0f, MathF.Cos(angle) * distance);
             var lean = new Vector3D<float>((float)random.NextDouble() - 0.5f, 0f, (float)random.NextDouble() - 0.5f) * 0.3f;
             var direction = Vector3D.Normalize(new Vector3D<float>(0f, -1f, 0f) + lean);

@@ -61,18 +61,25 @@ internal static class ItemGrid
         Unfound,
     }
 
-    /// <summary>Draws <paramref name="items"/> as cards filling the rest of the window (or <paramref name="height"/> of it) and returns the one clicked, if any.</summary>
+    /// <summary>
+    /// Draws <paramref name="items"/> as cards filling the rest of the window (or <paramref name="height"/> of it) and returns the one clicked, if any. The cards keep a
+    /// readable size; when there are more than fit, the grid scrolls (mouse wheel).
+    /// </summary>
     public static RunItem? Draw(IReadOnlyList<RunItem> items, Func<RunItem, int> countOf, Func<RunItem, CardLook> look, float height = 0f)
     {
         float scale = UiTheme.Scale;
-        var origin = ImGui.GetCursorScreenPos();
-        float width = ImGui.GetContentRegionAvail().X;
+        var start = ImGui.GetCursorScreenPos();
+        float fullWidth = ImGui.GetContentRegionAvail().X;
         float areaHeight = height > 0f ? height : ImGui.GetContentRegionAvail().Y;
-        int columns = Math.Max(2, (int)(width / (230f * scale)));
+        ImGui.BeginChild("##itemgrid", new Vector2(fullWidth, areaHeight), ImGuiChildFlags.None, ImGuiWindowFlags.None);
+
+        var origin = ImGui.GetCursorScreenPos();
+        float width = ImGui.GetContentRegionAvail().X - 14f * scale;   // room for the scrollbar
+        int columns = Math.Max(2, (int)(width / (220f * scale)));
         int rows = Math.Max(1, (items.Count + columns - 1) / columns);
         float gap = 12f * scale;
         float cardWidth = (width - gap * (columns - 1)) / columns;
-        float cardHeight = MathF.Min(118f * scale, (areaHeight - gap * (rows - 1)) / rows);
+        float cardHeight = MathF.Max(96f * scale, MathF.Min(118f * scale, (areaHeight - gap * (rows - 1)) / rows));
 
         RunItem? clicked = null;
         for (int i = 0; i < items.Count; i++)
@@ -95,6 +102,9 @@ internal static class ItemGrid
 
         ImGui.SetCursorScreenPos(origin + new Vector2(0f, rows * (cardHeight + gap)));
         ImGui.Dummy(new Vector2(width, 1f));
+        ImGui.EndChild();
+        ImGui.SetCursorScreenPos(start + new Vector2(0f, areaHeight));
+        ImGui.Dummy(new Vector2(fullWidth, 1f));
         return clicked;
     }
 

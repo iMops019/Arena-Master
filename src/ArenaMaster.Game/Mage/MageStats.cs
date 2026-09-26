@@ -109,21 +109,21 @@ internal sealed class MageStats
         Items = new ItemBonuses();
     }
 
-    public int Projectiles => BaseProjectiles + LevelOf(MageUpgrade.SplinterBolt) + Tree.Projectiles;
+    public int Projectiles => BaseProjectiles + LevelOf(MageUpgrade.SplinterBolt) + Tree.Projectiles + Items.Projectiles;
 
     public float BoltDamage =>
-        BaseBoltDamage * (1f + 0.20f * LevelOf(MageUpgrade.IceShards) + Items.Damage + Tree.ColdDamage) * Items.DamageMultiplier;
+        BaseBoltDamage * (1f + 0.20f * LevelOf(MageUpgrade.IceShards) + Items.Damage + Tree.ColdDamage) * Items.DamageMultiplier * Items.ProjectileDamage;
 
     public float BarrageInterval =>
         BaseBarrageInterval
-        / (MathF.Max(0.2f, 1f + 0.12f * LevelOf(MageUpgrade.QuickenedCasting) + Items.AttackSpeed + Tree.CastSpeed) * Items.AttackSpeedMultiplier);
+        / (MathF.Max(0.2f, 1f + 0.12f * LevelOf(MageUpgrade.QuickenedCasting) + Items.AttackSpeedNow + Tree.CastSpeed) * Items.AttackSpeedMultiplier);
 
-    public float BoltSpeed => BaseBoltSpeed * (1f + 0.20f * LevelOf(MageUpgrade.WinterWind) + Tree.ProjectileSpeed);
+    public float BoltSpeed => BaseBoltSpeed * (1f + 0.20f * LevelOf(MageUpgrade.WinterWind) + Tree.ProjectileSpeed + Items.ProjectileSpeed);
 
-    public float Range => BaseRange * (1f + 0.15f * LevelOf(MageUpgrade.WinterWind) + Tree.Range);
+    public float Range => BaseRange * (1f + 0.15f * LevelOf(MageUpgrade.WinterWind) + Tree.Range + Items.Range);
 
     /// <summary>How far away the barrage finds enemies to aim at: grows with range.</summary>
-    public float TargetRange => BaseTargetRange * (1f + 0.15f * LevelOf(MageUpgrade.WinterWind) + Tree.Range);
+    public float TargetRange => BaseTargetRange * (1f + 0.15f * LevelOf(MageUpgrade.WinterWind) + Tree.Range + Items.Range);
 
     public int Pierce => LevelOf(MageUpgrade.PiercingIce) + Tree.Pierce;
 
@@ -133,9 +133,9 @@ internal sealed class MageStats
     public float CritMultiplier => BaseCritMultiplier + 0.15f * LevelOf(MageUpgrade.FrozenPrecision) + Items.CritDamage + Tree.CritDamage;
 
     /// <summary>How much a chill slows an enemy's walk (0 to 1), capped at <see cref="MaxChill"/>.</summary>
-    public float Chill => MathF.Min(MaxChill, BaseChill + 0.08f * LevelOf(MageUpgrade.NumbingCold) + Tree.Chill);
+    public float Chill => MathF.Min(MaxChill, BaseChill + 0.08f * LevelOf(MageUpgrade.NumbingCold) + Tree.Chill + Items.ChillOnHit);
 
-    public float ChillDuration => BaseChillDuration + 0.3f * LevelOf(MageUpgrade.NumbingCold) + Tree.ChillDuration;
+    public float ChillDuration => BaseChillDuration + 0.3f * LevelOf(MageUpgrade.NumbingCold) + Tree.ChillDuration + Items.Duration;
 
     /// <summary>What a hit on a chilled (or frozen) enemy is multiplied by.</summary>
     public float ChilledMultiplier => 1f + Tree.ChilledDamage;
@@ -146,13 +146,22 @@ internal sealed class MageStats
 
     public float EliteMultiplier => 1f + Tree.EliteDamage;
 
-    public float BlastRadius => BaseBlastRadius * (1f + 0.25f * LevelOf(MageUpgrade.ConcussiveFrost) + Tree.BlastRadius);
+    public float BlastRadius => BaseBlastRadius * (1f + 0.25f * LevelOf(MageUpgrade.ConcussiveFrost) + Tree.BlastRadius + Items.Area);
+
+    /// <summary>What the fixed areas (the comet's blast, the blizzard, Shattering Ward's burst) are scaled by: an item's area.</summary>
+    public float AreaScale => 1f + Items.Area;
 
     public float BlastShare => BaseBlastDamage * (1f + Tree.BlastDamage);
 
-    public float ShieldAmount => (ShieldFlat + ShieldShare * MaxHealth) * (1f + 0.30f * LevelOf(MageUpgrade.GlacialWard) + Tree.ShieldStrength);
+    public float ShieldAmount => (ShieldFlat + ShieldShare * MaxHealth) * (1f + 0.30f * LevelOf(MageUpgrade.GlacialWard) + Tree.ShieldStrength + Items.WardShield);
 
-    public float ShieldDuration => BaseShieldDuration + Tree.ShieldDuration;
+    public float ShieldDuration => BaseShieldDuration + Tree.ShieldDuration + Items.Duration;
+
+    /// <summary>The block chance items give (the Mage has no shield to block with).</summary>
+    public float BlockChance => MathF.Min(0.6f, Items.BlockChance * Items.BlockMultiplier);
+
+    /// <summary>Seconds for the blink to recharge.</summary>
+    public float BlinkRecharge => BlinkCooldown / (1f + Items.DashRecharge);
 
     /// <summary>Seconds for the Frost Shield to form again after the last one ended.</summary>
     public float ShieldInterval => BaseShieldInterval / (1f + Tree.ShieldRecharge + (Tree.GlacialFortress ? FortressRecharge : 0f));
