@@ -248,7 +248,7 @@ public sealed partial class ArenaMasterContent
         _condition.Clear();
     }
 
-    /// <summary>What a kill leaves behind: its experience gem, and loot - an elite's or a boss's chest, or now and then an item from fodder.</summary>
+    /// <summary>What a kill leaves behind: its experience gem, and by chance loot - an elite's or a boss's chest, or (very rarely) an item from fodder.</summary>
     private void OnKill(Enemy killed)
     {
         if (killed.Kind.IsProp)
@@ -270,7 +270,7 @@ public sealed partial class ArenaMasterContent
                 {
                     DropCache(window, killed.Position);   // a Delve boss leaves the cache, not a chest
                 }
-                else
+                else if (_loot.RollBossDrop())
                 {
                     _loot.DropChest(killed.Position, RarityWeights.Boss);
                 }
@@ -278,7 +278,11 @@ public sealed partial class ArenaMasterContent
                 break;
             case EnemyTier.Elite:
                 _elitesKilled++;
-                _loot.DropChest(killed.Position, RarityWeights.Elite);
+                if (_loot.RollEliteDrop())
+                {
+                    _loot.DropChest(killed.Position, RarityWeights.Elite);
+                }
+
                 break;
             case EnemyTier.Fodder when _loot.RollFodderDrop():
                 _loot.DropItem(killed.Position);

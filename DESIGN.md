@@ -59,7 +59,7 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 The user's request: breakable boxes that turn up in the world at random, and random things in them, like a magnet that pulls every experience gem on the ground to the player, or food that heals. Claude added the rest of the list; all numbers are a first pass **(draft)**.
 
 - **Crates** (`World/Crates.cs`): the first turns up 20 s into a run, then one every 12 s while fewer than 8 are out, 12 to 32 m from the player. One left more than 70 m behind quietly goes. A crate stands on the enemy field as a prop (`EnemyKind.Crate`, 20 health scaled like any enemy's), so every class's attacks break it the way they hit anything: arrows, novas and circles, bolts, lightning. It never moves, turns or hurts; it isn't a kill (no silver or bounty credit, no Momentum) and doesn't count toward the swarm.
-- **What a broken crate leaves** (by weight): an apple (20: heals 15% of max health), a pouch of silver (20: +25 silver on top of the run's reward), a magnet (14: every gem on the map flies to you), a big gem (14: 5 experience plus 1 per minute survived), a roast (12: heals 40%), a bomb (10: 60 damage, scaled like enemy health, to every enemy within 8 m of you), a frenzy potion (10: +40% attack speed for 10 s). Walk over a pickup to take it; it floats, turns and glows until you do. Most show an announcement when taken.
+- **What a broken crate leaves** (by weight): an apple (20: heals 15% of max health), a pouch of silver (20: +10 silver on top of the run's reward; was 25 before the 2026-09-26 balance pass), a magnet (14: every gem on the map flies to you), a big gem (14: 5 experience plus 1 per minute survived), a roast (12: heals 40%), a bomb (10: 60 damage, scaled like enemy health, to every enemy within 8 m of you), a frenzy potion (10: +40% attack speed for 10 s). Walk over a pickup to take it; it floats, turns and glows until you do. Most show an announcement when taken.
 
 ## First class: Ranger
 
@@ -68,7 +68,7 @@ The user's request: breakable boxes that turn up in the world at random, and ran
 - **Level-up pool (built, first pass):** Sharpened Tips (+20% damage, x5), Quick Draw (+15% attack speed, x5), Split Shot (+1 arrow fanned 7 degrees apart, x4), Piercing Arrows (+1 pierce, x3), Deadeye (+8% crit, crits x2, base 5%, x5), Fletching (+20% arrow speed and +15% range, x3), Fleet Foot (+8% move speed, x5), Vitality (+20 max HP and heal, x5), Scavenger (+35% pickup range, x4).
 - **Rerolls and banishes** on the level-up screen come from the Quartermaster (see Meta progression).
 - **Ideas for later levels of the pool (draft):** Rain of Arrows (area), Traps, Poison or Fire Arrows (damage over time), Hawk companion, health regen.
-- **Passive trees:** a class has several trees; the player picks one to be active. The active tree earns the run's experience (its base amount, before item bonuses) and levels during runs, but points are only spent at camp. Respec is free (for now). Cap: tree level 50, one point per level. Levelling is slow on purpose: level n to n+1 takes 200 + 60 x n^1.6 experience.
+- **Passive trees:** a class has several trees; the player picks one to be active. The active tree earns the run's experience (its base amount, before item bonuses) and levels during runs, but points are only spent at camp. Respec is free (for now). Cap: tree level 50, one point per level. Levelling is slow on purpose: level n to n+1 takes 2,400 + 250 x (n-1)^1.35 experience (since 2026-09-26: the user's first 10-minute Delve, 2,192 experience, had taken the old curve, 200 + 60 x n^1.6, to level 5; now a first Delve gets *almost* a level, the fresh tree's one point being the start). Totals: level 5 about 11,600, level 10 about 37,800, level 28 (the capstones) about 300,000.
 - **First tree: Sharpshooter** (`Ranger/SharpshooterTree.cs`, built): 34 nodes in 7 tiers opening at tree levels 1, 3, 6, 10, 15, 21, 28, in three lanes (Precision, Volley, Trickshot). Two starting nodes: Steady Hands and Honed Draw (+10% damage and attack speed per rank, x5). Nine majors (one rank each). Chain Projectiles is a tier 2 major (user's request). A node needs its tier's level and a ranked parent.
   - Every node is playable. How the majors work in the game:
     - *Chain Projectiles:* an arrow that would stop in an enemy jumps to the nearest other one within 10 m (more with Seeker Fletching), once per chain.
@@ -161,7 +161,7 @@ The user's brief: a Shaman whose first tree is **Lightning Alignment** and whose
 
 ## Items
 
-- Dropped by monsters (elites and bosses more likely) and found in chests.
+- Dropped by monsters (elites and bosses more likely) and found in chests. **Rare on purpose** (the user's call, 2026-09-26, after four runs gave eight copies of items): about **one item per full classic run**, all sources together. Nothing drops an item for certain.
 - Give passive bonuses and multipliers. They stack.
 - **Items are kept between runs** (changed by the user after step 5). Everything found goes into the stash at camp. Before a run, the player picks up to **5 different items** to bring (up to 8 with the Quartermaster's Bigger Pack), and each comes with every copy owned. The limit is a starting point to tune while playing.
 - Rarity tiers: common, rare, epic, legendary.
@@ -170,11 +170,14 @@ The user's brief: a Shaman whose first tree is **Lightning Alignment** and whose
 - **Items are shared loot: any class can carry any item.** They speak in general terms (damage, attack speed, max health, ...) and each class's stats decide what those mean for it. This is how "classes share nothing" was read: class abilities, upgrade pools and passive trees are per class; the loot is the world's.
 - **Bonuses vs multipliers:** commons and rares give bonuses that add to each other and to the class's upgrades. Epics and legendaries give multipliers that multiply the total.
 - **Sources:**
-  - A chest turns up 18-45 m from the player every 60 s (first at 0:40, at most 3 waiting), marked by a gold beam. Odds: 60% common, 28% rare, 10% epic, 2% legendary.
-  - An elite drops a chest that is rare or better.
-  - A boss drops a chest that is epic or better.
-  - Fodder has a 1-in-200 chance to drop an item orb.
+  - Every 3 minutes (first at 3:00) there is a **4%** chance a chest turns up 18-45 m from the player (at most 3 waiting), marked by a gold beam. Odds: 60% common, 28% rare, 10% epic, 2% legendary.
+  - An elite has a **1.5%** chance to drop a chest that is rare or better.
+  - A boss (the classic run's Hollow King) has a **10%** chance to drop a chest that is epic or better. A Delve's King leaves his cache instead.
+  - Fodder has a **1-in-25,000** chance to drop an item orb.
+  - Rough total for a full classic run: chests 0.4, elites 0.35 (about 23 Brutes), Kings 0.3, fodder 0.2-0.3: a little over one item. A 10-minute Delve run gives about 0.3, plus its cache.
+  - An item already owned up to its cap never drops again (it would be wasted); the roll picks another.
   - Walk into a chest or orb to take it. It goes into the chest at once (kept even if the run is lost) but **does nothing in the run it was found in**, not even as an extra copy of an item already brought. The run's bonuses are the loadout's, fixed when it sets out. To use a find, choose it for a later run.
+- **Stack caps** (the user's request, 2026-09-26): copies of an item only count up to a cap. **Commons 3, rares 2, epics and legendaries 1** (they multiply). Exceptions: Prism Shard 1 (a projectile is a lot), Grounding Charm 2. More copies can sit in the chest, but the loadout brings only the cap's worth. Whetstones top out at +24% damage. (The user also floated 1% damage per copy capped at 30; with about one item a run that would make each find nearly worthless, so the per-copy numbers stayed and the caps went in instead.) The cards show "x1 of 3", "x3 max", or "x8 (3 count)" for an old save's extras.
 - **The 46 items.** The first 16:
   - *Common:* Whetstone (+8% damage), Feather Charm (+8% attack speed), Worn Boots (+6% move speed), Troll Blood (+0.4 HP/s), Leather Brigandine (6% less damage taken), Lodestone (+20% pickup range), Old Tome (+8% XP).
   - *Rare:* Hawk Feather (+6% crit), Troll Heart (+25 max HP), Vampire Fang (heal 1 per kill), Serrated Edge (+30% crit damage).
@@ -202,15 +205,17 @@ The user's brief: a Shaman whose first tree is **Lightning Alignment** and whose
 ## The Delve (built, first pass)
 
 Added content, not a replacement: the classic 30-minute run is still there, a button on the Delve chart. Inspired by Path of Exile's Delve. All numbers are a first guess.
-- **The chart** (the departure gate, `Ui/DelveChartScreen`): floors going down from depth 1, drawn as rows of nodes joined to the floor below. Each floor has **3 nodes** of different kinds, the same every time (seeded by depth, `Delve/DelveMap`), and **every 5th floor** a **Boss node** too (optional). **Clearing any node opens the floor below**; the floor's other nodes stay open to come back to. A cleared node is done. Floors not open yet are shown dark, two ahead.
+- **The chart** (the departure gate, `Ui/DelveChartScreen`): floors going down from depth 1, drawn as rows of nodes joined to the floor below. Each floor has **5 nodes**, the same every time (seeded by depth, `Delve/DelveMap`): **2 or 3 King nodes** of different kinds and the rest **Descents** (no King), mixed along the row (the user's call, 2026-09-26: more nodes, more normal ones, King nodes kept for variety). **Every 5th floor** has a **Boss node** too (optional). **Clearing any node opens the floor below**; the floor's other nodes stay open to come back to. A cleared node is done. Floors not open yet are shown dark, two ahead.
 - **Node kinds and what their cache pays** (`DelveRules.Reward`; base silver is 80 + 30 per depth):
+  - *Descent* (no King): the base silver and 400 + 100 per depth tree experience. A Brute at 5:00; at 10:00 the cache turns up a few steps from the player. The swarm holds at its 10:00 strength until it is opened.
   - *Currency:* four times the base silver.
-  - *Armoury:* twice the base silver, and a **35% chance** of a piece of gear not yet owned (400 silver instead if the roll comes up and every piece is owned).
-  - *Knowledge:* 500 + 150 per depth passive tree experience, plus the base silver.
-  - *Relic:* two items at a boss chest's odds (with Lucky Charm), plus the base silver.
-  - *Boss:* three times the base silver, an item, **Delve Marks** (1 + the boss tier: 2 at depth 5, 3 at depth 10...), and a **50% chance** of a piece of gear.
-  - Gear is a chance, never a promise (the user's call, like Path of Exile's pinnacle bosses): a piece may take a few runs. The rest of the cache always pays.
-- **A Delve node's run** (`Delve/DelveDirector`), about 10 minutes on the usual map: one Ghoul Brute at 5:00; the Hollow King and two Brutes at 10:00; three more Brutes when the King is at half health. The swarm is the classic run's curves played faster, and how far along them it gets by 10:00 depends on the depth: the classic 10:00 on depth 1, 1.5 minutes more each floor, up to 28:00. After 10:00 the swarm holds at that strength until the King falls. The King leaves the **Delve cache** (black and iron-bound, an orange seal, a beam of light); walking up to it opens it and clears the node. The HUD shows the depth and node, and the clock counts to the King, then says to slay him, then to open the cache.
+  - *Armoury:* twice the base silver, and a **30% chance** of a piece of gear (any piece, see Gear). **Only from depth 6** (past the first boss tier): the first five floors' King nodes are Currency, Knowledge and Relic.
+  - *Knowledge:* 1,000 + 250 per depth passive tree experience, plus the base silver.
+  - *Relic:* one item at an elite chest's odds, rare or better (with Lucky Charm), plus the base silver. (Two at boss odds before the 2026-09-26 balance pass.)
+  - *Boss:* three times the base silver, an item (epic or better), **Delve Marks** (1 + the boss tier: 2 at depth 5, 3 at depth 10...), and a **40% chance** of a piece of gear.
+  - Gear is a chance, never a promise (the user's call, like Path of Exile's pinnacle bosses). On 2026-09-26 it went to 5% for a test, then to 30% and 40% once duplicates could drop: the drop comes more often, but the piece wanted stays a hunt. The rest of the cache always pays.
+  - **A cleared node is locked for good**, so it can't be farmed: the player has to move on to another node. A node that was failed (death, or Return to Camp) stays open to try again; its run keeps what any run keeps, but pays no cache.
+- **A King node's run** (`Delve/DelveDirector`), about 10 minutes on the usual map: one Ghoul Brute at 5:00; the Hollow King and two Brutes at 10:00; three more Brutes when the King is at half health. The swarm is the classic run's curves played faster, and how far along them it gets by 10:00 depends on the depth: the classic 10:00 on depth 1, 1.5 minutes more each floor, up to 28:00. After 10:00 the swarm holds at that strength until the King falls. The King leaves the **Delve cache** (black and iron-bound, an orange seal, a beam of light); walking up to it opens it and clears the node. The HUD shows the depth and node, and the clock counts to the King, then says to slay him, then to open the cache.
 - **Depth** makes everything tougher on top of the run's own ramp: +15% enemy health and +6% damage per floor.
 - **Dying** keeps what dying always kept (the run's silver, items found, tree experience), but the node isn't cleared and the cache pays nothing. Only a classic 30:00 counts as a win for the bounties.
 - **Floor looks** (`Delve/DelveBands`): the same map, lit and weathered by band. Depth 1-4 *the Greenwood* (day); 5-9 *the Amber Hollows* (a low evening sun, amber mist); 10-14 *the Mistdeep* (overcast, rain, thick mist); 15-19 *the Night Hollows* (night, blue mist, wisps); 20 and deeper *the Frozen Deep* (snow falling, mist, cold). Camp's own sky comes back on the way home.
@@ -224,7 +229,7 @@ Added content, not a replacement: the classic 30-minute run is still there, a bu
 ## Gear (built, first pass)
 
 - Three slots: **Body Armour, Weapon, Trinket** (`Gear/Gear.cs`). Every piece is a **unique**: a name, one simple, strong effect, a line of flavour, and the orange unique look. Any class can wear any piece. Worn gear counts on every run, classic or Delve, through the same bonuses items use (not an item: it doesn't take a loadout slot).
-- Can drop from **Armoury** (35% a cache) and **Boss** (50%) Delves: a piece not owned yet, preferring an empty slot's, and put on if its slot is empty. Owned once; worn and taken off at the armour stand (`Ui/GearScreen`).
+- Can drop from **Armoury** (30% a cache, from depth 6) and **Boss** (40%) Delves: **any of the 12, owned already or not** (the user's call, 2026-09-26: a drop is still a rush, and the piece wanted stays a hunt). A new piece is put on if its slot is empty. A duplicate adds a copy: the armour stand shows "x2", the summary "again: x2". **Copies do nothing yet**; they are there for a later use (salvage, upgrades, Delve Marks: the user's to decide). Worn and taken off at the armour stand (`Ui/GearScreen`).
 - The 12 pieces:
   - *Body Armour:* **Great Mage's Vestments** (a 100-point shield over health and any class shield; once broken it returns after 10 s), **Ironhide Hauberk** (15% less damage taken, +30 max health), **Thornmail of the Hollow** (blows that reach you are paid back in full), **Wraithskin Coat** (+15% move speed, Shift move 30% faster).
   - *Weapon:* **Kingsbane** (x1.4 damage to elites and bosses), **Emberbrand** (a ring of fire around you every 5 s for 60 damage), **Tempest Fang** (x1.2 attack speed), **Soulreaver** (+10% damage, heal 2 per kill).
@@ -234,33 +239,33 @@ Added content, not a replacement: the classic 30-minute run is still there, a bu
 ## Meta progression (built, first pass)
 
 All in `Progression/MetaProgress.cs`; all numbers are a starting point to tune.
-- **Silver**, earned at the end of every run, win or lose: 1 per 10 kills, 5 per elite, 60 per boss, 3 per minute survived, +250 for a win. Shown at camp and in the run summary.
+- **Silver**, earned at the end of every run, win or lose: 1 per 20 kills, 4 per elite, 40 per boss, 2 per minute survived, +150 for a win. Shown at camp and in the run summary. (Cut on 2026-09-26: one 30-minute run was paying 2,500-3,000 silver with its bounties. Before: 1 per 10 kills, 5, 60, 3, +250.)
 - **The Quartermaster** (camp stall) sells permanent upgrades with silver:
-  - *Bigger Pack:* +1 loadout slot, 3 ranks (5 -> 8 items).
+  - *Bigger Pack:* +1 loadout slot, 3 ranks (5 -> 8 items): 1,500, 4,000 and 9,000 silver (600, 1,800, 4,500 before the balance pass; the other upgrades went up about half as much).
   - *Second Thoughts:* +1 reroll per run on the level-up screen, 5 ranks. A reroll swaps all three cards (R).
   - *Clear Mind:* +1 banish per run, 3 ranks. A banish strikes one card's upgrade from the pool for the rest of the run and replaces the card.
   - *Lucky Charm:* 5 ranks. Each makes rares 15%, epics 30% and legendaries 50% likelier (relative to commons) from chests and drops.
-- **The Bounty Board** (camp) has 42 one-time challenges, checked at the end of every run. Each pays silver once, and 18 unlock an item into the drop pool. **Every epic and legendary starts locked** (items already owned stay owned). The board lists the open ones first and scrolls:
+- **The Bounty Board** (camp) has 42 one-time challenges, checked at the end of every run. Each pays silver once, and 18 unlock an item into the drop pool. On 2026-09-26 every bounty's silver was halved and the easy ones made harder (the numbers below are the new ones). **Every epic and legendary starts locked** (items already owned stay owned). The board lists the open ones first and scrolls:
   - Brute Force (kill a Brute) -> Ironbark Totem
   - Holding On (survive 10 min) -> Swiftwind Sigil
   - Regicide (kill the Hollow King) -> Hunter's Moon
   - The Long Night (survive 20 min) -> Dragon Heart
-  - Massacre (1,000 kills in a run) -> Rune of Might
-  - Shieldbearer (survive 10 min as the Paladin) -> Bulwark Sigil
-  - Cold Snap (500 kills in a run as the Mage) -> Heart of Winter
-  - Glass Cannon (reach level 25 in a run) -> Glass Pendant
-  - Brute Hunter (5 Brutes in a run) -> Berserker's Band
-  - Dark Bargain (set out on 15 runs) -> Cursed Idol
+  - Massacre (2,500 kills in a run) -> Rune of Might
+  - Shieldbearer (survive 15 min as the Paladin) -> Bulwark Sigil
+  - Cold Snap (1,500 kills in a run as the Mage) -> Heart of Winter
+  - Glass Cannon (reach level 35 in a run) -> Glass Pendant
+  - Brute Hunter (10 Brutes in a run) -> Berserker's Band
+  - Dark Bargain (set out on 25 runs) -> Cursed Idol
   - Martyr (defeat the Hollow King as the Paladin) -> Martyr's Crown
   - Dawnbringer (win as the Paladin) -> Aegis of the Dawn
   - Endless Winter (win as the Mage) -> Staff of the Long Night
   - Deadeye's Prize (win as the Ranger) -> Splintered Crown
   - Rise Again (survive 25 min) -> Phoenix Feather
   - Hoarder (own 30 different items) -> Crown of Plenty
-  - Conductor (600 kills in a run as the Shaman) -> Stormcaller's Horn
+  - Conductor (1,500 kills in a run as the Shaman) -> Stormcaller's Horn
   - Stormborn (win as the Shaman) -> Crown of Storms
-  - Silver only: First Hunt, Collector, Deep Roots, A Thousand Cuts (lifetime), Champion (win).
-  - The Delve's, silver only: Into the Dark (first node), Deeper Still / The Mistdeep / Night Walker / The Frozen Deep / Abyss Gazer (open depth 5, 10, 15, 20, 30), Delver and Veteran Delver (10 and 40 nodes), Every Path (a node of each run kind), Swift Delve (a node within 11 minutes), Unbound and Kingbreaker (the Hollow King Unbound once and three times), Ranger / Paladin / Mage / Shaman of the Deep (a node at depth 10+ as that class), Armourer (4 pieces of gear), Fully Kitted (all three slots worn), The Full Armoury (every piece).
+  - Silver only: First Hunt (250 kills in a run), Collector (10 different items), Deep Roots (tree level 10), A Thousand Cuts (25,000 kills, lifetime), Champion (win).
+  - The Delve's, silver only: Into the Dark (first node), Deeper Still / The Mistdeep / Night Walker / The Frozen Deep / Abyss Gazer (open depth 5, 10, 15, 20, 30), Delver and Veteran Delver (10 and 40 nodes), Every Path (a node of each run kind), Swift Delve (a King's node within 11 minutes), Unbound and Kingbreaker (the Hollow King Unbound once and three times), Ranger / Paladin / Mage / Shaman of the Deep (a node at depth 10+ as that class), Armourer (4 pieces of gear), Fully Kitted (all three slots worn), The Full Armoury (every piece).
   - While a rarity's items are all locked, a roll of that rarity falls back to the next one down.
 - Later: unlocking a second class, more trees, cosmetic or camp upgrades.
 
@@ -287,11 +292,11 @@ Each step should be playable before the next one starts. **[engine]** means the 
 - The Paladin: should the Holy Nova stay centred on the Paladin, or go off where the crosshair aims (so aim matters, as for the Ranger)? Should the flail do anything of its own?
 
 - Should item experience bonuses (Old Tome) also speed up the passive tree? (Left for later; currently they don't.)
-- Items stack for good across runs. With no cap on copies, a loadout keeps getting stronger; watch the balance while playing.
 - Meta progression numbers (silver rates, prices, which items are locked behind which bounty) are a first guess.
 - The real map: size, layout and look (the hybrid: bounded, mid-to-large).
 - Respec is free for now. Keep it free, or give it a cost later?
 - **What Delve Marks buy** (the user is designing a system for them).
-- **Item limits:** some items stack too hard (the user got three Serrated Edges, +90% crit damage, and one-shot everything for 30 minutes). The plan is to cap some items; not done yet.
+- **Item limits:** done (2026-09-26): stack caps, and items made rare. Whether one item a run feels right, and whether the caps are right, is to be felt out.
+- **What duplicate gear is for** (copies are counted, and do nothing yet).
 - **Late classic runs:** past about 25:00 the screen fills and it gets very hard; a non-crit Frost Mage falls at about 27:00. With ~200 Ghoul Mages on the field their fireball marks pile up (hundreds of circles under the player) and catch them. The Ghoul Mage needs a nerf and a look (a cap on marks or on mages casting at once).
 - The Unbound King's health (26,000 times the depth's), the arena's starting level, and whether picking 14+ upgrades before the fight feels good, are guesses to try.

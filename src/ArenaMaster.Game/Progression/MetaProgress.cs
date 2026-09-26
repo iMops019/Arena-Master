@@ -25,11 +25,11 @@ internal sealed record RunRecord(int Kills, int ElitesKilled, int BossesKilled, 
 /// <summary>The silver a run earns, win or lose: a little per kill, more for elites and bosses, some for every minute survived, and a bonus for winning.</summary>
 internal static class RunRewards
 {
-    public const int KillsPerSilver = 10;
-    public const int SilverPerElite = 5;
-    public const int SilverPerBoss = 60;
-    public const int SilverPerMinute = 3;
-    public const int SilverForVictory = 250;
+    public const int KillsPerSilver = 20;
+    public const int SilverPerElite = 4;
+    public const int SilverPerBoss = 40;
+    public const int SilverPerMinute = 2;
+    public const int SilverForVictory = 150;
 
     public static long Silver(RunRecord run) =>
         run.Kills / KillsPerSilver
@@ -57,10 +57,10 @@ internal static class Shop
 
     public static readonly IReadOnlyList<ShopUpgrade> All = new ShopUpgrade[]
     {
-        new(PackSlot, "Bigger Pack", "+1 loadout slot: bring one more kind of item on every run.", new long[] { 600, 1800, 4500 }),
-        new(Reroll, "Second Thoughts", "+1 reroll per run on the level-up screen: swap all three choices for new ones.", new long[] { 150, 350, 700, 1200, 2000 }),
-        new(Banish, "Clear Mind", "+1 banish per run on the level-up screen: strike one choice from the pool for the rest of the run.", new long[] { 250, 700, 1500 }),
-        new(Luck, "Lucky Charm", "Better odds from chests and drops: rarer items turn up more often.", new long[] { 300, 700, 1300, 2200, 3500 }),
+        new(PackSlot, "Bigger Pack", "+1 loadout slot: bring one more kind of item on every run.", new long[] { 1500, 4000, 9000 }),
+        new(Reroll, "Second Thoughts", "+1 reroll per run on the level-up screen: swap all three choices for new ones.", new long[] { 200, 500, 1000, 1800, 3000 }),
+        new(Banish, "Clear Mind", "+1 banish per run on the level-up screen: strike one choice from the pool for the rest of the run.", new long[] { 400, 1200, 2500 }),
+        new(Luck, "Lucky Charm", "Better odds from chests and drops: rarer items turn up more often.", new long[] { 400, 1000, 2000, 3500, 5500 }),
     };
 
     public static ShopUpgrade Get(string id) => All.First(u => u.Id == id);
@@ -125,61 +125,61 @@ internal static class Bounties
 {
     public static readonly IReadOnlyList<Bounty> All = new Bounty[]
     {
-        new("first_hunt", "First Hunt", "Kill 100 enemies in one run.", 50, null, (run, _, _) => run.Kills >= 100),
-        new("brute_force", "Brute Force", "Kill a Ghoul Brute.", 100, "ironbark_totem", (run, _, _) => run.ElitesKilled >= 1),
-        new("holding_on", "Holding On", "Survive 10 minutes in one run.", 150, "swiftwind_sigil", (run, _, _) => run.Seconds >= 600f),
-        new("regicide", "Regicide", "Defeat the Hollow King.", 300, "hunters_moon", (run, _, _) => run.BossesKilled >= 1),
-        new("long_night", "The Long Night", "Survive 20 minutes in one run.", 300, "dragon_heart", (run, _, _) => run.Seconds >= 1200f),
-        new("massacre", "Massacre", "Kill 1,000 enemies in one run.", 250, "rune_of_might", (run, _, _) => run.Kills >= 1000),
-        new("collector", "Collector", "Own 10 different items.", 200, null, (_, profile, _) => profile.Stash.Count(kv => kv.Value > 0) >= 10),
-        new("deep_roots", "Deep Roots", "Reach passive tree level 10.", 300, null, (_, _, tree) => tree.Level >= 10),
-        new("thousand_cuts", "A Thousand Cuts", "Kill 10,000 enemies over all your runs.", 400, null, (_, profile, _) => profile.Lifetime.Kills >= 10_000),
-        new("champion", "Champion", "Survive to 30:00 and win a run.", 1000, null, (run, _, _) => run.Won),
+        new("first_hunt", "First Hunt", "Kill 250 enemies in one run.", 25, null, (run, _, _) => run.Kills >= 250),
+        new("brute_force", "Brute Force", "Kill a Ghoul Brute.", 50, "ironbark_totem", (run, _, _) => run.ElitesKilled >= 1),
+        new("holding_on", "Holding On", "Survive 10 minutes in one run.", 75, "swiftwind_sigil", (run, _, _) => run.Seconds >= 600f),
+        new("regicide", "Regicide", "Defeat the Hollow King.", 150, "hunters_moon", (run, _, _) => run.BossesKilled >= 1),
+        new("long_night", "The Long Night", "Survive 20 minutes in one run.", 150, "dragon_heart", (run, _, _) => run.Seconds >= 1200f),
+        new("massacre", "Massacre", "Kill 2,500 enemies in one run.", 125, "rune_of_might", (run, _, _) => run.Kills >= 2500),
+        new("collector", "Collector", "Own 10 different items.", 100, null, (_, profile, _) => profile.Stash.Count(kv => kv.Value > 0) >= 10),
+        new("deep_roots", "Deep Roots", "Reach passive tree level 10.", 150, null, (_, _, tree) => tree.Level >= 10),
+        new("thousand_cuts", "A Thousand Cuts", "Kill 25,000 enemies over all your runs.", 200, null, (_, profile, _) => profile.Lifetime.Kills >= 25_000),
+        new("champion", "Champion", "Survive to 30:00 and win a run.", 500, null, (run, _, _) => run.Won),
 
         // The newer epics.
-        new("shieldbearer", "Shieldbearer", "Survive 10 minutes as the Paladin.", 200, "bulwark_sigil", (run, _, _) => run.ClassId == Paladin && run.Seconds >= 600f),
-        new("cold_snap", "Cold Snap", "Kill 500 enemies in one run as the Mage.", 200, "heart_of_winter", (run, _, _) => run.ClassId == Mage && run.Kills >= 500),
-        new("glass_cannon", "Glass Cannon", "Reach level 25 in one run.", 250, "glass_pendant", (run, _, _) => run.Level >= 25),
-        new("brute_hunter", "Brute Hunter", "Kill 5 Ghoul Brutes in one run.", 250, "berserkers_band", (run, _, _) => run.ElitesKilled >= 5),
-        new("dark_bargain", "Dark Bargain", "Set out on 15 runs.", 250, "cursed_idol", (_, profile, _) => profile.Lifetime.Runs >= 15),
+        new("shieldbearer", "Shieldbearer", "Survive 15 minutes as the Paladin.", 100, "bulwark_sigil", (run, _, _) => run.ClassId == Paladin && run.Seconds >= 900f),
+        new("cold_snap", "Cold Snap", "Kill 1,500 enemies in one run as the Mage.", 100, "heart_of_winter", (run, _, _) => run.ClassId == Mage && run.Kills >= 1500),
+        new("glass_cannon", "Glass Cannon", "Reach level 35 in one run.", 125, "glass_pendant", (run, _, _) => run.Level >= 35),
+        new("brute_hunter", "Brute Hunter", "Kill 10 Ghoul Brutes in one run.", 125, "berserkers_band", (run, _, _) => run.ElitesKilled >= 10),
+        new("dark_bargain", "Dark Bargain", "Set out on 25 runs.", 125, "cursed_idol", (_, profile, _) => profile.Lifetime.Runs >= 25),
 
         // The newer legendaries.
-        new("martyr", "Martyr", "Defeat the Hollow King as the Paladin.", 400, "martyrs_crown", (run, _, _) => run.ClassId == Paladin && run.BossesKilled >= 1),
-        new("dawnbringer", "Dawnbringer", "Win a run as the Paladin.", 800, "aegis_of_dawn", (run, _, _) => run.ClassId == Paladin && run.Won),
-        new("endless_winter", "Endless Winter", "Win a run as the Mage.", 800, "staff_of_long_night", (run, _, _) => run.ClassId == Mage && run.Won),
-        new("deadeye_prize", "Deadeye's Prize", "Win a run as the Ranger.", 800, "splintered_crown", (run, _, _) => run.ClassId == Ranger && run.Won),
-        new("rise_again", "Rise Again", "Survive 25 minutes in one run.", 500, "phoenix_feather", (run, _, _) => run.Seconds >= 1500f),
-        new("hoarder", "Hoarder", "Own 30 different items.", 600, "crown_of_plenty", (_, profile, _) => profile.Stash.Count(kv => kv.Value > 0) >= 30),
+        new("martyr", "Martyr", "Defeat the Hollow King as the Paladin.", 200, "martyrs_crown", (run, _, _) => run.ClassId == Paladin && run.BossesKilled >= 1),
+        new("dawnbringer", "Dawnbringer", "Win a run as the Paladin.", 400, "aegis_of_dawn", (run, _, _) => run.ClassId == Paladin && run.Won),
+        new("endless_winter", "Endless Winter", "Win a run as the Mage.", 400, "staff_of_long_night", (run, _, _) => run.ClassId == Mage && run.Won),
+        new("deadeye_prize", "Deadeye's Prize", "Win a run as the Ranger.", 400, "splintered_crown", (run, _, _) => run.ClassId == Ranger && run.Won),
+        new("rise_again", "Rise Again", "Survive 25 minutes in one run.", 250, "phoenix_feather", (run, _, _) => run.Seconds >= 1500f),
+        new("hoarder", "Hoarder", "Own 30 different items.", 300, "crown_of_plenty", (_, profile, _) => profile.Stash.Count(kv => kv.Value > 0) >= 30),
 
         // The Shaman's.
-        new("conductor", "Conductor", "Kill 600 enemies in one run as the Shaman.", 250, "stormcallers_horn", (run, _, _) => run.ClassId == Shaman && run.Kills >= 600),
-        new("stormborn", "Stormborn", "Win a run as the Shaman.", 800, "crown_of_storms", (run, _, _) => run.ClassId == Shaman && run.Won),
+        new("conductor", "Conductor", "Kill 1,500 enemies in one run as the Shaman.", 125, "stormcallers_horn", (run, _, _) => run.ClassId == Shaman && run.Kills >= 1500),
+        new("stormborn", "Stormborn", "Win a run as the Shaman.", 400, "crown_of_storms", (run, _, _) => run.ClassId == Shaman && run.Won),
 
         // The Delve.
-        new("into_the_dark", "Into the Dark", "Clear your first Delve node.", 100, null, (_, profile, _) => profile.Delve.Cleared.Count >= 1),
-        new("deeper_still", "Deeper Still", "Open Delve depth 5.", 200, null, (_, profile, _) => profile.Delve.Deepest >= 5),
-        new("the_mistdeep", "The Mistdeep", "Open Delve depth 10.", 400, null, (_, profile, _) => profile.Delve.Deepest >= 10),
-        new("night_walker", "Night Walker", "Open Delve depth 15.", 700, null, (_, profile, _) => profile.Delve.Deepest >= 15),
-        new("frozen_deep", "The Frozen Deep", "Open Delve depth 20.", 1000, null, (_, profile, _) => profile.Delve.Deepest >= 20),
-        new("abyss_gazer", "Abyss Gazer", "Open Delve depth 30.", 2000, null, (_, profile, _) => profile.Delve.Deepest >= 30),
-        new("delver", "Delver", "Clear 10 Delve nodes.", 250, null, (_, profile, _) => profile.Delve.Cleared.Count >= 10),
-        new("veteran_delver", "Veteran Delver", "Clear 40 Delve nodes.", 800, null, (_, profile, _) => profile.Delve.Cleared.Count >= 40),
-        new("every_path", "Every Path", "Clear a Currency, Armoury, Knowledge and Relic Delve.", 400, null, (_, profile, _) =>
+        new("into_the_dark", "Into the Dark", "Clear your first Delve node.", 50, null, (_, profile, _) => profile.Delve.Cleared.Count >= 1),
+        new("deeper_still", "Deeper Still", "Open Delve depth 5.", 100, null, (_, profile, _) => profile.Delve.Deepest >= 5),
+        new("the_mistdeep", "The Mistdeep", "Open Delve depth 10.", 200, null, (_, profile, _) => profile.Delve.Deepest >= 10),
+        new("night_walker", "Night Walker", "Open Delve depth 15.", 350, null, (_, profile, _) => profile.Delve.Deepest >= 15),
+        new("frozen_deep", "The Frozen Deep", "Open Delve depth 20.", 500, null, (_, profile, _) => profile.Delve.Deepest >= 20),
+        new("abyss_gazer", "Abyss Gazer", "Open Delve depth 30.", 1000, null, (_, profile, _) => profile.Delve.Deepest >= 30),
+        new("delver", "Delver", "Clear 10 Delve nodes.", 125, null, (_, profile, _) => profile.Delve.Cleared.Count >= 10),
+        new("veteran_delver", "Veteran Delver", "Clear 40 Delve nodes.", 400, null, (_, profile, _) => profile.Delve.Cleared.Count >= 40),
+        new("every_path", "Every Path", "Clear a Currency, Armoury, Knowledge and Relic Delve.", 200, null, (_, profile, _) =>
             new[] { "Currency", "Armoury", "Knowledge", "Relic" }.All(k => profile.Delve.ClearedByKind.GetValueOrDefault(k) > 0)),
-        new("swift_delve", "Swift Delve", "Clear a Delve node within 11 minutes.", 300, null, (run, _, _) => run.DelveCleared && !run.DelveBoss && run.Seconds <= 660f),
-        new("unbound", "Unbound", "Defeat the Hollow King Unbound in a Boss Delve.", 500, null, (_, profile, _) => profile.Delve.BossesSlain >= 1),
-        new("kingbreaker", "Kingbreaker", "Defeat the Hollow King Unbound 3 times.", 1200, null, (_, profile, _) => profile.Delve.BossesSlain >= 3),
-        new("deep_ranger", "Ranger of the Deep", "Clear a Delve node at depth 10 or deeper as the Ranger.", 400, null,
+        new("swift_delve", "Swift Delve", "Clear a King's Delve node within 11 minutes.", 150, null, (run, _, _) => run.DelveCleared && !run.DelveBoss && run.BossesKilled > 0 && run.Seconds <= 660f),
+        new("unbound", "Unbound", "Defeat the Hollow King Unbound in a Boss Delve.", 250, null, (_, profile, _) => profile.Delve.BossesSlain >= 1),
+        new("kingbreaker", "Kingbreaker", "Defeat the Hollow King Unbound 3 times.", 600, null, (_, profile, _) => profile.Delve.BossesSlain >= 3),
+        new("deep_ranger", "Ranger of the Deep", "Clear a Delve node at depth 10 or deeper as the Ranger.", 200, null,
             (run, _, _) => run.ClassId == Ranger && run.DelveCleared && run.Depth >= 10),
-        new("deep_paladin", "Paladin of the Deep", "Clear a Delve node at depth 10 or deeper as the Paladin.", 400, null,
+        new("deep_paladin", "Paladin of the Deep", "Clear a Delve node at depth 10 or deeper as the Paladin.", 200, null,
             (run, _, _) => run.ClassId == Paladin && run.DelveCleared && run.Depth >= 10),
-        new("deep_mage", "Mage of the Deep", "Clear a Delve node at depth 10 or deeper as the Mage.", 400, null,
+        new("deep_mage", "Mage of the Deep", "Clear a Delve node at depth 10 or deeper as the Mage.", 200, null,
             (run, _, _) => run.ClassId == Mage && run.DelveCleared && run.Depth >= 10),
-        new("deep_shaman", "Shaman of the Deep", "Clear a Delve node at depth 10 or deeper as the Shaman.", 400, null,
+        new("deep_shaman", "Shaman of the Deep", "Clear a Delve node at depth 10 or deeper as the Shaman.", 200, null,
             (run, _, _) => run.ClassId == Shaman && run.DelveCleared && run.Depth >= 10),
-        new("armourer", "Armourer", "Own 4 pieces of gear.", 300, null, (_, profile, _) => profile.Gear.Owned.Count >= 4),
-        new("fully_kitted", "Fully Kitted", "Wear gear in all three slots.", 250, null, (_, profile, _) => Gear.GearCatalog.Worn(profile).Count() >= 3),
-        new("armoury_complete", "The Full Armoury", "Own every piece of gear.", 1500, null,
+        new("armourer", "Armourer", "Own 4 pieces of gear.", 150, null, (_, profile, _) => profile.Gear.Owned.Count >= 4),
+        new("fully_kitted", "Fully Kitted", "Wear gear in all three slots.", 125, null, (_, profile, _) => Gear.GearCatalog.Worn(profile).Count() >= 3),
+        new("armoury_complete", "The Full Armoury", "Own every piece of gear.", 750, null,
             (_, profile, _) => Gear.GearCatalog.All.All(piece => Gear.GearCatalog.Owns(profile, piece))),
     };
 
@@ -189,6 +189,9 @@ internal static class Bounties
     /// <summary>Whether <paramref name="item"/> can come out of chests and drops: yes unless a bounty not yet done unlocks it.</summary>
     public static bool IsUnlocked(RunItem item, Profile profile) =>
         All.FirstOrDefault(b => b.UnlocksItem == item.Id) is not { } bounty || profile.HasBounty(bounty.Id);
+
+    /// <summary>Whether <paramref name="item"/> can drop for <paramref name="profile"/>: unlocked, and not already owned as many times as can count, so a find is never wasted.</summary>
+    public static bool CanDrop(RunItem item, Profile profile) => IsUnlocked(item, profile) && profile.CountOf(item.Id) < item.MaxStack;
 
     /// <summary>
     /// The end of a run: adds it to the lifetime totals, then completes every bounty it (or the totals) now meets that wasn't done before, paying each one's silver.

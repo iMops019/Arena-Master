@@ -13,8 +13,8 @@ public class RunRewardTests
         var lost = new RunRecord(Kills: 250, ElitesKilled: 2, BossesKilled: 0, Seconds: 11.5f * 60f, Won: false, Level: 20);
         var won = lost with { BossesKilled = 3, Seconds = 30f * 60f, Won = true };
 
-        Assert.Equal(25 + 10 + 11 * 3, RunRewards.Silver(lost));
-        Assert.Equal(25 + 10 + 180 + 30 * 3 + 250, RunRewards.Silver(won));
+        Assert.Equal(12 + 8 + 11 * 2, RunRewards.Silver(lost));
+        Assert.Equal(12 + 8 + 120 + 30 * 2 + 150, RunRewards.Silver(won));
     }
 }
 
@@ -93,8 +93,8 @@ public class BountyTests
     {
         var profile = new Profile();
 
-        var first = Bounties.Settle(Run(kills: 150), profile, Tree(profile));
-        var again = Bounties.Settle(Run(kills: 150), profile, Tree(profile));
+        var first = Bounties.Settle(Run(kills: 300), profile, Tree(profile));
+        var again = Bounties.Settle(Run(kills: 300), profile, Tree(profile));
 
         Assert.Contains(first, b => b.Id == "first_hunt");
         Assert.DoesNotContain(again, b => b.Id == "first_hunt");
@@ -107,11 +107,11 @@ public class BountyTests
         var profile = new Profile();
         for (int i = 0; i < 9; i++)
         {
-            Bounties.Settle(Run(kills: 1000), profile, Tree(profile));
+            Bounties.Settle(Run(kills: 2500), profile, Tree(profile));
         }
 
         Assert.False(profile.HasBounty("thousand_cuts"));
-        Bounties.Settle(Run(kills: 1000), profile, Tree(profile));
+        Bounties.Settle(Run(kills: 2500), profile, Tree(profile));
         Assert.True(profile.HasBounty("thousand_cuts"));
         Assert.Equal(10, profile.Lifetime.Runs);
     }

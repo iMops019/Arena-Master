@@ -7,7 +7,7 @@ namespace ArenaMaster.Game.Ui;
 
 /// <summary>
 /// What choosing a loadout means: at most <see cref="Limit"/> different items - <see cref="MaxItems"/>, plus any slots bought from the Quartermaster - each brought with
-/// every copy owned.
+/// every copy owned (only up to its <see cref="RunItem.MaxStack"/> count).
 /// </summary>
 internal static class Loadout
 {
@@ -108,6 +108,10 @@ internal static class ItemGrid
         return clicked;
     }
 
+    /// <summary>How many are owned against how many can count: "x1 of 3", "x3 max", or "x8 (3 count)" for copies past the cap.</summary>
+    public static string StackBadge(RunItem item, int count) =>
+        count > item.MaxStack ? $"x{count} ({item.MaxStack} count)" : count == item.MaxStack ? $"x{count} max" : $"x{count} of {item.MaxStack}";
+
     private static void DrawCard(RunItem item, int count, CardLook look, Vector2 min, Vector2 max, bool hovered)
     {
         float scale = UiTheme.Scale;
@@ -120,6 +124,8 @@ internal static class ItemGrid
             UiTheme.Card(min, max, UiTheme.WithAlpha(UiTheme.PanelRaised, 0.5f), UiTheme.Line);
             UiTheme.Text(min + new Vector2(pad, pad), item.Rarity.ToString().ToUpperInvariant(), UiTheme.WithAlpha(rarity, 0.35f), 0.62f);
             UiTheme.Text(min + new Vector2(pad, pad + ImGui.GetFontSize() * 0.85f), "Not found yet", UiTheme.Faint, 0.95f);
+            string most = item.MaxStack == 1 ? "Doesn't stack" : $"Stacks to {item.MaxStack}";
+            UiTheme.Text(min + new Vector2(pad, pad + ImGui.GetFontSize() * 2.2f), most, UiTheme.Faint, 0.72f);
             return;
         }
 
@@ -132,7 +138,7 @@ internal static class ItemGrid
         UiTheme.Text(min + new Vector2(pad, pad + ImGui.GetFontSize() * 0.85f), item.Name, UiTheme.Ink, 1.02f);
         UiTheme.Text(min + new Vector2(pad, pad + ImGui.GetFontSize() * 2.2f), item.Description, UiTheme.Muted, 0.8f, max.X - min.X - 2f * pad);
 
-        string badge = $"x{count}";
+        string badge = StackBadge(item, count);
         float badgeWidth = UiTheme.TextWidth(badge, 0.95f);
         UiTheme.Text(new Vector2(max.X - pad - badgeWidth, min.Y + pad), badge, look == CardLook.Selected ? UiTheme.Teal : UiTheme.BrassHi, 0.95f);
     }
@@ -229,7 +235,7 @@ internal sealed class LoadoutScreen : GameScreen
         var start = ImGui.GetCursorScreenPos();
         float width = ImGui.GetContentRegionAvail().X;
         float beginWidth = 200f * scale, backWidth = 130f * scale, clearWidth = 120f * scale;
-        UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.28f), "Every copy you own of a chosen item comes along. Items found during a run go to the chest and only count once you bring them.",
+        UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.28f), "Every copy you own of a chosen item comes along, up to its stack cap. Items found during a run go to the chest and only count once you bring them.",
             UiTheme.Muted, 0.8f, width - beginWidth - backWidth - clearWidth - 40f * scale);
 
         var result = Result.None;
@@ -284,7 +290,7 @@ internal sealed class LoadoutScreen : GameScreen
                 var rarity = UiTheme.Rarity(item.Rarity);
                 UiTheme.Card(min, max, UiTheme.TealDeep, rarity, 2f);
                 UiTheme.Text(min + new Vector2(10f * scale, 8f * scale), item.Name, UiTheme.Ink, 0.9f, slotWidth - 60f * scale);
-                string count = $"x{profile.CountOf(item.Id)}";
+                string count = $"x{Math.Min(profile.CountOf(item.Id), item.MaxStack)}";
                 UiTheme.Text(new Vector2(max.X - 10f * scale - UiTheme.TextWidth(count, 0.9f), min.Y + 8f * scale), count, UiTheme.BrassHi, 0.9f);
                 UiTheme.Text(min + new Vector2(10f * scale, 30f * scale), item.Rarity.ToString(), rarity, 0.65f);
             }

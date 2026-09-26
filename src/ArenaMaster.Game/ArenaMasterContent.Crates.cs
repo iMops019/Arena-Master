@@ -13,7 +13,7 @@ public sealed partial class ArenaMasterContent
     /// frenzy's attack speed and length, and a big gem's worth (plus one per minute survived).</summary>
     private const float AppleHeal = 0.15f;
     private const float RoastHeal = 0.4f;
-    private const int SilverPouch = 25;
+    private const int SilverPouch = 10;
     private const float BombRadius = 8f;
     private const float BombDamage = 60f;
     private const float FrenzyBonus = 0.4f;

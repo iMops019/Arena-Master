@@ -5,7 +5,8 @@ namespace ArenaMaster.Game.Delve;
 /// <summary>
 /// A Delve node's run, about 10 minutes: the swarm ramps up faster than a classic run's (the classic's own curves, played quicker, and how far along them a floor
 /// gets depends on its depth); one Ghoul Brute at 5:00; the Hollow King with two Brutes at 10:00; and three more Brutes when the King is down to half his health.
-/// The swarm holds at its 10:00 strength until the King falls, and the run is over when his cache is opened. Everything is tougher by the floor's depth. Pure.
+/// The swarm holds at its 10:00 strength until the King falls, and the run is over when his cache is opened. Everything is tougher by the floor's depth.
+/// A Descent has no King: at 10:00 the cache is due instead (<see cref="CacheDue"/>). Pure.
 /// </summary>
 internal sealed class DelveDirector
 {
@@ -18,9 +19,16 @@ internal sealed class DelveDirector
     private bool _boss;
     private bool _half;
 
-    public DelveDirector(int depth) => Depth = Math.Max(1, depth);
+    public DelveDirector(int depth, bool king = true)
+    {
+        Depth = Math.Max(1, depth);
+        King = king;
+    }
 
     public int Depth { get; }
+
+    /// <summary>Whether the King comes at 10:00 (false for a Descent).</summary>
+    public bool King { get; }
 
     /// <summary>How far along the classic run's curves (in its minutes) this floor's swarm is at the boss: 10:00 on the first floor, 1.5 minutes more each floor, 28:00 at most.</summary>
     public static float PeakMinutes(int depth) => MathF.Min(28f, 10f + 1.5f * (Math.Max(1, depth) - 1));
@@ -52,8 +60,11 @@ internal sealed class DelveDirector
         if (!_boss && seconds >= BossAt)
         {
             _boss = true;
-            spawnBoss = true;
-            elites += ElitesWithBoss;
+            if (King)
+            {
+                spawnBoss = true;
+                elites += ElitesWithBoss;
+            }
         }
 
         if (_boss && !_half && boss is { IsAlive: true } && boss.Health <= boss.MaxHealth * 0.5f)
@@ -66,5 +77,8 @@ internal sealed class DelveDirector
     }
 
     /// <summary>Whether the King has been called yet.</summary>
-    public bool BossCalled => _boss;
+    public bool BossCalled => King && _boss;
+
+    /// <summary>A Descent's 10:00 has come: the cache should be out.</summary>
+    public bool CacheDue => !King && _boss;
 }

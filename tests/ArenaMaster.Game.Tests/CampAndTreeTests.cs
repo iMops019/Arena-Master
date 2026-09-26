@@ -103,6 +103,16 @@ public class TreeProgressTests
     }
 
     [Fact]
+    public void AFirstDelve_GetsAlmostALevel()
+    {
+        // The user's first 10-minute Delve (a Relic node, no cache experience) earned 2,192 tree experience.
+        var tree = Fresh(2192);
+        Assert.Equal(1, tree.Level);
+        Assert.InRange(tree.IntoLevel / (float)TreeProgress.RequiredFor(1), 0.8f, 0.97f);
+        Assert.True(TreeProgress.RequiredFor(10) > TreeProgress.RequiredFor(2));   // and each level after costs more
+    }
+
+    [Fact]
     public void ItStartsWithTwoChoices_AndOnePoint()
     {
         var tree = Fresh();

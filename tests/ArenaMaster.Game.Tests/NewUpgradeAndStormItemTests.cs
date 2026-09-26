@@ -193,10 +193,10 @@ public class StormItemTests
         Assert.False(Bounties.IsUnlocked(horn, profile));
         Assert.False(Bounties.IsUnlocked(crown, profile));
 
-        Bounties.Settle(new RunRecord(700, 0, 0, 600f, false, 20, "mage"), profile, tree);
+        Bounties.Settle(new RunRecord(1600, 0, 0, 600f, false, 20, "mage"), profile, tree);
         Assert.False(Bounties.IsUnlocked(horn, profile));   // not as the Shaman
 
-        Bounties.Settle(new RunRecord(700, 0, 0, 600f, false, 20, "shaman"), profile, tree);
+        Bounties.Settle(new RunRecord(1600, 0, 0, 600f, false, 20, "shaman"), profile, tree);
         Assert.True(Bounties.IsUnlocked(horn, profile));
         Assert.False(Bounties.IsUnlocked(crown, profile));
     }

@@ -40,6 +40,7 @@ internal sealed class DelveChartScreen : GameScreen
         DelveNodeKind.Armoury => UiTheme.Unique,
         DelveNodeKind.Knowledge => UiTheme.Teal,
         DelveNodeKind.Relic => UiTheme.Rarity(Items.ItemRarity.Epic),
+        DelveNodeKind.Descent => new Vector4(0.62f, 0.68f, 0.74f, 1f),
         _ => new Vector4(0.92f, 0.3f, 0.28f, 1f),
     };
 
@@ -196,6 +197,7 @@ internal sealed class DelveChartScreen : GameScreen
                     DelveNodeKind.Armoury => "A",
                     DelveNodeKind.Knowledge => "K",
                     DelveNodeKind.Relic => "R",
+                    DelveNodeKind.Descent => "D",
                     _ => "B",
                 };
                 var glyphColour = !open ? UiTheme.Faint : cleared ? UiTheme.WithAlpha(colour, 0.9f) : new Vector4(0.05f, 0.06f, 0.08f, 1f);
@@ -289,6 +291,8 @@ internal sealed class DelveChartScreen : GameScreen
         y += font * 1.1f;
         string how = node.IsBoss
             ? $"The arena: the Hollow King Unbound alone, {DelveRules.ArenaBossHealth(node.Depth):N0} health, in three stages. You start at level {DelveRules.ArenaLevel(node.Depth)} and pick your upgrades first."
+            : !node.HasKing
+            ? $"10 minutes, no King: a Brute at 5:00, and the cache turns up at 10:00. The swarm grows as a classic run does to {DelveDirector.PeakMinutes(node.Depth):0}:00."
             : $"About 10 minutes: a Brute at 5:00, the Hollow King and two Brutes at 10:00, three more Brutes when he is at half. The swarm grows as a classic run does to {DelveDirector.PeakMinutes(node.Depth):0}:00. Slay the King and open his cache.";
         UiTheme.Text(new Vector2(x, y), how, UiTheme.Muted, 0.78f, inner);
 

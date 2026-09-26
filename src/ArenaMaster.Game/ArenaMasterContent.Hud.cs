@@ -26,6 +26,7 @@ public sealed partial class ArenaMasterContent
             Delve.RunKind.Arena => _cacheAt is not null ? $"{clock}  ·  open the cache" : $"{clock}  ·  the Hollow King Unbound",
             _ when _cacheAt is not null => $"{clock}  ·  open the cache",
             _ when _delveDirector is { BossCalled: true } => $"{clock}  ·  slay the King",
+            _ when _delveDirector is { King: false } => $"{clock}  ·  the cache at {Clock(Delve.DelveDirector.BossAt)}",
             _ => $"{clock}  ·  the King at {Clock(Delve.DelveDirector.BossAt)}",
         };
     }

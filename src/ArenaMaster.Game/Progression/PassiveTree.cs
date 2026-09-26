@@ -70,8 +70,11 @@ internal sealed class TreeProgress
 
     public TreeSave Save { get; }
 
-    /// <summary>Experience to go from tree level <paramref name="level"/> to the next: 200 + 60 x level^1.6.</summary>
-    public static long RequiredFor(int level) => (long)MathF.Round(200f + 60f * MathF.Pow(level, 1.6f));
+    /// <summary>
+    /// Experience to go from tree level <paramref name="level"/> to the next: 2,400 + 250 x (level - 1)^1.35. The first level is about one 10-minute Delve's worth (a
+    /// first Delve gets most of the way there), and each after it a little more.
+    /// </summary>
+    public static long RequiredFor(int level) => (long)MathF.Round(2400f + 250f * MathF.Pow(level - 1, 1.35f));
 
     /// <summary>All the experience it takes to reach <paramref name="level"/> from level 1.</summary>
     public static long TotalFor(int level)

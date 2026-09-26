@@ -27,26 +27,57 @@ public class ItemTests
         inventory.Add(Item("whetstone"));
         inventory.Add(Item("whetstone"));
         inventory.Add(Item("rune_of_might"));
-        inventory.Add(Item("rune_of_might"));
+        inventory.Add(Item("glass_pendant"));
 
         var bonuses = inventory.Bonuses;
 
         Assert.Equal(0.16f, bonuses.Damage, 4);
-        Assert.Equal(1.44f, bonuses.DamageMultiplier, 4);
+        Assert.Equal(1.2f * 1.35f, bonuses.DamageMultiplier, 4);
         Assert.Equal(2, inventory.CountOf(Item("whetstone")));
-        Assert.Equal(2, inventory.Items.Count);   // one line per kind of item, in the order found
+        Assert.Equal(3, inventory.Items.Count);   // one line per kind of item, in the order found
     }
 
     [Fact]
-    public void DamageReduction_StacksWithoutEverReachingZero()
+    public void CopiesPastAnItemsCap_DontCount()
     {
         var inventory = new ItemInventory();
-        for (int i = 0; i < 50; i++)
+        for (int i = 0; i < 8; i++)
         {
-            inventory.Add(Item("brigandine"));
+            inventory.Add(Item("whetstone"));
+            inventory.Add(Item("serrated_edge"));
+            inventory.Add(Item("rune_of_might"));
         }
 
-        Assert.InRange(inventory.Bonuses.DamageTaken, 0.01f, 0.1f);
+        Assert.Equal(8, inventory.CountOf(Item("whetstone")));   // owned, but only the cap's worth count
+        Assert.Equal(0.08f * 3, inventory.Bonuses.Damage, 4);
+        Assert.Equal(0.30f * 2, inventory.Bonuses.CritDamage, 4);
+        Assert.Equal(1.2f, inventory.Bonuses.DamageMultiplier, 4);
+    }
+
+    [Fact]
+    public void EveryItem_HasACap_CommonsThree_RaresTwo_TheRestOne()
+    {
+        Assert.All(ItemCatalog.All, i => Assert.InRange(i.MaxStack, 1, 3));
+        Assert.All(ItemCatalog.All.Where(i => i.Rarity >= ItemRarity.Epic), i => Assert.Equal(1, i.MaxStack));
+        Assert.Equal(3, Item("whetstone").MaxStack);
+        Assert.Equal(2, Item("serrated_edge").MaxStack);
+        Assert.Equal(1, Item("prism_shard").MaxStack);   // a projectile is a lot: its own cap
+    }
+
+    [Fact]
+    public void AMaxedItem_DoesntDropAgain()
+    {
+        var profile = new Progression.Profile();
+        var whetstone = Item("whetstone");
+        Assert.True(Progression.Bounties.CanDrop(whetstone, profile));
+        for (int i = 0; i < whetstone.MaxStack; i++)
+        {
+            profile.AddToStash(whetstone.Id);
+        }
+
+        Assert.False(Progression.Bounties.CanDrop(whetstone, profile));
+        var random = new Random(5);
+        Assert.All(Enumerable.Range(0, 300), _ => Assert.NotEqual(whetstone, ItemCatalog.Roll(random, RarityWeights.World, i => Progression.Bounties.CanDrop(i, profile))));
     }
 
     [Fact]
@@ -151,16 +182,35 @@ public class LootTests
     }
 
     [Fact]
-    public void ChestsTurnUpAroundThePlayer_OnATimer_UpToALimit()
+    public void ChestsTurnUpAroundThePlayer_NowAndThen_UpToALimit()
     {
         var loot = new LootField(new Random(2));
 
-        for (float t = 0f; t < LootField.FirstChestAt + LootField.ChestInterval * 10f; t += 0.5f)
+        for (float t = 0f; t < LootField.FirstChestAt + LootField.ChestInterval * 400f; t += 1f)
         {
             loot.Update(0.5f, new Vector3D<float>(0f, 0f, 0f), FlatGround, new List<Chest>(), new List<ItemPickup>());
         }
 
         Assert.Equal(LootField.MaxWorldChests, loot.Chests.Count);
         Assert.All(loot.Chests, c => Assert.InRange(new Vector2D<float>(c.Position.X, c.Position.Z).Length, LootField.ChestMinDistance, LootField.ChestMaxDistance));
+    }
+
+    [Fact]
+    public void Drops_AreAChance_NeverASureThing()
+    {
+        var loot = new LootField(new Random(3));
+        int elites = Enumerable.Range(0, 20_000).Count(_ => loot.RollEliteDrop());
+        int bosses = Enumerable.Range(0, 20_000).Count(_ => loot.RollBossDrop());
+        Assert.InRange(elites / 20_000f, LootField.EliteDropChance * 0.7f, LootField.EliteDropChance * 1.3f);
+        Assert.InRange(bosses / 20_000f, LootField.BossDropChance * 0.85f, LootField.BossDropChance * 1.15f);
+
+        // One chance at a world chest: mostly none.
+        int chests = Enumerable.Range(0, 2000).Count(seed =>
+        {
+            var field = new LootField(new Random(seed));
+            field.Update(LootField.FirstChestAt + 0.1f, Vector3D<float>.Zero, FlatGround, new List<Chest>(), new List<ItemPickup>());
+            return field.Chests.Count > 0;
+        });
+        Assert.InRange(chests / 2000f, LootField.WorldChestChance * 0.5f, LootField.WorldChestChance * 1.5f);
     }
 }

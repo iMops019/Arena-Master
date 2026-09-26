@@ -1,3 +1,4 @@
+using ArenaMaster.Game.Items;
 using ArenaMaster.Game.Progression;
 
 namespace ArenaMaster.Game.Delve;
@@ -14,8 +15,11 @@ internal enum DelveNodeKind
     /// <summary>Experience for the active passive tree.</summary>
     Knowledge,
 
-    /// <summary>Items: two rolls at a boss chest's odds.</summary>
+    /// <summary>An item at an elite chest's odds (rare or better).</summary>
     Relic,
+
+    /// <summary>No King: hold out for 10 minutes and the cache appears. A modest purse and some tree experience. Most of a floor's nodes are these.</summary>
+    Descent,
 
     /// <summary>A fight with the Hollow King Unbound in the arena, for Delve Marks, an item, silver and a chance at gear. Every <see cref="DelveMap.BossEvery"/>th floor.</summary>
     Boss,
@@ -31,30 +35,45 @@ internal sealed record DelveNode(int Depth, int Slot, DelveNodeKind Kind)
 
     public bool IsBoss => Kind == DelveNodeKind.Boss;
 
+    /// <summary>Whether its run ends with the Hollow King at 10:00 (every run node but a Descent).</summary>
+    public bool HasKing => Kind != DelveNodeKind.Descent && !IsBoss;
+
     public string Name => DelveMap.NameOf(Kind);
 }
 
 /// <summary>
-/// The Delve's chart: every floor down from depth 1, each with <see cref="NodesPerFloor"/> nodes of mixed kinds, and on every <see cref="BossEvery"/>th floor one more,
-/// the Boss node. A floor is the same every time it is asked for (seeded by its depth), so the chart doesn't reshuffle between visits. Pure.
+/// The Delve's chart: every floor down from depth 1, each with <see cref="NodesPerFloor"/> nodes - some Descents (no King) and some King nodes of different kinds -
+/// and on every <see cref="BossEvery"/>th floor one more, the Boss node. A floor is the same every time it is asked for (seeded by its depth), so the chart doesn't reshuffle between visits. Pure.
 /// </summary>
 internal static class DelveMap
 {
-    public const int NodesPerFloor = 3;
+    public const int NodesPerFloor = 5;
     public const int BossEvery = 5;
 
-    private static readonly DelveNodeKind[] RunKinds = { DelveNodeKind.Currency, DelveNodeKind.Armoury, DelveNodeKind.Knowledge, DelveNodeKind.Relic };
+    /// <summary>How many of a floor's nodes have a King: this many or one more, the rest Descents.</summary>
+    public const int FewestKingNodes = 2;
+
+    /// <summary>The first floor with Armoury nodes: the first boss tier's floors have none, so gear is something found deeper down.</summary>
+    public const int ArmouryFrom = BossEvery + 1;
+
+    /// <summary>The kinds of node with a King at the end. A floor never has two of the same.</summary>
+    private static readonly DelveNodeKind[] KingKinds = { DelveNodeKind.Currency, DelveNodeKind.Armoury, DelveNodeKind.Knowledge, DelveNodeKind.Relic };
 
     public static bool IsBossFloor(int depth) => depth % BossEvery == 0;
 
     /// <summary>
-    /// The nodes of floor <paramref name="depth"/> (1 and down): <see cref="NodesPerFloor"/> run nodes of different kinds, picked the same way every time for the
-    /// same depth; on a boss floor, the Boss node after them.
+    /// The nodes of floor <paramref name="depth"/> (1 and down): <see cref="NodesPerFloor"/> run nodes, 2 or 3 with a King (of different kinds, no Armoury before
+    /// <see cref="ArmouryFrom"/>) and the rest Descents, mixed along the row. Picked the same way every time for the same depth. On a boss floor, the Boss node after them.
     /// </summary>
     public static IReadOnlyList<DelveNode> Floor(int depth)
     {
         var random = new Random(depth * 7919 + 17);
-        var kinds = RunKinds.OrderBy(_ => random.Next()).Take(NodesPerFloor).ToList();
+        int kings = FewestKingNodes + random.Next(2);
+        var kinds = KingKinds.Where(k => depth >= ArmouryFrom || k != DelveNodeKind.Armoury).OrderBy(_ => random.Next()).Take(kings)
+            .Concat(Enumerable.Repeat(DelveNodeKind.Descent, NodesPerFloor))
+            .Take(NodesPerFloor)
+            .OrderBy(_ => random.Next())
+            .ToList();
         var nodes = kinds.Select((kind, slot) => new DelveNode(depth, slot, kind)).ToList();
         if (IsBossFloor(depth))
         {
@@ -82,16 +101,18 @@ internal static class DelveMap
         DelveNodeKind.Armoury => "Armoury Delve",
         DelveNodeKind.Knowledge => "Knowledge Delve",
         DelveNodeKind.Relic => "Relic Delve",
+        DelveNodeKind.Descent => "Descent",
         _ => "Delve Boss",
     };
 
     public static string RewardOf(DelveNodeKind kind) => kind switch
     {
         DelveNodeKind.Currency => "A heavy purse of silver in the cache.",
-        DelveNodeKind.Armoury => "A chance at a piece of gear you don't own yet, and silver either way.",
+        DelveNodeKind.Armoury => "A chance at a piece of gear (any piece, even one you have), and silver either way.",
         DelveNodeKind.Knowledge => "A large sum of experience for your active passive tree.",
-        DelveNodeKind.Relic => "Two items at a boss chest's odds.",
-        _ => "Delve Marks, an item and silver, and a good chance at a piece of gear. The Hollow King Unbound waits in the arena: no swarm, just the two of you.",
+        DelveNodeKind.Relic => "An item, rare or better.",
+        DelveNodeKind.Descent => "No King: hold out for 10 minutes and the cache appears. A modest purse of silver and some tree experience.",
+        _ => "Delve Marks, an epic or better item, silver, and a good chance at a piece of gear. The Hollow King Unbound waits in the arena: no swarm, just the two of you.",
     };
 }
 
@@ -113,14 +134,14 @@ internal sealed class DelveSave
     public Dictionary<string, int> ClearedByKind { get; set; } = new();
 }
 
-/// <summary>What clearing a node pays. <paramref name="GearChance"/> is the chance (0 to 1) the cache also holds a piece of gear: never a sure thing, so a piece
-/// the player is after may take a few runs.</summary>
-internal sealed record DelveReward(long Silver, long TreeExperience, int Items, float GearChance, long Marks);
+/// <summary>What clearing a node pays: <paramref name="Items"/> items rolled at <paramref name="ItemOdds"/>. <paramref name="GearChance"/> is the chance (0 to 1) the
+/// cache also holds a piece of gear: never a sure thing, so gear stays a hunt.</summary>
+internal sealed record DelveReward(long Silver, long TreeExperience, int Items, float GearChance, long Marks, RarityWeights ItemOdds = default);
 
 /// <summary>The Delve's rules: which floors and nodes are open, what clearing one does, how hard a floor is and what it pays. Pure.</summary>
 internal static class DelveRules
 {
-    /// <summary>Whether <paramref name="node"/> can be run: its floor is open and it hasn't been cleared.</summary>
+    /// <summary>Whether <paramref name="node"/> can be run: its floor is open and it hasn't been cleared. A cleared node is locked for good: no farming it.</summary>
     public static bool IsOpen(DelveSave save, DelveNode node) => node.Depth <= save.Deepest && !save.Cleared.Contains(node.Id);
 
     public static bool IsCleared(DelveSave save, DelveNode node) => save.Cleared.Contains(node.Id);
@@ -143,8 +164,8 @@ internal static class DelveRules
     }
 
     /// <summary>The chance an Armoury node's cache holds a piece of gear, and a Boss node's.</summary>
-    public const float ArmouryGearChance = 0.35f;
-    public const float BossGearChance = 0.5f;
+    public const float ArmouryGearChance = 0.30f;
+    public const float BossGearChance = 0.40f;
 
     /// <summary>Whether this cache holds gear: a roll against <paramref name="reward"/>'s chance.</summary>
     public static bool RollsGear(DelveReward reward, Random random) => reward.GearChance > 0f && random.NextDouble() < reward.GearChance;
@@ -173,12 +194,10 @@ internal static class DelveRules
         {
             DelveNodeKind.Currency => new DelveReward(silver * 4, 0, 0, 0f, 0),
             DelveNodeKind.Armoury => new DelveReward(silver * 2, 0, 0, ArmouryGearChance, 0),
-            DelveNodeKind.Knowledge => new DelveReward(silver, 500 + 150L * depth, 0, 0f, 0),
-            DelveNodeKind.Relic => new DelveReward(silver, 0, 2, 0f, 0),
-            _ => new DelveReward(silver * 3, 0, 1, BossGearChance, 1 + Tier(depth)),
+            DelveNodeKind.Knowledge => new DelveReward(silver, 1000 + 250L * depth, 0, 0f, 0),
+            DelveNodeKind.Relic => new DelveReward(silver, 0, 1, 0f, 0, RarityWeights.Elite),
+            DelveNodeKind.Descent => new DelveReward(silver, 400 + 100L * depth, 0, 0f, 0),
+            _ => new DelveReward(silver * 3, 0, 1, BossGearChance, 1 + Tier(depth), RarityWeights.Boss),
         };
     }
-
-    /// <summary>The silver a cache pays instead of gear when its roll comes up but every piece is owned already.</summary>
-    public const long NoGearSilver = 400;
 }

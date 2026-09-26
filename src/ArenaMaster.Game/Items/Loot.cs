@@ -43,16 +43,27 @@ internal sealed class ItemPickup
 }
 
 /// <summary>
-/// The loot on the map: chests that turn up around the player every so often, the chests elites and bosses leave, and items fodder enemies now and then drop.
+/// The loot on the map: chests that now and then turn up around the player, the chests elites and bosses sometimes leave, and items fodder enemies very rarely drop.
 /// Walking into a chest opens it; walking into an item picks it up. Pure simulation - <see cref="LootView"/> draws it.
 /// </summary>
 internal sealed class LootField
 {
-    /// <summary>A chance in this many that a fodder enemy drops an item: 1 in 200.</summary>
-    public const float FodderDropChance = 0.005f;
+    // Items are meant to be rare: about one a full classic run, all sources together. Nothing drops an item for certain.
 
-    public const float FirstChestAt = 40f;
-    public const float ChestInterval = 60f;
+    /// <summary>The chance a fodder enemy drops an item: 1 in 25,000.</summary>
+    public const float FodderDropChance = 0.00004f;
+
+    /// <summary>The chance an elite leaves a chest (rare or better).</summary>
+    public const float EliteDropChance = 0.015f;
+
+    /// <summary>The chance a boss leaves a chest (epic or better).</summary>
+    public const float BossDropChance = 0.10f;
+
+    /// <summary>Every <see cref="ChestInterval"/> seconds (the first at <see cref="FirstChestAt"/>), a chest may turn up on the map: this chance.</summary>
+    public const float WorldChestChance = 0.04f;
+
+    public const float FirstChestAt = 180f;
+    public const float ChestInterval = 180f;
     public const int MaxWorldChests = 3;
     public const float ChestMinDistance = 18f;
     public const float ChestMaxDistance = 45f;
@@ -100,6 +111,12 @@ internal sealed class LootField
     /// <summary>Whether a fodder kill drops an item this time.</summary>
     public bool RollFodderDrop() => _random.NextDouble() < FodderDropChance;
 
+    /// <summary>Whether an elite's kill leaves a chest this time.</summary>
+    public bool RollEliteDrop() => _random.NextDouble() < EliteDropChance;
+
+    /// <summary>Whether a boss's kill leaves a chest this time.</summary>
+    public bool RollBossDrop() => _random.NextDouble() < BossDropChance;
+
     /// <summary>
     /// One frame: maybe a new chest turns up near the player; chests and items the player walks into are opened or picked up. Returns what the player got; the chests
     /// and items now gone are added to <paramref name="goneChests"/> and <paramref name="gonePickups"/> so their view can go too.
@@ -112,7 +129,8 @@ internal sealed class LootField
         if (_chestTimer <= 0f)
         {
             _chestTimer = ChestInterval;
-            if (_chests.Count(c => !c.Opened && c.Weights == RarityWeights.World) < MaxWorldChests && TryPickChestSpot(playerFeet, groundAt, out var spot))
+            if (_random.NextDouble() < WorldChestChance && _chests.Count(c => !c.Opened && c.Weights == RarityWeights.World) < MaxWorldChests
+                && TryPickChestSpot(playerFeet, groundAt, out var spot))
             {
                 DropChest(spot, RarityWeights.World);
             }

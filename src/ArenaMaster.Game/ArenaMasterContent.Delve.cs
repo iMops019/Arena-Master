@@ -80,9 +80,9 @@ public sealed partial class ArenaMasterContent
         ApplyLook(window, DelveBands.For(node.Depth));
         if (_plan.Kind == RunKind.Delve)
         {
-            _delveDirector = new DelveDirector(node.Depth);
+            _delveDirector = new DelveDirector(node.Depth, node.HasKing);
             window.TeleportPlayer(CampLayout.Ground(terrain, CampLayout.RunStart));
-            Announce($"Depth {node.Depth}: the Hollow King comes at 10:00");
+            Announce(node.HasKing ? $"Depth {node.Depth}: the Hollow King comes at 10:00" : $"Depth {node.Depth}: hold out until 10:00");
             return;
         }
 
@@ -113,6 +113,13 @@ public sealed partial class ArenaMasterContent
         {
             var orders = director.Update(_runSeconds, _enemies, _enemies.Boss);
             FollowOrders(orders, window.PlayerFeet, groundAt);
+            if (director.CacheDue && _cacheAt is null)
+            {
+                // A Descent held to the end: the cache turns up a few steps away.
+                var feet = window.PlayerFeet;
+                float x = feet.X + 5f, z = feet.Z;
+                DropCache(window, groundAt(x, z) is { } ground ? new Vector3D<float>(x, ground, z) : feet);
+            }
         }
 
         // A new stage of the arena's King: his line, and a Brute (two when enraged) stepping out at his side - inside the wall, not in the usual ring out past it.
@@ -222,21 +229,13 @@ public sealed partial class ArenaMasterContent
         var items = new List<RunItem>();
         for (int i = 0; i < reward.Items; i++)
         {
-            var item = Items.ItemCatalog.Roll(_random, Shop.Lucky(RarityWeights.Boss, _profile), item => Bounties.IsUnlocked(item, _profile));
+            var item = Items.ItemCatalog.Roll(_random, Shop.Lucky(reward.ItemOdds, _profile), item => Bounties.CanDrop(item, _profile));
             GainItem(item);
             items.Add(item);
         }
 
-        GearPiece? gear = null;
-        bool gearRolled = DelveRules.RollsGear(reward, _random);   // a chance, not a promise
-        if (gearRolled)
-        {
-            gear = GearCatalog.Grant(_profile, _random);
-            if (gear is null)
-            {
-                silver += DelveRules.NoGearSilver;   // every piece owned already
-            }
-        }
+        bool gearRolled = DelveRules.RollsGear(reward, _random);   // a chance, not a promise; and any piece, so the one wanted may take a while
+        var gear = gearRolled ? GearCatalog.Grant(_profile, _random) : null;
 
         if (reward.TreeExperience > 0)
         {
@@ -247,7 +246,7 @@ public sealed partial class ArenaMasterContent
         _profile.Delve.Marks += reward.Marks;
         DelveRules.Clear(_profile.Delve, node);
         return new DelveOutcome(node.Depth, node.Name, Cleared: true, silver, reward.TreeExperience, reward.Marks, gear, items,
-            GearMissed: reward.GearChance > 0f && !gearRolled);
+            GearMissed: reward.GearChance > 0f && !gearRolled, GearCopies: gear is null ? 0 : GearCatalog.CopiesOf(_profile, gear));
     }
 
     /// <summary>Lights and weathers the world for a floor's band, keeping camp's own to put back afterwards.</summary>

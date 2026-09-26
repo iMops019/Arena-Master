@@ -11,17 +11,46 @@ namespace ArenaMaster.Game.Tests;
 public class DelveMapTests
 {
     [Fact]
-    public void AFloor_HasThreeNodesOfDifferentKinds_TheSameEveryTime()
+    public void AFloor_MixesDescentsWithKingNodesOfDifferentKinds_TheSameEveryTime()
     {
         for (int depth = 1; depth <= 30; depth++)
         {
             var floor = DelveMap.Floor(depth);
             var runs = floor.Where(n => !n.IsBoss).ToList();
             Assert.Equal(DelveMap.NodesPerFloor, runs.Count);
-            Assert.Equal(runs.Count, runs.Select(n => n.Kind).Distinct().Count());
+            var kings = runs.Where(n => n.HasKing).ToList();
+            Assert.InRange(kings.Count, DelveMap.FewestKingNodes, DelveMap.FewestKingNodes + 1);
+            Assert.Equal(kings.Count, kings.Select(n => n.Kind).Distinct().Count());
+            Assert.All(runs.Where(n => !n.HasKing), n => Assert.Equal(DelveNodeKind.Descent, n.Kind));
+            Assert.Equal(Enumerable.Range(0, floor.Count), floor.Select(n => n.Slot));
             Assert.Equal(floor.Select(n => n.Kind), DelveMap.Floor(depth).Select(n => n.Kind));
             Assert.All(floor, n => Assert.Equal(depth, n.Depth));
         }
+    }
+
+    [Fact]
+    public void ADescent_HasNoKing_AndPaysAModestCache()
+    {
+        var descent = new DelveNode(4, 0, DelveNodeKind.Descent);
+        Assert.False(descent.HasKing);
+        Assert.True(new DelveNode(4, 0, DelveNodeKind.Relic).HasKing);
+        Assert.False(DelveMap.Floor(5).Single(n => n.IsBoss).HasKing);   // the arena's King is his own thing
+
+        var reward = DelveRules.Reward(descent);
+        var currency = DelveRules.Reward(new DelveNode(4, 0, DelveNodeKind.Currency));
+        Assert.True(reward.Silver < currency.Silver && reward.TreeExperience > 0 && reward.Items == 0 && reward.GearChance == 0f);
+    }
+
+    [Fact]
+    public void ArmouryNodes_OnlyTurnUpPastTheFirstBossTier()
+    {
+        for (int depth = 1; depth <= 30; depth++)
+        {
+            bool armoury = DelveMap.Floor(depth).Any(n => n.Kind == DelveNodeKind.Armoury);
+            Assert.False(depth < DelveMap.ArmouryFrom && armoury, $"depth {depth} has an Armoury node");
+        }
+
+        Assert.Contains(Enumerable.Range(DelveMap.ArmouryFrom, 10), d => DelveMap.Floor(d).Any(n => n.Kind == DelveNodeKind.Armoury));
     }
 
     [Fact]
@@ -124,8 +153,8 @@ public class DelveRulesTests
         Assert.Equal(DelveRules.ArmouryGearChance, armoury.GearChance);
         Assert.Equal(0f, currency.GearChance);
         Assert.True(knowledge.TreeExperience > 0);
-        Assert.Equal(2, relic.Items);
-        Assert.True(boss.GearChance == DelveRules.BossGearChance && boss.Items == 1 && boss.Marks == 3);
+        Assert.True(relic.Items == 1 && relic.ItemOdds == RarityWeights.Elite);
+        Assert.True(boss.GearChance == DelveRules.BossGearChance && boss.Items == 1 && boss.ItemOdds == RarityWeights.Boss && boss.Marks == 3);
         Assert.True(DelveRules.Reward(Node(9, DelveNodeKind.Currency)).Silver > currency.Silver);
     }
 
@@ -168,6 +197,21 @@ public class DelveRulesTests
 
 public class DelveDirectorTests
 {
+    [Fact]
+    public void ADescent_CallsNoKing_TheCacheIsDueAt10()
+    {
+        var field = new EnemyField(new Random(1));
+        var director = new DelveDirector(1, king: false);
+        Assert.False(director.Update(599f, field, null).Boss);
+        Assert.False(director.CacheDue);
+
+        var orders = director.Update(DelveDirector.BossAt, field, null);
+        Assert.False(orders.Boss);
+        Assert.Equal(0, orders.Elites);   // no Brutes at 10:00 without the King
+        Assert.True(director.CacheDue);
+        Assert.False(director.BossCalled);
+    }
+
     private static EnemyField Field() => new(new Random(1));
 
     [Fact]
@@ -372,26 +416,29 @@ public class GearTests
     }
 
     [Fact]
-    public void AFind_GoesToAnEmptySlot_AndIsWorn_UntilEveryPieceIsOwned()
+    public void AFind_IsAnyPiece_WornIfItsSlotIsEmpty_AndDuplicatesCount()
     {
         var profile = new Profile();
         var random = new Random(4);
-        var first = GearCatalog.Grant(profile, random)!;
+        var first = GearCatalog.Grant(profile, random);
         Assert.Equal(first, GearCatalog.WornIn(profile, first.Slot));
+        Assert.Equal(1, GearCatalog.CopiesOf(profile, first));
 
-        var second = GearCatalog.Grant(profile, random)!;
-        Assert.NotEqual(first.Slot, second.Slot);   // an empty slot's piece first
-        var third = GearCatalog.Grant(profile, random)!;
-        Assert.Equal(3, GearCatalog.Worn(profile).Count());
-        Assert.Equal(3, new[] { first.Slot, second.Slot, third.Slot }.Distinct().Count());
+        var finds = Enumerable.Range(0, 400).Select(_ => GearCatalog.Grant(profile, random)).ToList();
+        Assert.Equal(GearCatalog.All.Count, finds.Distinct().Count());               // any piece can come
+        Assert.Equal(GearCatalog.All.Count, profile.Gear.Owned.Count);               // each owned once
+        Assert.Equal(401, GearCatalog.All.Sum(p => GearCatalog.CopiesOf(profile, p))); // every find counted
+        Assert.Equal(first, GearCatalog.WornIn(profile, first.Slot));                 // a later find doesn't swap what is worn
+    }
 
-        for (int i = 3; i < GearCatalog.All.Count; i++)
-        {
-            Assert.NotNull(GearCatalog.Grant(profile, random));
-        }
-
-        Assert.Null(GearCatalog.Grant(profile, random));
-        Assert.Equal(GearCatalog.All.Count, profile.Gear.Owned.Distinct().Count());
+    [Fact]
+    public void AnOldSave_CountsItsOwnedPiecesAsOneCopy()
+    {
+        var profile = new Profile();
+        var fang = GearCatalog.Find("tempest_fang")!;
+        profile.Gear.Owned.Add(fang.Id);
+        Assert.Equal(1, GearCatalog.CopiesOf(profile, fang));
+        Assert.Equal(0, GearCatalog.CopiesOf(profile, GearCatalog.Find("kingsbane")!));
     }
 
     [Fact]

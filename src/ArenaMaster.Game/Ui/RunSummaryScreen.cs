@@ -11,7 +11,7 @@ internal enum RunEnding
     Slain,
     ReturnedToCamp,
 
-    /// <summary>A Delve node's boss slain and his cache opened.</summary>
+    /// <summary>A Delve node's cache opened: its King slain first, or on a Descent, held out to 10:00.</summary>
     DelveCleared,
 }
 
@@ -25,7 +25,8 @@ internal sealed record DelveOutcome(
     long Marks = 0,
     Gear.GearPiece? Gear = null,
     IReadOnlyList<RunItem>? Items = null,
-    bool GearMissed = false);
+    bool GearMissed = false,
+    int GearCopies = 0);
 
 /// <summary>How a run went, for the summary at its end.</summary>
 internal sealed record RunSummary(
@@ -121,7 +122,7 @@ internal sealed class RunSummaryScreen : GameScreen
 
             if (cache.Gear is { } piece)
             {
-                Row("Gear found", piece.Name, UiTheme.Unique);
+                Row("Gear found", cache.GearCopies > 1 ? $"{piece.Name}  (again: x{cache.GearCopies})" : $"{piece.Name}  (new!)", UiTheme.Unique);
             }
             else if (cache.GearMissed)
             {

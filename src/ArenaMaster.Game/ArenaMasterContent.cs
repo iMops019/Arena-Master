@@ -80,7 +80,7 @@ public sealed partial class ArenaMasterContent : IGameContent
         _crates = new CrateField(_random);
         _loot = new LootField(_random)
         {
-            Available = item => Bounties.IsUnlocked(item, _profile),   // locked items don't come out of chests or drops until their bounty is done
+            Available = item => Bounties.CanDrop(item, _profile),   // locked items don't come out of chests or drops until their bounty is done, nor maxed ones
             Luck = weights => Shop.Lucky(weights, _profile),
         };
     }

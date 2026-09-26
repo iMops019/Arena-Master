@@ -75,7 +75,7 @@ internal sealed class GearScreen : GameScreen
         var start = ImGui.GetCursorScreenPos();
         float closeWidth = 150f * scale;
         UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.3f),
-            $"Gear can drop from Armoury Delves ({DelveRules.ArmouryGearChance * 100f:0}% a cache) and Boss Delves ({DelveRules.BossGearChance * 100f:0}%). Worn gear counts on every run. Click a piece to wear it, or to take it off.", UiTheme.Muted, 0.78f,
+            $"Armoury Delves (from depth {DelveMap.ArmouryFrom}) hold a piece {DelveRules.ArmouryGearChance * 100f:0}% of the time, Boss Delves {DelveRules.BossGearChance * 100f:0}%: any piece, even one you have. Worn gear counts on every run. Click a piece to wear it, or to take it off.", UiTheme.Muted, 0.78f,
             width - closeWidth - 20f * scale);
         ImGui.SetCursorScreenPos(start + new Vector2(width - closeWidth, 0f));
         bool close = UiTheme.Button("Close  [E]", new Vector2(closeWidth, buttonHeight));
@@ -124,9 +124,11 @@ internal sealed class GearScreen : GameScreen
         float m = 6f * scale;
         draw.AddQuadFilled(mark + new Vector2(0f, -m), mark + new Vector2(m, 0f), mark + new Vector2(0f, m), mark + new Vector2(-m, 0f), UiTheme.U32(UiTheme.Unique));
         UiTheme.Text(min + new Vector2(pad + 18f * scale, pad), piece.Name, UiTheme.Unique, 1.2f);
-        if (worn)
+        int copies = GearCatalog.CopiesOf(profile, piece);
+        string tag = (worn ? "WORN" : "") + (worn && copies > 1 ? "  ·  " : "") + (copies > 1 ? $"x{copies}" : "");
+        if (tag.Length > 0)
         {
-            UiTheme.Text(new Vector2(max.X - pad - UiTheme.TextWidth("WORN", 0.8f), min.Y + pad + font * 0.2f), "WORN", UiTheme.Unique, 0.8f);
+            UiTheme.Text(new Vector2(max.X - pad - UiTheme.TextWidth(tag, 0.8f), min.Y + pad + font * 0.2f), tag, UiTheme.Unique, 0.8f);
         }
 
         float wrap = size.X - 2f * pad;

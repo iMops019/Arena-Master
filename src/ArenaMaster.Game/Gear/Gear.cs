@@ -20,8 +20,11 @@ internal sealed record GearPiece(string Id, string Name, GearSlot Slot, string E
 /// <summary>What the player owns and wears, saved in the <see cref="Profile"/>.</summary>
 internal sealed class GearSave
 {
-    /// <summary>The ids of the pieces owned. A piece is owned once, never twice.</summary>
+    /// <summary>The ids of the pieces owned, each once.</summary>
     public List<string> Owned { get; set; } = new();
+
+    /// <summary>Piece id -> how many times it has been found (a piece can drop again once owned).</summary>
+    public Dictionary<string, int> Copies { get; set; } = new();
 
     /// <summary>Slot name -> the id of the piece worn there.</summary>
     public Dictionary<string, string> Worn { get; set; } = new();
@@ -134,6 +137,10 @@ internal static class GearCatalog
 
     public static bool Owns(Profile profile, GearPiece piece) => profile.Gear.Owned.Contains(piece.Id);
 
+    /// <summary>How many times <paramref name="piece"/> has been found (at least 1 if owned: a save from before copies were counted).</summary>
+    public static int CopiesOf(Profile profile, GearPiece piece) =>
+        Math.Max(profile.Gear.Copies.GetValueOrDefault(piece.Id), Owns(profile, piece) ? 1 : 0);
+
     /// <summary>The piece worn in <paramref name="slot"/>, or null.</summary>
     public static GearPiece? WornIn(Profile profile, GearSlot slot) =>
         profile.Gear.Worn.TryGetValue(slot.ToString(), out var id) && Find(id) is { } piece && Owns(profile, piece) ? piece : null;
@@ -157,24 +164,20 @@ internal static class GearCatalog
     public static void TakeOff(Profile profile, GearSlot slot) => profile.Gear.Worn.Remove(slot.ToString());
 
     /// <summary>
-    /// A piece found (a Delve cache's gear roll that came up): one not yet owned, at random, preferring an empty slot's. It goes straight into what the player owns, and on if its slot is
-    /// empty. Null if every piece is owned already.
+    /// A piece found (a Delve cache's gear roll that came up): any of the twelve at random, owned already or not, so the one the player is after stays a hunt. A new
+    /// piece goes into what the player owns, and on if its slot is empty; one owned already adds a copy (see <see cref="CopiesOf"/>).
     /// </summary>
-    public static GearPiece? Grant(Profile profile, Random random)
+    public static GearPiece Grant(Profile profile, Random random)
     {
-        var unowned = All.Where(p => !Owns(profile, p)).ToList();
-        if (unowned.Count == 0)
+        var piece = All[random.Next(All.Count)];
+        profile.Gear.Copies[piece.Id] = CopiesOf(profile, piece) + 1;
+        if (!Owns(profile, piece))
         {
-            return null;
-        }
-
-        var forEmpty = unowned.Where(p => WornIn(profile, p.Slot) is null).ToList();
-        var pool = forEmpty.Count > 0 ? forEmpty : unowned;
-        var piece = pool[random.Next(pool.Count)];
-        profile.Gear.Owned.Add(piece.Id);
-        if (WornIn(profile, piece.Slot) is null)
-        {
-            Wear(profile, piece);
+            profile.Gear.Owned.Add(piece.Id);
+            if (WornIn(profile, piece.Slot) is null)
+            {
+                Wear(profile, piece);
+            }
         }
 
         return piece;

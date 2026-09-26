@@ -154,8 +154,20 @@ internal sealed class ItemBonuses
     public float CacheSilver;
 }
 
-/// <summary>One item: its name, rarity, what one of it does in words, and what one of it does to the bonuses. Stacks apply it once per copy.</summary>
-internal sealed record RunItem(string Id, string Name, ItemRarity Rarity, string Description, Action<ItemBonuses> ApplyOne);
+/// <summary>
+/// One item: its name, rarity, what one of it does in words, and what one of it does to the bonuses. Stacks apply it once per copy, up to <see cref="MaxStack"/>
+/// copies: more can sit in the chest, but no more count. <paramref name="Cap"/> overrides the rarity's usual cap (0 keeps it).
+/// </summary>
+internal sealed record RunItem(string Id, string Name, ItemRarity Rarity, string Description, Action<ItemBonuses> ApplyOne, int Cap = 0)
+{
+    /// <summary>The most copies that count: commons 3, rares 2, epics and legendaries 1 - unless the item sets its own.</summary>
+    public int MaxStack => Cap > 0 ? Cap : Rarity switch
+    {
+        ItemRarity.Common => 3,
+        ItemRarity.Rare => 2,
+        _ => 1,
+    };
+}
 
 /// <summary>How likely each rarity is from one source of loot. Relative weights, not percentages.</summary>
 internal readonly record struct RarityWeights(float Common, float Rare, float Epic, float Legendary)
@@ -215,7 +227,7 @@ internal static class ItemCatalog
 
         // Mage-leaning: projectiles, cold, wards.
         new("rime_charm", "Rime Charm", ItemRarity.Common, "Your hits chill: 10% slower for 1 s (the Mage's chill +10%)", b => b.ChillOnHit += 0.10f),
-        new("prism_shard", "Prism Shard", ItemRarity.Rare, "+1 projectile (the Paladin: +12% nova damage)", b => b.Projectiles += 1),
+        new("prism_shard", "Prism Shard", ItemRarity.Rare, "+1 projectile (the Paladin: +12% nova damage)", b => b.Projectiles += 1, Cap: 1),
         new("warding_crystal", "Warding Crystal", ItemRarity.Rare, "Every 15 s a 20-point ward holds for 5 s (with Frost Shield: shield +25%)", b =>
         {
             b.Ward += 20f;
@@ -244,7 +256,7 @@ internal static class ItemCatalog
         }),
 
         // Shaman-leaning: chains, area, lightning.
-        new("grounding_charm", "Grounding Charm", ItemRarity.Common, "Take 25% less damage from bolts and fireballs", b => b.RangedDamageTaken *= 0.75f),
+        new("grounding_charm", "Grounding Charm", ItemRarity.Common, "Take 25% less damage from bolts and fireballs", b => b.RangedDamageTaken *= 0.75f, Cap: 2),
         new("storm_glass", "Storm Glass", ItemRarity.Common, "+10% area, and lingering effects last 0.5 s longer", b =>
         {
             b.Area += 0.10f;
@@ -421,7 +433,7 @@ internal sealed class ItemInventory
         _bonuses = null;
     }
 
-    /// <summary>What everything carried adds up to (worked out again only after the items change).</summary>
+    /// <summary>What everything carried adds up to, each item counted up to its <see cref="RunItem.MaxStack"/> (worked out again only after the items change).</summary>
     public ItemBonuses Bonuses
     {
         get
@@ -431,7 +443,7 @@ internal sealed class ItemInventory
                 _bonuses = new ItemBonuses();
                 foreach (var (item, count) in _items)
                 {
-                    for (int i = 0; i < count; i++)
+                    for (int i = 0; i < Math.Min(count, item.MaxStack); i++)
                     {
                         item.ApplyOne(_bonuses);
                     }
