@@ -10,12 +10,15 @@ public class EnemyModelTests
 {
     public static readonly TheoryData<string> Kinds = new()
     {
-        EnemyKind.Ghoul.Name, EnemyKind.CrossbowGhoul.Name, EnemyKind.GhoulMage.Name, EnemyKind.Brute.Name, EnemyKind.HollowKing.Name,
-        DelveBosses.HollowKingUnbound.Name,
+        EnemyKind.Ghoul.Name, EnemyKind.CrossbowGhoul.Name, EnemyKind.GhoulMage.Name, EnemyKind.BeastRider.Name, EnemyKind.GhoulTactician.Name,
+        EnemyKind.Brute.Name, EnemyKind.HollowKing.Name, DelveBosses.HollowKingUnbound.Name,
     };
 
     private static readonly EnemyKind[] All =
-        { EnemyKind.Ghoul, EnemyKind.CrossbowGhoul, EnemyKind.GhoulMage, EnemyKind.Brute, EnemyKind.HollowKing, DelveBosses.HollowKingUnbound };
+    {
+        EnemyKind.Ghoul, EnemyKind.CrossbowGhoul, EnemyKind.GhoulMage, EnemyKind.BeastRider, EnemyKind.GhoulTactician, EnemyKind.Brute, EnemyKind.HollowKing,
+        DelveBosses.HollowKingUnbound,
+    };
 
     private static EnemyKind Kind(string name) => All.Single(k => k.Name == name);
 
@@ -81,6 +84,40 @@ public class EnemyModelTests
 
         Assert.True(Size(0.38f) > 1.5f * Size(0f));
         Assert.True(Size(0.6f) < 0.3f * Size(0f));
+    }
+
+    [Fact]
+    public void TheTacticiansBomb_IsGoneOnceThrown_AndANewOneIsInHandByTheEnd()
+    {
+        var model = Load(EnemyKind.GhoulTactician.HeldModel!);
+        var lob = model.Clips[AttackType.Lob.ToString()];
+        int bomb = model.JointIndex("bomb");
+
+        float Size(float t)
+        {
+            var bones = new Matrix4x4[model.JointCount];
+            lob.Sample(t, bones);
+            return new Vector3(bones[bomb].M11, bones[bomb].M12, bones[bomb].M13).Length();
+        }
+
+        Assert.True(Size(0.38f) >= Size(0f));
+        Assert.True(Size(0.6f) < 0.1f * Size(0f));
+        Assert.Equal(Size(0f), Size(0.99f), 1);
+    }
+
+    [Fact]
+    public void TheBeast_AlwaysHasAPawOnTheGround_FrontAndBack()
+    {
+        var model = Load(EnemyKind.BeastRider.Model);
+        var walk = model.Clips[EnemyMotion.WalkClip];
+        int foreLeft = model.JointIndex("fore_foot_l"), foreRight = model.JointIndex("fore_foot_r");
+        for (float t = 0f; t < walk.Duration; t += 0.02f)
+        {
+            var bones = new Matrix4x4[model.JointCount];
+            walk.Sample(t, bones);
+            float lowest = MathF.Min(Lowest(model, bones, foreLeft), Lowest(model, bones, foreRight));
+            Assert.InRange(lowest, -0.02f, 0.02f);
+        }
     }
 
     private static float Lowest(SkinnedModel model, Matrix4x4[] bones, int joint)

@@ -7,10 +7,11 @@ namespace ArenaMaster.Game.Combat;
 /// Puts the <see cref="EnemyField"/> on screen: every enemy of a kind drawn as one engine animated crowd (one instanced draw however many there are, each copy
 /// at its own clip and time, chosen by <see cref="EnemyMotion"/>: walking with its feet planted, winding up and landing its attacks, dying), with a flinch and
 /// a flash when it is hit, standing still and pale while frozen, and a sink into the ground as it dies. A kind that holds a weapon (the Crossbow Ghoul's
-/// crossbow, the Ghoul Mage's flame) has it drawn as an animated crowd of its own on the same skeleton and clip, lighting up from faint to bright as a shot
-/// winds up. A prop (a crate) is a plain crowd. The shots in flight are crowds too; a fireball's landing spot is marked with a burning ring while it flies, and it bursts in a ring
-/// of fire. Attacks show their
-/// telegraphs on the ground as placed props: a red lane for a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave. There
+/// crossbow, the Ghoul Mage's flame, the Ghoul Tactician's bomb) has it drawn as an animated crowd of its own on the same skeleton and clip, lighting up from
+/// faint to bright as a shot winds up. A prop (a crate) is a plain crowd. The shots in flight are crowds too; a fireball's landing spot is marked with a
+/// burning ring while it flies, and it bursts in a ring of fire; a bomb tumbles, a ghostly ring on the ground under it showing its blast and pulsing faster as
+/// it slows, and goes off in a ring of green. Attacks show their telegraphs on the ground as placed props: a red lane for a lunge, a red circle filling up for
+/// a leap slam's landing, a ring spreading out for a shockwave.
 /// </summary>
 internal sealed class EnemyView
 {
@@ -23,6 +24,8 @@ internal sealed class EnemyView
     public const string ShockwaveModel = "shockwave_ring.glb";
     public const string LandingModel = "fireball_mark.glb";
     public const string BlastModel = "fireball_burst.glb";
+    public const string BombMarkModel = "ghoul_bomb_mark.glb";
+    public const string BombBurstModel = "ghoul_bomb_burst.glb";
 
     private enum Marker
     {
@@ -39,7 +42,8 @@ internal sealed class EnemyView
     private readonly EnemyMotion _motion = new();
     private readonly Dictionary<string, List<CrowdInstance>> _shots = new();   // shot model -> this frame's copies
     private readonly List<CrowdInstance> _landings = new();
-    private readonly List<CrowdInstance> _blasts = new();
+    private readonly List<CrowdInstance> _bombMarks = new();
+    private readonly Dictionary<string, List<CrowdInstance>> _blasts = new() { [BlastModel] = new(), [BombBurstModel] = new() };   // burst model -> this frame's
     private float _time;
 
     public void Sync(EngineWindow window, EnemyField field, IEnumerable<Enemy> gone, float deltaSeconds, Func<float, float, float?> groundAt)
@@ -127,11 +131,28 @@ internal sealed class EnemyView
             }
         }
 
-        _blasts.Clear();
+        _bombMarks.Clear();
+        foreach (var bomb in field.Bombs)
+        {
+            // Tumbling as it goes; the ring under it pulses quicker as it slows to a stop, and brighter the nearer it is to the ground.
+            float speed = bomb.Velocity.Length;
+            Copies(_shots, bomb.Model).Add(new CrowdInstance(bomb.Position, bomb.Age * 7f, 1f, bomb.Age * 11f, Flash: 0.35f + 0.35f * MathF.Abs(MathF.Sin(bomb.Age * 9f))));
+            float ground = groundAt(bomb.Position.X, bomb.Position.Z) ?? bomb.Position.Y - bomb.Radius;
+            float pulse = MathF.Abs(MathF.Sin(bomb.Age * (bomb.Rolling ? 20f - 2f * MathF.Min(speed, 6f) : 8f)));
+            float near = 1f - Math.Clamp((bomb.Position.Y - bomb.Radius - ground) / 3f, 0f, 0.7f);
+            _bombMarks.Add(new CrowdInstance(new Vector3D<float>(bomb.Position.X, ground + 0.07f, bomb.Position.Z), -_time * 2f, bomb.Splash,
+                Flash: (0.2f + 0.5f * pulse) * near));
+        }
+
+        foreach (var list in _blasts.Values)
+        {
+            list.Clear();
+        }
+
         foreach (var blast in field.Blasts)
         {
             float t = Math.Clamp(blast.Age / EnemyField.BlastSeconds, 0f, 1f);
-            _blasts.Add(new CrowdInstance(Lift(blast.Centre, 0.15f + 0.4f * t), 0f, blast.Radius * (0.4f + 0.6f * (1f - (1f - t) * (1f - t))), Flash: 1f - t));
+            Copies(_blasts, blast.Model).Add(new CrowdInstance(Lift(blast.Centre, 0.15f + 0.4f * t), 0f, blast.Radius * (0.4f + 0.6f * (1f - (1f - t) * (1f - t))), Flash: 1f - t));
         }
 
         foreach (var (model, shots) in _shots)
@@ -140,7 +161,11 @@ internal sealed class EnemyView
         }
 
         window.SetCrowd(LandingModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_landings));
-        window.SetCrowd(BlastModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_blasts));
+        window.SetCrowd(BombMarkModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_bombMarks));
+        foreach (var (model, blasts) in _blasts)
+        {
+            window.SetCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(blasts));
+        }
     }
 
     /// <summary>
@@ -149,7 +174,7 @@ internal sealed class EnemyView
     /// </summary>
     public static float Glow(Enemy enemy)
     {
-        if (!enemy.IsAlive || enemy.Attack is not { Type: AttackType.Shoot })
+        if (!enemy.IsAlive || enemy.Attack is not { Type: AttackType.Shoot or AttackType.Lob })
         {
             return 0f;
         }
@@ -267,10 +292,10 @@ internal sealed class EnemyView
                 case (AttackPhase.WindUp, AttackType.Shockwave or AttackType.Summon or AttackType.Barrage):
                     pitch -= 0.3f * windUp;                                                           // rearing up
                     break;
-                case (AttackPhase.WindUp, AttackType.Shoot):
+                case (AttackPhase.WindUp, AttackType.Shoot or AttackType.Lob):
                     pitch -= 0.12f * windUp;                                                          // straightening up to aim
                     break;
-                case (AttackPhase.Active, AttackType.Shoot):
+                case (AttackPhase.Active, AttackType.Shoot or AttackType.Lob):
                     pitch -= 0.25f;                                                                   // the kick of the shot
                     break;
                 case (AttackPhase.Active, AttackType.Lunge):

@@ -90,6 +90,7 @@ public sealed partial class ArenaMasterContent
         _enemies.HitEffects = ItemEffects.HitEffectsOf(bonuses);
         _enemies.HealthBonus = bonuses.EnemyHealth;
         _enemies.RangedDamageTaken = bonuses.RangedDamageTaken;
+        _enemies.Obstacles = (centre, radius) => window.TouchesObstacle(centre, radius, out _, out _);
         _itemEffects.Begin();
         BeginCrates();
         _health.DamageTaken = _hero.DamageTaken;

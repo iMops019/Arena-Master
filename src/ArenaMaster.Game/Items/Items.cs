@@ -293,7 +293,7 @@ internal static class ItemCatalog
         }),
 
         // Shaman-leaning: chains, area, lightning.
-        new("grounding_charm", "Grounding Charm", ItemRarity.Common, "Take 25% less damage from bolts and fireballs", b => b.RangedDamageTaken *= 0.75f, Cap: 2),
+        new("grounding_charm", "Grounding Charm", ItemRarity.Common, "Take 25% less damage from bolts, fireballs and bombs", b => b.RangedDamageTaken *= 0.75f, Cap: 2),
         new("storm_glass", "Storm Glass", ItemRarity.Common, "+10% area, and lingering effects last 0.5 s longer", b =>
         {
             b.Area += 0.10f;

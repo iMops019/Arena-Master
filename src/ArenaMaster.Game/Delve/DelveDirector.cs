@@ -47,7 +47,7 @@ internal sealed class DelveDirector
         field.SpawnInterval = RunDirector.SpawnInterval(classic);
         var scaling = RunDirector.ScalingAt(classic);
         field.Scaling = scaling with { Health = scaling.Health * DelveRules.HealthMultiplier(Depth), Damage = scaling.Damage * DelveRules.DamageMultiplier(Depth) };
-        field.Mix = new[] { (EnemyKind.CrossbowGhoul, RunDirector.CrossbowShareAt(classic)), (EnemyKind.GhoulMage, RunDirector.MageShareAt(classic)) };
+        field.Mix = RunDirector.MixAt(classic);
 
         int elites = 0;
         bool spawnBoss = false;

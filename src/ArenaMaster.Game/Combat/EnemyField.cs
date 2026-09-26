@@ -164,10 +164,47 @@ internal sealed class EnemyBolt
     public float Knockback { get; init; }
 }
 
-/// <summary>A splash shot bursting (a fireball), for the view: where, how wide, and how long ago.</summary>
+/// <summary>
+/// A Ghoul Tactician's bomb: lobbed high, falling, bouncing along the ground toward where the player stood (<see cref="BouncesLeft"/> more times), then
+/// rolling to a stop, when it goes off. It goes off at once on touching the player, a tree or a rock, or running into a slope too steep to roll up.
+/// </summary>
+internal sealed class EnemyBomb
+{
+    public required Enemy Thrower { get; init; }
+
+    /// <summary>The model it is drawn with.</summary>
+    public required string Model { get; init; }
+
+    /// <summary>Its middle.</summary>
+    public Vector3D<float> Position { get; set; }
+
+    public Vector3D<float> Velocity { get; set; }
+
+    public float Radius { get; init; }
+
+    /// <summary>How far its blast reaches.</summary>
+    public float Splash { get; init; }
+
+    public float Damage { get; init; }
+
+    public float Knockback { get; init; }
+
+    /// <summary>How many more times it bounces before it rolls.</summary>
+    public int BouncesLeft { get; set; }
+
+    /// <summary>Whether it has bounced its last and is rolling along the ground to a stop.</summary>
+    public bool Rolling { get; set; }
+
+    /// <summary>Seconds since it was thrown.</summary>
+    public float Age { get; set; }
+}
+
+/// <summary>A splash shot bursting (a fireball, a bomb), for the view: where, how wide, how long ago, and the model it is drawn with.</summary>
 internal sealed class EnemyBlast
 {
     public Vector3D<float> Centre { get; init; }
+
+    public string Model { get; init; } = EnemyView.BlastModel;
 
     public float Radius { get; init; }
 
@@ -220,6 +257,7 @@ internal sealed class EnemyField
     private readonly List<Strike> _strikes = new();
     private readonly List<EnemyBolt> _bolts = new();
     private readonly List<EnemyBlast> _blasts = new();
+    private readonly List<EnemyBomb> _bombs = new();
     private readonly List<(Enemy Boss, BossPhase Phase)> _phaseChanges = new();
     private readonly EnemyGrid _grid = new();
     private readonly Random _random;
@@ -238,13 +276,22 @@ internal sealed class EnemyField
     public EnemyScaling Scaling { get; set; } = EnemyScaling.None;
 
     /// <summary>
-    /// The kinds some of the fodder spawns as instead of <see cref="Kind"/> (the Crossbow Ghoul, the Ghoul Mage), each with the share that does (0 to 1, and
+    /// The kinds some of the fodder spawns as instead of <see cref="Kind"/> (the Crossbow Ghoul, the Ghoul Mage, the Beast Rider, the Tactician), each with the share that does (0 to 1, and
     /// together at most 1).
     /// </summary>
     public IReadOnlyList<(EnemyKind Kind, float Share)> Mix { get; set; } = Array.Empty<(EnemyKind, float)>();
 
     /// <summary>The enemies' shots in flight.</summary>
     public IReadOnlyList<EnemyBolt> Bolts => _bolts;
+
+    /// <summary>The Ghoul Tacticians' bombs, flying, bouncing or rolling.</summary>
+    public IReadOnlyList<EnemyBomb> Bombs => _bombs;
+
+    /// <summary>
+    /// Whether a ball of the given radius at a point touches a solid obstacle (a tree, a rock): a bomb that does goes off. In the game this is the engine's
+    /// <c>EngineWindow.TouchesObstacle</c>; null for none.
+    /// </summary>
+    public Func<Vector3D<float>, float, bool>? Obstacles { get; set; }
 
     /// <summary>How long a burst lasts, for the view.</summary>
     public const float BlastSeconds = 0.35f;
@@ -334,6 +381,7 @@ internal sealed class EnemyField
         }
 
         MoveBolts(deltaSeconds, player, groundAt);
+        MoveBombs(deltaSeconds, player, groundAt);
         foreach (var blast in _blasts)
         {
             blast.Age += deltaSeconds;
@@ -498,6 +546,7 @@ internal sealed class EnemyField
         _summoned.Clear();
         _strikes.Clear();
         _bolts.Clear();
+        _bombs.Clear();
         _blasts.Clear();
         _spawnTimer = 0f;
         _gridStale = true;
@@ -733,6 +782,12 @@ internal sealed class EnemyField
         switch (enemy.AttackPhase)
         {
             case AttackPhase.WindUp:
+                if (attack.Type == AttackType.Lunge && enemy.PhaseTime < attack.Tracking)
+                {
+                    // The lane still follows the player; it locks once the tracking is over.
+                    enemy.AttackTarget = enemy.AttackOrigin + Geometry.FlatDirection(enemy.AttackOrigin, player.Feet, out _) * attack.Reach;
+                }
+
                 FaceAttack(enemy, player);
                 if (enemy.PhaseTime >= attack.WindUp)
                 {
@@ -749,6 +804,10 @@ internal sealed class EnemyField
                     else if (attack.Type == AttackType.Barrage)
                     {
                         Barrage(enemy, attack, player, groundAt);
+                    }
+                    else if (attack.Type == AttackType.Lob)
+                    {
+                        Lob(enemy, attack, player, groundAt);
                     }
                 }
 
@@ -981,7 +1040,7 @@ internal sealed class EnemyField
             {
                 if (bolt.Splash > 0f)
                 {
-                    Burst(bolt, from + (to - from) * along, player, bottom, top);
+                    Burst(bolt.Shooter, from + (to - from) * along, bolt.Splash, bolt.Damage, bolt.Knockback, bolt.Velocity, EnemyView.BlastModel, player, bottom, top);
                 }
                 else if (Strike(bolt.Shooter, bolt.Damage, player, out bool blocked) && !blocked)
                 {
@@ -996,7 +1055,7 @@ internal sealed class EnemyField
             {
                 if (bolt.Splash > 0f)
                 {
-                    Burst(bolt, new Vector3D<float>(to.X, ground, to.Z), player, bottom, top);
+                    Burst(bolt.Shooter, new Vector3D<float>(to.X, ground, to.Z), bolt.Splash, bolt.Damage, bolt.Knockback, bolt.Velocity, EnemyView.BlastModel, player, bottom, top);
                 }
 
                 _bolts.RemoveAt(i);
@@ -1013,16 +1072,165 @@ internal sealed class EnemyField
         }
     }
 
-    /// <summary>A splash shot bursting at <paramref name="centre"/>: it strikes the player if any of them is within its splash, shoving them away from it.</summary>
-    private void Burst(EnemyBolt bolt, Vector3D<float> centre, PlayerTarget player, Vector3D<float> bottom, Vector3D<float> top)
+    /// <summary>
+    /// A splash shot or a bomb bursting at <paramref name="centre"/>: it strikes the player if any of them is within <paramref name="splash"/>, shoving them
+    /// away from it (along <paramref name="heading"/> if they are right on it).
+    /// </summary>
+    private void Burst(Enemy shooter, Vector3D<float> centre, float splash, float damage, float knockback, Vector3D<float> heading, string model,
+        PlayerTarget player, Vector3D<float> bottom, Vector3D<float> top)
     {
-        _blasts.Add(new EnemyBlast { Centre = centre, Radius = bolt.Splash });
-        if (Geometry.SegmentDistance(centre, centre, bottom, top, out _) <= bolt.Splash + PlayerRadius
-            && Strike(bolt.Shooter, bolt.Damage, player, out bool blocked) && !blocked)
+        _blasts.Add(new EnemyBlast { Centre = centre, Radius = splash, Model = model });
+        if (Geometry.SegmentDistance(centre, centre, bottom, top, out _) <= splash + PlayerRadius
+            && Strike(shooter, damage, player, out bool blocked) && !blocked)
         {
             var away = Geometry.FlatDirection(centre, player.Feet, out _);
-            player.Condition.Knock(away == Vector3D<float>.Zero ? bolt.Velocity : away, bolt.Knockback);
+            player.Condition.Knock(away == Vector3D<float>.Zero ? heading : away, knockback);
         }
+    }
+
+    /// <summary>How hard a bomb falls (metres a second, each second).</summary>
+    public const float BombGravity = 18f;
+
+    /// <summary>Where a lobbed bomb leaves the thrower's hand: this high above its feet, this far in front.</summary>
+    public const float LobHeight = 1.6f;
+    public const float LobForward = 0.4f;
+
+    /// <summary>A lobbed bomb first lands this share of the way to where the player stood, and bounces on toward them.</summary>
+    public const float LobShort = 0.6f;
+
+    /// <summary>What a bounce keeps of a bomb's upward speed and of its speed along the ground.</summary>
+    public const float BounceUp = 0.5f;
+    public const float BounceAlong = 0.75f;
+
+    /// <summary>How fast a rolling bomb slows (metres a second, each second), and the speed it counts as stopped - and goes off - below.</summary>
+    public const float RollDrag = 6f;
+    public const float RollStop = 0.3f;
+
+    /// <summary>A rolling bomb that meets ground rising steeper than this (rise over run) has run into the hillside, and goes off.</summary>
+    public const float SteepSlope = 1f;
+
+    /// <summary>A bomb goes off after this long whatever it is doing.</summary>
+    public const float BombFuse = 5f;
+
+    /// <summary>
+    /// Lobs a bomb from <paramref name="thrower"/>'s raised hand in a high arc that first lands <see cref="LobShort"/> of the way to where the player stands
+    /// now, so it bounces on toward them.
+    /// </summary>
+    private void Lob(Enemy thrower, AttackSpec attack, PlayerTarget player, Func<float, float, float?> groundAt)
+    {
+        var facing = new Vector3D<float>(MathF.Sin(thrower.Yaw), 0f, MathF.Cos(thrower.Yaw));
+        var from = thrower.Position + new Vector3D<float>(0f, LobHeight, 0f) + facing * LobForward;
+        var toward = Geometry.FlatDirection(from, player.Feet, out float distance);
+        if (toward == Vector3D<float>.Zero)
+        {
+            toward = facing;
+        }
+
+        float along = distance * LobShort;
+        var land = from + toward * along;
+        float landY = (groundAt(land.X, land.Z) ?? player.Feet.Y) + attack.HitWidth;
+        float flight = 0.75f + 0.02f * distance;
+        float up = (landY - from.Y + 0.5f * BombGravity * flight * flight) / flight;
+        _bombs.Add(new EnemyBomb
+        {
+            Thrower = thrower,
+            Model = attack.ProjectileModel ?? "ghoul_bomb.glb",
+            Position = from,
+            Velocity = toward * (along / flight) + new Vector3D<float>(0f, up, 0f),
+            Radius = attack.HitWidth,
+            Splash = attack.Splash,
+            Damage = attack.Damage * thrower.DamageScale * RangedDamageTaken,
+            Knockback = attack.Knockback,
+            BouncesLeft = attack.Count,
+        });
+    }
+
+    /// <summary>
+    /// Moves the bombs: falling, bouncing off the ground, rolling to a stop. One goes off where it touches the player, a tree or a rock, or a slope too steep
+    /// to roll up; when it stops rolling; when its fuse runs out; or off the map.
+    /// </summary>
+    private void MoveBombs(float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
+    {
+        var bottom = player.Feet + new Vector3D<float>(0f, PlayerRadius, 0f);
+        var top = player.Feet + new Vector3D<float>(0f, PlayerHeight - PlayerRadius, 0f);
+        for (int i = _bombs.Count - 1; i >= 0; i--)
+        {
+            var bomb = _bombs[i];
+            bomb.Age += deltaSeconds;
+            var velocity = bomb.Velocity;
+            if (bomb.Rolling)
+            {
+                var flat = new Vector3D<float>(velocity.X, 0f, velocity.Z);
+                float speed = MathF.Max(0f, flat.Length - RollDrag * deltaSeconds);
+                velocity = flat.Length > 1e-4f ? Vector3D.Normalize(flat) * speed : Vector3D<float>.Zero;
+            }
+            else
+            {
+                velocity.Y -= BombGravity * deltaSeconds;
+            }
+
+            var from = bomb.Position;
+            var to = from + velocity * deltaSeconds;
+            if (Geometry.SegmentDistance(from, to, bottom, top, out float along) <= PlayerRadius + bomb.Radius)
+            {
+                GoOff(i, from + (to - from) * along, player, bottom, top);
+                continue;
+            }
+
+            if (Obstacles?.Invoke(to, bomb.Radius) == true || groundAt(to.X, to.Z) is not { } ground || bomb.Age >= BombFuse)
+            {
+                GoOff(i, from, player, bottom, top);
+                continue;
+            }
+
+            if (to.Y - bomb.Radius <= ground)
+            {
+                // Meeting ground that rises steeply (or rising above it while it still climbs) is running into the hillside: it goes off there.
+                float run = new Vector2D<float>(to.X - from.X, to.Z - from.Z).Length;
+                float rise = ground - (groundAt(from.X, from.Z) ?? ground);
+                if ((run > 1e-4f && rise > SteepSlope * run) || (!bomb.Rolling && velocity.Y >= 0f))
+                {
+                    GoOff(i, from, player, bottom, top);
+                    continue;
+                }
+            }
+
+            if (bomb.Rolling)
+            {
+                to.Y = ground + bomb.Radius;   // it keeps to the ground, up or down
+                if (velocity.Length <= RollStop)
+                {
+                    GoOff(i, to, player, bottom, top);   // come to rest: it goes off
+                    continue;
+                }
+            }
+            else if (to.Y - bomb.Radius <= ground)
+            {
+                to.Y = ground + bomb.Radius;
+                float bounce = -velocity.Y * BounceUp;
+                velocity = new Vector3D<float>(velocity.X * BounceAlong, 0f, velocity.Z * BounceAlong);
+                if (bomb.BouncesLeft > 0)
+                {
+                    bomb.BouncesLeft--;
+                    velocity.Y = bounce;
+                }
+                else
+                {
+                    bomb.Rolling = true;
+                }
+            }
+
+            bomb.Position = to;
+            bomb.Velocity = velocity;
+        }
+    }
+
+    /// <summary>The bomb at <paramref name="index"/> goes off at <paramref name="centre"/>.</summary>
+    private void GoOff(int index, Vector3D<float> centre, PlayerTarget player, Vector3D<float> bottom, Vector3D<float> top)
+    {
+        var bomb = _bombs[index];
+        _bombs.RemoveAt(index);
+        Burst(bomb.Thrower, centre, bomb.Splash, bomb.Damage, bomb.Knockback, bomb.Velocity, EnemyView.BombBurstModel, player, bottom, top);
     }
 
     /// <summary>Calls <paramref name="count"/> fodder up in a ring around <paramref name="caller"/> (added after this frame's moves).</summary>

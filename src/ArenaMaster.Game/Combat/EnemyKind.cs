@@ -10,7 +10,10 @@ internal enum EnemyTier
 
 internal enum AttackType
 {
-    /// <summary>Crouches, then charges straight down a marked lane.</summary>
+    /// <summary>
+    /// Crouches, then charges straight down a marked lane. With <see cref="AttackSpec.Tracking"/> the lane follows the player for the first part of the
+    /// wind-up and only then locks.
+    /// </summary>
     Lunge,
 
     /// <summary>Marks a circle, leaps into the air and lands in it: damage, knock-back and a stun to anyone inside.</summary>
@@ -33,6 +36,13 @@ internal enum AttackType
     /// stand), each spot marked by a burning ring while its fireball falls, bursting on landing. Keep moving.
     /// </summary>
     Barrage,
+
+    /// <summary>
+    /// Draws a bomb back, glowing brighter, and lobs it high at the player: it lands short and bounces on toward them (<see cref="AttackSpec.Count"/> times),
+    /// rolls to a stop and goes off, catching anyone within its <see cref="AttackSpec.Splash"/> - or goes off at once if it hits the player, a tree or a rock
+    /// on the way. A ring on the ground under it shows what its blast will catch.
+    /// </summary>
+    Lob,
 }
 
 /// <summary>
@@ -41,14 +51,15 @@ internal enum AttackType
 /// </summary>
 /// <param name="MinRange">It only starts this attack with the player at least this far away...</param>
 /// <param name="MaxRange">...and no further than this.</param>
-/// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls. Shoot: how far the bolt flies. Barrage: how far from the player the fireballs spread.</param>
-/// <param name="HitWidth">Lunge: how close to the charging body counts as hit. Shockwave: half the ring's width. Shoot: the bolt's radius. Unused otherwise.</param>
+/// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls. Shoot: how far the bolt flies. Barrage: how far from the player the fireballs spread. Lob: unused.</param>
+/// <param name="HitWidth">Lunge: how close to the charging body counts as hit. Shockwave: half the ring's width. Shoot, Lob: the shot's radius. Unused otherwise.</param>
 /// <param name="LeapHeight">LeapSlam: the top of the arc, above the straight line from take-off to landing.</param>
 /// <param name="ProjectileSpeed">Shoot: how fast the shot flies - slow enough to sidestep once it is loosed.</param>
-/// <param name="Splash">Shoot: 0 for a bolt that has to hit the player; more for a fireball that bursts where it lands, hurting anyone within this far.</param>
-/// <param name="ProjectileModel">Shoot, Barrage: the model the shot is drawn with.</param>
-/// <param name="Count">Barrage: how many fireballs fall.</param>
+/// <param name="Splash">Shoot: 0 for a bolt that has to hit the player; more for a fireball that bursts where it lands, hurting anyone within this far. Lob: the bomb's blast.</param>
+/// <param name="ProjectileModel">Shoot, Barrage, Lob: the model the shot is drawn with.</param>
+/// <param name="Count">Barrage: how many fireballs fall. Lob: how many times the bomb bounces before it rolls.</param>
 /// <param name="Chain">How many times more it goes straight into the same attack once one ends (a double or triple leap, rolling shockwaves), each with half the wind-up.</param>
+/// <param name="Tracking">Lunge: for this many seconds of the wind-up the lane keeps turning to follow the player; then it locks, and stepping out of it is the answer.</param>
 internal sealed record AttackSpec(
     AttackType Type,
     float MinRange,
@@ -66,7 +77,8 @@ internal sealed record AttackSpec(
     float Splash = 0f,
     string? ProjectileModel = null,
     int Count = 0,
-    int Chain = 0);
+    int Chain = 0,
+    float Tracking = 0f);
 
 /// <summary>
 /// A boss's next stage, once its health falls to <paramref name="Below"/> of its most (0 to 1): a new set of attacks, a shorter breather between them, a faster walk,
@@ -107,7 +119,10 @@ internal sealed record EnemyKind(
     /// <summary>A boss's later stages, from the first reached to the last (see <see cref="BossPhase"/>). Empty for everything else.</summary>
     public IReadOnlyList<BossPhase> Phases { get; init; } = Array.Empty<BossPhase>();
 
-    /// <summary>A second model drawn with the body (a crossbow, a flame), which lights up from faint to bright as a <see cref="AttackType.Shoot"/> winds up. Null for none.</summary>
+    /// <summary>
+    /// A second model drawn with the body (a crossbow, a flame, a bomb), which lights up from faint to bright as a <see cref="AttackType.Shoot"/> or a
+    /// <see cref="AttackType.Lob"/> winds up. Null for none.
+    /// </summary>
     public string? HeldModel { get; init; }
 
     /// <summary>The first enemy: slow, fragile fodder that shambles straight at the player and claws on contact.</summary>
@@ -173,6 +188,58 @@ internal sealed record EnemyKind(
         {
             new AttackSpec(AttackType.Shoot, MinRange: 4f, MaxRange: 18f, WindUp: 1.4f, Active: 0.1f, Recover: 0.6f,
                 Damage: 16f, Reach: 30f, HitWidth: 0.35f, Knockback: 6f, ProjectileSpeed: 13f, Splash: 2f, ProjectileModel: "ghoul_fireball.glb"),
+        },
+    };
+
+    /// <summary>
+    /// Fodder that charges: a ghoul riding a fiendish beast, much tougher than a ghoul on foot and quicker. Once the player is in range it stops and winds up
+    /// for 1.5 s - the beast crouching and pawing the ground, the rider levelling its spear - over a red lane that follows the player for the first second and
+    /// then locks; then it charges 13 m down the lane. Stepping out of the lane once it locks is the answer. Winded after, open to punishment.
+    /// </summary>
+    public static readonly EnemyKind BeastRider = new(
+        Name: "Ghoul Beast Rider",
+        Model: "beast_rider.glb",
+        Tier: EnemyTier.Fodder,
+        MaxHealth: 100f,
+        Speed: 4.2f,
+        Radius: 0.65f,
+        Height: 2.3f,
+        ContactDamage: 10f,
+        ContactInterval: 0.8f,
+        Experience: 4)
+    {
+        AttackCooldown = 3.5f,
+        Attacks = new[]
+        {
+            new AttackSpec(AttackType.Lunge, MinRange: 4f, MaxRange: 11f, WindUp: 1.5f, Active: 0.8f, Recover: 0.9f,
+                Damage: 16f, Reach: 13f, HitWidth: 0.5f, Knockback: 10f, Tracking: 1f),
+        },
+    };
+
+    /// <summary>
+    /// Ranged fodder that lobs bombs: a ghoul officer that keeps its distance, points the player out and lobs a bomb glowing with ghoulish energy high at them.
+    /// It lands short and bounces on toward them, then rolls to a stop and goes off (sooner if it hits the player, a tree or a rock). A ring on the ground
+    /// under it shows the blast: get out of it before it stops.
+    /// </summary>
+    public static readonly EnemyKind GhoulTactician = new(
+        Name: "Ghoul Tactician",
+        Model: "ghoul_tactician.glb",
+        Tier: EnemyTier.Fodder,
+        MaxHealth: 40f,
+        Speed: 3.1f,
+        Radius: 0.4f,
+        Height: 1.65f,
+        ContactDamage: 6f,
+        ContactInterval: 0.8f,
+        Experience: 3)
+    {
+        AttackCooldown = 4f,
+        StandOff = 12f,
+        HeldModel = "ghoul_tactician_bomb.glb",
+        Attacks = new[]
+        {
+            new AttackSpec(AttackType.Lob, MinRange: 5f, MaxRange: 16f, WindUp: 1.2f, Active: 0.15f, Recover: 0.8f,
+                Damage: 18f, Reach: 0f, HitWidth: 0.2f, Knockback: 7f, Splash: 2.5f, ProjectileModel: "ghoul_bomb.glb", Count: 2),
         },
     };
 

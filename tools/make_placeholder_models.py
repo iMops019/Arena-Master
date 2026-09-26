@@ -13,13 +13,18 @@
   frost_shard.glb         a small ice shard, centred on its middle (the Frost Shield's and the Blizzard's swirl)
   aegis_burst.glb         a flat pale-gold ring of radius 1, scaled as the Aegis of the Dawn's burst spreads (an item's, any class)
   thunderstone_bolt.glb   one piece of the Thunderstone's bolt from the sky: a thin bright bar 1 m long along Z (an item's, any class)
-  ghoul.glb, crossbow_ghoul.glb (+ ghoul_crossbow.glb), ghoul_mage.glb (+ ghoul_flame.glb), brute.glb, hollow_king.glb, hollow_king_unbound.glb
-                          the enemies, skinned and animated (idle, walk, die and their attacks), with their held crossbow and flame: see tools/enemy_models.py
+  ghoul.glb, crossbow_ghoul.glb (+ ghoul_crossbow.glb), ghoul_mage.glb (+ ghoul_flame.glb), beast_rider.glb, ghoul_tactician.glb
+  (+ ghoul_tactician_bomb.glb), brute.glb, hollow_king.glb, hollow_king_unbound.glb
+                          the enemies, skinned and animated (idle, walk, die and their attacks), with their held crossbow, flame and bomb: see
+                          tools/enemy_models.py
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
   ghoul_bolt.glb          a Crossbow Ghoul's bolt: a dark shaft with a glowing head, centred on its middle, pointing +Z
   ghoul_fireball.glb      a Ghoul Mage's fireball: a fiery orb with a bright core, centred on its middle
   fireball_mark.glb       a flat burning ring of radius 1 with flames on it, marking where a fireball will land
   fireball_burst.glb      a flat ring of fire of radius 1, scaled as a fireball bursts
+  ghoul_bomb.glb          a Ghoul Tactician's bomb: a black iron ball with a ghostly green band and a green-lit fuse, radius 0.2, centred on its middle
+  ghoul_bomb_mark.glb     a flat ghostly green ring of radius 1 with spikes of energy on it, under a bouncing bomb: what its blast will catch
+  ghoul_bomb_burst.glb    a flat ghostly green ring of radius 1, scaled as a bomb goes off
   xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
   telegraph_ring.glb      a flat red ring of radius 1 on y = 0, scaled to an attack's radius (outline of where it lands)
   telegraph_disc.glb      a flat dark-red disc of radius 1, scaled up inside the ring as an attack winds up
@@ -415,6 +420,47 @@ def build_fireball_mark():
         a = 2 * math.pi * i / 8
         x, z = math.cos(a) * 0.93, math.sin(a) * 0.93
         m.pyramid(x - 0.05, 0.0, z - 0.05, x + 0.05, 0.0, z + 0.05, (x, 0.16, z), "fire_light")
+    return m
+
+
+def ghoul_bomb(m, cx, cy, cz, r):
+    """A Ghoul Tactician's bomb of radius <r> round (cx, cy, cz): a black iron ball girdled by a band of ghostly green, an iron cap on top with a green-lit
+    fuse. The Tactician holds one (tools/enemy_models.py) and lobs another (ghoul_bomb.glb)."""
+    import math
+    stacks, slices = 6, 10
+    ring = [[(cx + r * math.sin(math.pi * i / stacks) * math.cos(2 * math.pi * k / slices), cy + r * math.cos(math.pi * i / stacks),
+              cz + r * math.sin(math.pi * i / stacks) * math.sin(2 * math.pi * k / slices)) for k in range(slices)] for i in range(stacks + 1)]
+    for i in range(stacks):
+        for k in range(slices):
+            a, b, c, d = ring[i][k], ring[i][(k + 1) % slices], ring[i + 1][(k + 1) % slices], ring[i + 1][k]
+            mid = tuple((a[n] + b[n] + c[n] + d[n]) / 4 - (cx, cy, cz)[n] for n in range(3))
+            if i == 0:
+                m.facing([a, c, d], mid, "bomb_black")
+            elif i == stacks - 1:
+                m.facing([a, b, c], mid, "bomb_black")
+            else:
+                m.facing([a, b, c, d], mid, "bomb_black")
+    m.prism(cx, cz, r * 1.04, cy - r * 0.14, cy + r * 0.14, "ghost_eye", sides=slices)   # the glowing band round its middle
+    cap = r * 0.3
+    m.box(cx - cap, cy + r * 0.85, cz - cap, cx + cap, cy + r * 1.15, cz + cap, "iron")
+    m.box(cx - cap * 0.3, cy + r * 1.15, cz - cap * 0.3, cx + cap * 0.3, cy + r * 1.45, cz + cap * 0.3, "ghost_eye")
+
+
+def build_ghoul_bomb():
+    """A Ghoul Tactician's lobbed bomb, radius 0.2, centred on its middle."""
+    m = Mesh()
+    ghoul_bomb(m, 0.0, 0.0, 0.0, 0.2)
+    return m
+
+
+def build_ghoul_bomb_mark():
+    """What a bomb will catch when it goes off: a ghostly green ring of radius 1 with little spikes of energy on it, drawn under the bomb as it bounces."""
+    m = build_ring(0.9, 1.0, "ghost_eye")
+    import math
+    for i in range(10):
+        a = 2 * math.pi * i / 10
+        x, z = math.cos(a) * 0.95, math.sin(a) * 0.95
+        m.pyramid(x - 0.04, 0.0, z - 0.04, x + 0.04, 0.0, z + 0.04, (x, 0.2, z), "ghost_eye")
     return m
 
 
@@ -1248,7 +1294,9 @@ if __name__ == "__main__":
                         ("aegis_burst.glb", lambda: build_ring(0.9, 1.0, "holy_light")), ("thunderstone_bolt.glb", build_lightning_arc),
                         ("arrow_placeholder.glb", build_arrow), ("ghoul_bolt.glb", build_ghoul_bolt),
                         ("ghoul_fireball.glb", build_ghoul_fireball), ("fireball_mark.glb", build_fireball_mark),
-                        ("fireball_burst.glb", lambda: build_ring(0.75, 1.0, "fire")), ("xp_gem_placeholder.glb", build_xp_gem),
+                        ("fireball_burst.glb", lambda: build_ring(0.75, 1.0, "fire")), ("ghoul_bomb.glb", build_ghoul_bomb),
+                        ("ghoul_bomb_mark.glb", build_ghoul_bomb_mark), ("ghoul_bomb_burst.glb", lambda: build_ring(0.7, 1.0, "ghost_eye")),
+                        ("xp_gem_placeholder.glb", build_xp_gem),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
                         ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),
                         ("chest_placeholder.glb", build_chest), ("loot_beam.glb", build_beam), ("crate_placeholder.glb", build_crate),
