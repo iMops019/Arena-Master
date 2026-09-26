@@ -164,7 +164,7 @@ internal sealed class ShamanStats
 
     public float EliteMultiplier => 1f + Tree.EliteDamage;
 
-    public float MaxHealth => BaseMaxHealth + 20f * LevelOf(ShamanUpgrade.EarthenHide) + Items.MaxHealth + Tree.MaxHealth;
+    public float MaxHealth => (BaseMaxHealth + 20f * LevelOf(ShamanUpgrade.EarthenHide) + Items.MaxHealth + Tree.MaxHealth) * Items.MaxHealthMultiplier;
 
     public float Regeneration => Items.Regeneration + Tree.Regeneration;
 

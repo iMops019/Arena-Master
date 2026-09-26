@@ -89,8 +89,8 @@ internal sealed class QuartermasterScreen : GameScreen
     /// <summary>Set when something is bought, so the caller knows to save.</summary>
     public bool Changed { get; set; }
 
-    /// <summary>Draws the stall. Returns true when the player closes it.</summary>
-    public bool Draw(Profile profile)
+    /// <summary>Draws the stall: the upgrades, and the Battle Elixirs under them (the active class's tree at <paramref name="treeLevel"/>). Returns true when the player closes it.</summary>
+    public bool Draw(Profile profile, int treeLevel)
     {
         if (!IsOpen)
         {
@@ -107,7 +107,9 @@ internal sealed class QuartermasterScreen : GameScreen
         float buttonHeight = 40f * scale;
         float gap = 12f * scale;
         int count = Shop.All.Count;
-        float cardHeight = MathF.Min(120f * scale, (ImGui.GetContentRegionAvail().Y - buttonHeight - 20f * scale - gap * (count - 1)) / count);
+        float elixirHeight = 118f * scale;
+        float elixirBlock = elixirHeight + ImGui.GetFontSize() * 1.6f + gap;
+        float cardHeight = MathF.Min(120f * scale, (ImGui.GetContentRegionAvail().Y - elixirBlock - buttonHeight - 20f * scale - gap * count) / count);
         float font = ImGui.GetFontSize();
 
         for (int i = 0; i < count; i++)
@@ -150,7 +152,9 @@ internal sealed class QuartermasterScreen : GameScreen
             }
         }
 
-        ImGui.SetCursorScreenPos(origin + new Vector2(0f, count * (cardHeight + gap) + 4f * scale));
+        DrawElixirs(profile, treeLevel, origin + new Vector2(0f, count * (cardHeight + gap)), width, elixirHeight, buttonHeight);
+
+        ImGui.SetCursorScreenPos(origin + new Vector2(0f, count * (cardHeight + gap) + elixirBlock + 4f * scale));
         var start = ImGui.GetCursorScreenPos();
         float closeWidth = 150f * scale;
         UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.3f), "Silver comes at the end of every run: kills, elites, bosses, time survived, and a bonus for a win.",
@@ -166,5 +170,51 @@ internal sealed class QuartermasterScreen : GameScreen
         }
 
         return false;
+    }
+
+    /// <summary>The Battle Elixirs: a card each, side by side, bought once for the next run and greyed until it is over, or refused to a class grown too strong.</summary>
+    private void DrawElixirs(Profile profile, int treeLevel, Vector2 at, float width, float height, float buttonHeight)
+    {
+        float scale = UiTheme.Scale;
+        float font = ImGui.GetFontSize();
+        float gap = 12f * scale;
+        float pad = 12f * scale;
+        UiTheme.Text(at, "Battle Elixirs", UiTheme.Brass, 1.0f);
+        UiTheme.Text(at + new Vector2(170f * scale, font * 0.1f),
+            $"For the next run only · one of each · until the class's tree reaches level {Elixirs.TooHighFrom}", UiTheme.Muted, 0.75f);
+        at += new Vector2(0f, font * 1.6f);
+
+        int count = Elixirs.All.Count;
+        float cardWidth = (width - gap * (count - 1)) / count;
+        for (int i = 0; i < count; i++)
+        {
+            var elixir = Elixirs.All[i];
+            bool bought = Elixirs.Bought(profile, elixir);
+            string? why = Elixirs.WhyNotBuy(profile, elixir, treeLevel);
+            bool greyed = bought || treeLevel >= Elixirs.TooHighFrom;
+            var min = at + new Vector2(i * (cardWidth + gap), 0f);
+            var max = min + new Vector2(cardWidth, height);
+            UiTheme.Card(min, max, greyed ? UiTheme.Panel : UiTheme.PanelRaised, bought ? UiTheme.WithAlpha(UiTheme.Brass, 0.8f) : UiTheme.Line);
+            var ink = greyed ? UiTheme.Muted : UiTheme.Ink;
+            UiTheme.Text(min + new Vector2(pad, pad * 0.7f), elixir.Name, ink, 0.95f);
+            UiTheme.Text(min + new Vector2(pad, pad * 0.7f + font * 1.15f), elixir.Description, UiTheme.Muted, 0.72f, cardWidth - 2f * pad);
+
+            float buyHeight = buttonHeight * 0.85f;
+            var buyAt = new Vector2(min.X + pad, max.Y - pad - buyHeight);
+            ImGui.SetCursorScreenPos(buyAt);
+            ImGui.PushID(elixir.Id);
+            string label = bought ? "Bought" : treeLevel >= Elixirs.TooHighFrom ? Elixirs.TooHighLevel : $"Buy  ·  {elixir.Cost:N0} silver";
+            if (UiTheme.Button(label, new Vector2(cardWidth - 2f * pad, buyHeight), primary: why is null, enabled: why is null)
+                && Elixirs.Buy(profile, elixir, treeLevel))
+            {
+                Changed = true;
+            }
+
+            ImGui.PopID();
+            if (why is not null && !bought && treeLevel < Elixirs.TooHighFrom)
+            {
+                UiTheme.Text(new Vector2(buyAt.X, buyAt.Y - font * 0.95f), why, UiTheme.Warn, 0.65f);
+            }
+        }
     }
 }

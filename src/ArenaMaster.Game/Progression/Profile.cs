@@ -39,6 +39,9 @@ internal sealed class Profile
     /// <summary>Shop upgrade id -> ranks bought (see <see cref="Shop"/>).</summary>
     public Dictionary<string, int> Shop { get; set; } = new();
 
+    /// <summary>The Battle Elixirs bought for the next run (see <see cref="Elixirs"/>): drunk as it sets out, and gone after.</summary>
+    public List<string> Elixirs { get; set; } = new();
+
     /// <summary>The ids of the bounties completed so far (see <see cref="Bounties"/>). Each pays out once.</summary>
     public List<string> Bounties { get; set; } = new();
 

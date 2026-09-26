@@ -165,7 +165,7 @@ internal sealed class PaladinStats
 
     public float ThornsInterval => BaseThornsInterval / (1f + Tree.ThornsSpeed + 0.20f * LevelOf(PaladinUpgrade.BrambleMail));
 
-    public float MaxHealth => BaseMaxHealth + 20f * LevelOf(PaladinUpgrade.HeavyPlate) + Items.MaxHealth + Tree.MaxHealth;
+    public float MaxHealth => (BaseMaxHealth + 20f * LevelOf(PaladinUpgrade.HeavyPlate) + Items.MaxHealth + Tree.MaxHealth) * Items.MaxHealthMultiplier;
 
     /// <summary>Health back per second, always on - more while low, with Desperate Prayer.</summary>
     public float Regeneration(bool low) =>

@@ -127,7 +127,7 @@ public sealed partial class ArenaMasterContent
 
         if (_shopScreen.IsOpen)
         {
-            bool closed = _shopScreen.Draw(_profile);
+            bool closed = _shopScreen.Draw(_profile, _tree.Level);
             if (_shopScreen.Changed)
             {
                 _shopScreen.Changed = false;

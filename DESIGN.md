@@ -279,6 +279,7 @@ All in `Progression/MetaProgress.cs`; all numbers are a starting point to tune.
   - *Second Thoughts:* +1 reroll per run on the level-up screen, 5 ranks. A reroll swaps all three cards (R).
   - *Clear Mind:* +1 banish per run, 3 ranks. A banish strikes one card's upgrade from the pool for the rest of the run and replaces the card.
   - *Lucky Charm:* 5 ranks. Each makes rares 15%, epics 30% and legendaries 50% likelier (relative to commons) from chests and drops.
+  - **Battle Elixirs** (the user's, 2026-09-26), for the next run only, 100 silver each: *Damage Elixir* (+20% damage), *Speed Elixir* (+20% attack and cast speed) and *Life Elixir* (+20% max health, after every flat bonus). One of each at most (no stacking), all three allowed. Once bought an elixir greys out until the run it was bought for is over; it is drunk as the run sets out (taken out of the save then, so quitting mid-run doesn't keep it). They are for early levelling: a class whose passive tree has reached level 6 can't buy them ("Too High Level"). The check is on the class chosen when buying.
 - **The Bounty Board** (camp) has 42 one-time challenges, checked at the end of every run. Each pays silver once, and 18 unlock an item into the drop pool. On 2026-09-26 every bounty's silver was halved and the easy ones made harder (the numbers below are the new ones). **Every epic and legendary starts locked** (items already owned stay owned). The board lists the open ones first and scrolls:
   - Brute Force (kill a Brute) -> Ironbark Totem
   - Holding On (survive 10 min) -> Swiftwind Sigil

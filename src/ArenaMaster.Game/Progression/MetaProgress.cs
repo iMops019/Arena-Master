@@ -114,6 +114,57 @@ internal static class Shop
     }
 }
 
+/// <summary>A Battle Elixir the Quartermaster sells: a boon for the next run only.</summary>
+internal sealed record Elixir(string Id, string Name, string Description, long Cost, Action<ItemBonuses> Apply);
+
+/// <summary>
+/// Battle Elixirs: bought at the Quartermaster for the next run only, one of each at most (they don't stack), drunk as the run sets out and gone after it, when
+/// they can be bought again. They are there to help a new class find its feet, so a class whose passive tree has reached <see cref="TooHighFrom"/> can't buy them.
+/// </summary>
+internal static class Elixirs
+{
+    /// <summary>The passive tree level from which the class is too strong for elixirs.</summary>
+    public const int TooHighFrom = 6;
+
+    public const string TooHighLevel = "Too High Level";
+
+    public static readonly IReadOnlyList<Elixir> All = new Elixir[]
+    {
+        new("elixir_damage", "Damage Elixir", "+20% damage for the next run.", 100, b => b.DamageMultiplier *= 1.2f),
+        new("elixir_speed", "Speed Elixir", "+20% attack and cast speed for the next run.", 100, b => b.AttackSpeedMultiplier *= 1.2f),
+        new("elixir_life", "Life Elixir", "+20% max health for the next run.", 100, b => b.MaxHealthMultiplier *= 1.2f),
+    };
+
+    public static bool Bought(Profile profile, Elixir elixir) => profile.Elixirs.Contains(elixir.Id);
+
+    /// <summary>Why <paramref name="elixir"/> can't be bought now, by a class whose tree is at <paramref name="treeLevel"/>, or null if it can.</summary>
+    public static string? WhyNotBuy(Profile profile, Elixir elixir, int treeLevel) =>
+        Bought(profile, elixir) ? "Bought: drunk on the next run."
+        : treeLevel >= TooHighFrom ? TooHighLevel
+        : profile.Silver < elixir.Cost ? $"Needs {elixir.Cost - profile.Silver:N0} more silver."
+        : null;
+
+    public static bool Buy(Profile profile, Elixir elixir, int treeLevel)
+    {
+        if (WhyNotBuy(profile, elixir, treeLevel) is not null)
+        {
+            return false;
+        }
+
+        profile.Silver -= elixir.Cost;
+        profile.Elixirs.Add(elixir.Id);
+        return true;
+    }
+
+    /// <summary>A run sets out: the elixirs bought for it, taken out of the profile (so they last for this run only, and can be bought again after it).</summary>
+    public static IReadOnlyList<Elixir> Drink(Profile profile)
+    {
+        var drunk = All.Where(e => Bought(profile, e)).ToList();
+        profile.Elixirs.Clear();
+        return drunk;
+    }
+}
+
 /// <summary>A one-time challenge on the Bounty Board: what it asks, what it pays, and the item (if any) it unlocks into the drop pool.</summary>
 internal sealed record Bounty(string Id, string Name, string Task, long Silver, string? UnlocksItem, Func<RunRecord, Profile, TreeProgress, bool> Met);
 

@@ -36,6 +36,9 @@ internal sealed class ItemBonuses
 
     public float MaxHealth;
 
+    /// <summary>What the whole max health is multiplied by, after every flat bonus (a Life Elixir).</summary>
+    public float MaxHealthMultiplier = 1f;
+
     /// <summary>Health back per second.</summary>
     public float Regeneration;
 

@@ -113,7 +113,7 @@ internal sealed record EnemyKind(
     /// <summary>The first enemy: slow, fragile fodder that shambles straight at the player and claws on contact.</summary>
     public static readonly EnemyKind Ghoul = new(
         Name: "Ghoul",
-        Model: "ghoul_placeholder.glb",
+        Model: "ghoul.glb",
         Tier: EnemyTier.Fodder,
         MaxHealth: 30f,
         Speed: 3.6f,
@@ -129,7 +129,7 @@ internal sealed record EnemyKind(
     /// </summary>
     public static readonly EnemyKind CrossbowGhoul = new(
         Name: "Crossbow Ghoul",
-        Model: "crossbow_ghoul_placeholder.glb",
+        Model: "crossbow_ghoul.glb",
         Tier: EnemyTier.Fodder,
         MaxHealth: 24f,
         Speed: 3.2f,
@@ -156,7 +156,7 @@ internal sealed record EnemyKind(
     /// </summary>
     public static readonly EnemyKind GhoulMage = new(
         Name: "Ghoul Mage",
-        Model: "ghoul_mage_placeholder.glb",
+        Model: "ghoul_mage.glb",
         Tier: EnemyTier.Fodder,
         MaxHealth: 36f,
         Speed: 3f,
@@ -195,7 +195,7 @@ internal sealed record EnemyKind(
     /// <summary>The first elite: a hulking brute that lunges down a lane and leaps to slam a marked circle.</summary>
     public static readonly EnemyKind Brute = new(
         Name: "Ghoul Brute",
-        Model: "brute_placeholder.glb",
+        Model: "brute.glb",
         Tier: EnemyTier.Elite,
         MaxHealth: 260f,
         Speed: 3.3f,
@@ -218,7 +218,7 @@ internal sealed record EnemyKind(
     /// <summary>The boss: a towering ghoul king that slams, sends shockwaves along the ground, and calls up ghouls.</summary>
     public static readonly EnemyKind HollowKing = new(
         Name: "The Hollow King",
-        Model: "hollow_king_placeholder.glb",
+        Model: "hollow_king.glb",
         Tier: EnemyTier.Boss,
         MaxHealth: 3200f,
         Speed: 2.9f,

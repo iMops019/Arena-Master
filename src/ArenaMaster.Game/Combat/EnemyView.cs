@@ -4,13 +4,13 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Combat;
 
 /// <summary>
-/// Puts the <see cref="EnemyField"/> on screen: every enemy of a kind drawn as one engine crowd (one instanced draw however many there are), with a shambling bob
-/// while it walks, a flinch and a flash when it is hit, a crouch or a rearing-up as it winds up an attack, standing still and pale while frozen, and a sink into
-/// the ground as it dies. A kind that holds a weapon (the Crossbow Ghoul's crossbow) has it drawn as a crowd of its own in the same pose, lighting up from faint to
-/// bright as a shot winds up. The shots in flight are crowds too; a fireball's landing spot is marked with a burning ring while it flies, and it bursts in a ring
+/// Puts the <see cref="EnemyField"/> on screen: every enemy of a kind drawn as one engine animated crowd (one instanced draw however many there are, each copy
+/// at its own clip and time, chosen by <see cref="EnemyMotion"/>: walking with its feet planted, winding up and landing its attacks, dying), with a flinch and
+/// a flash when it is hit, standing still and pale while frozen, and a sink into the ground as it dies. A kind that holds a weapon (the Crossbow Ghoul's
+/// crossbow, the Ghoul Mage's flame) has it drawn as an animated crowd of its own on the same skeleton and clip, lighting up from faint to bright as a shot
+/// winds up. A prop (a crate) is a plain crowd. The shots in flight are crowds too; a fireball's landing spot is marked with a burning ring while it flies, and it bursts in a ring
 /// of fire. Attacks show their
 /// telegraphs on the ground as placed props: a red lane for a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave. There
-/// are no animations yet; the stand-in models are rigid.
 /// </summary>
 internal sealed class EnemyView
 {
@@ -33,7 +33,10 @@ internal sealed class EnemyView
     }
 
     private readonly Dictionary<(int Enemy, Marker Marker), int> _markers = new();   // telegraph -> placed prop id
-    private readonly Dictionary<string, List<CrowdInstance>> _crowds = new();       // model -> this frame's copies
+    private readonly Dictionary<string, List<CrowdInstance>> _crowds = new();       // model -> this frame's copies (props)
+    private readonly Dictionary<string, List<SkinnedCrowdInstance>> _animated = new();   // model -> this frame's animated copies
+    private readonly Dictionary<string, IReadOnlyDictionary<string, float>> _clips = new();   // model -> its clips' lengths
+    private readonly EnemyMotion _motion = new();
     private readonly Dictionary<string, List<CrowdInstance>> _shots = new();   // shot model -> this frame's copies
     private readonly List<CrowdInstance> _landings = new();
     private readonly List<CrowdInstance> _blasts = new();
@@ -46,6 +49,7 @@ internal sealed class EnemyView
         foreach (var enemy in gone)
         {
             Remove(window, enemy);
+            _motion.Forget(enemy);
         }
 
         foreach (var list in _crowds.Values)
@@ -53,26 +57,26 @@ internal sealed class EnemyView
             list.Clear();
         }
 
+        foreach (var list in _animated.Values)
+        {
+            list.Clear();
+        }
+
         var shown = new HashSet<(int, Marker)>();
         foreach (var enemy in field.Enemies)
         {
-            if (!_crowds.TryGetValue(enemy.Kind.Model, out var copies))
+            if (enemy.Kind.IsProp || Clips(window, enemy.Kind.Model) is not { } clips)
             {
-                copies = new List<CrowdInstance>();
-                _crowds[enemy.Kind.Model] = copies;
+                Copies(_crowds, enemy.Kind.Model).Add(Pose(enemy));
             }
-
-            var pose = Pose(enemy);
-            copies.Add(pose);
-            if (enemy.Kind.HeldModel is { } held)
+            else
             {
-                if (!_crowds.TryGetValue(held, out var weapons))
+                var body = Animate(enemy, _motion.Update(enemy, deltaSeconds, clips));
+                Copies(_animated, enemy.Kind.Model).Add(body);
+                if (enemy.Kind.HeldModel is { } held)
                 {
-                    weapons = new List<CrowdInstance>();
-                    _crowds[held] = weapons;
+                    Copies(_animated, held).Add(body with { Flash = MathF.Max(Glow(enemy), body.Flash * 0.5f) });
                 }
-
-                weapons.Add(pose with { Flash = MathF.Max(Glow(enemy), pose.Flash * 0.5f) });
             }
 
             if (enemy.IsAlive)
@@ -94,6 +98,11 @@ internal sealed class EnemyView
         foreach (var (model, copies) in _crowds)
         {
             window.SetCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(copies));   // an empty list clears a kind that is gone
+        }
+
+        foreach (var (model, copies) in _animated)
+        {
+            window.SetSkinnedCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(copies));
         }
 
         foreach (var list in _shots.Values)
@@ -174,6 +183,50 @@ internal sealed class EnemyView
         {
             props[key] = window.PlaceProp(placement);
         }
+    }
+
+    private static List<T> Copies<T>(Dictionary<string, List<T>> crowds, string model)
+    {
+        if (!crowds.TryGetValue(model, out var copies))
+        {
+            copies = new List<T>();
+            crowds[model] = copies;
+        }
+
+        return copies;
+    }
+
+    /// <summary>An animated model's clips and their lengths (null if the model isn't there), asked of the engine once per model.</summary>
+    private IReadOnlyDictionary<string, float>? Clips(EngineWindow window, string model)
+    {
+        if (!_clips.TryGetValue(model, out var clips) && window.SkinnedCrowdClips(model) is { } loaded)
+        {
+            clips = loaded;
+            _clips[model] = clips;
+        }
+
+        return clips;
+    }
+
+    /// <summary>
+    /// An animated enemy's copy: its clip from <paramref name="motion"/>, and on top of it a quick swell and flinch back when hit, pale while frozen, and a sink
+    /// into the ground over the second half of dying (the Die clip has it on the ground by then).
+    /// </summary>
+    private static SkinnedCrowdInstance Animate(Enemy enemy, EnemyMotion.Pose motion)
+    {
+        var position = enemy.Position;
+        bool fodder = enemy.Kind.Tier == EnemyTier.Fodder;
+        float scale = 1f + 0.08f * enemy.HitFlash * (fodder ? 1f : 0.3f);
+        float pitch = -0.2f * enemy.HitFlash * (fodder ? 1f : 0.2f);
+        float flash = enemy.IsFrozen ? MathF.Max(0.55f, enemy.HitFlash) : enemy.HitFlash;
+        if (!enemy.IsAlive)
+        {
+            float t = Math.Clamp(enemy.DeadFor / EnemyField.DeathDuration, 0f, 1f);
+            position.Y -= MathF.Max(0f, t - 0.5f) * 2f * enemy.Kind.Height * 0.35f;
+            flash = 0f;
+        }
+
+        return new SkinnedCrowdInstance(position, enemy.Yaw, motion.Clip, motion.Time, scale, pitch, flash, motion.From, motion.FromTime, motion.Fade);
     }
 
     private CrowdInstance Pose(Enemy enemy)

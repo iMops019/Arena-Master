@@ -1,7 +1,7 @@
-"""Draws a skinned hero's clips as contact sheets, to look at poses without the game: each row is one clip, each column a moment in it, seen from the side
+"""Draws a skinned hero's (or enemy's) clips as contact sheets, to look at poses without the game: each row is one clip, each column a moment in it, seen from the side
 (+X), the front (+Z) or three-quarters. Needs Pillow (pip install pillow); the model script itself needs nothing.
 
-    python tools/preview_hero.py ranger [out.png] [--view side|front|three|back] [--frames 8]
+    python tools/preview_hero.py ranger|ghoul|brute|... [out.png] [--view side|front|three|back] [--frames 8]
 """
 
 import math
@@ -85,12 +85,23 @@ def sheet(mesh, rig, clips, path, view="side", frames=8):
 
 
 if __name__ == "__main__":
+    import enemy_models
     import hero_models
 
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     options = dict(a[2:].split("=", 1) for a in sys.argv[1:] if a.startswith("--") and "=" in a)
-    hero = hero_models.HEROES[args[0] if args else "ranger"]
-    out = Path(args[1]) if len(args) > 1 else Path(f"{hero.name}_{options.get('view', 'side')}.png")
+    name = args[0] if args else "ranger"
+    model = hero_models.HEROES.get(name) or enemy_models.ENEMIES[name]
+    mesh = model.mesh()
+    for _, build in getattr(model, "held", ()):     # an enemy's held model, drawn with it
+        extra = build(model.rig)
+        base = len(mesh.positions)
+        mesh.positions += extra.positions
+        mesh.normals += extra.normals
+        mesh.uvs += extra.uvs
+        mesh.joints += extra.joints
+        mesh.indices += [i + base for i in extra.indices]
+    out = Path(args[1]) if len(args) > 1 else Path(f"{name}_{options.get('view', 'side')}.png")
     wanted = options.get("clips")
-    clips = [(name, seconds, pose) for name, (seconds, pose) in hero.clips().items() if not wanted or name in wanted.split(",")]
-    print(sheet(hero.mesh(), hero.rig, clips, out, options.get("view", "side"), int(options.get("frames", 8))))
+    clips = [(clip, seconds, pose) for clip, (seconds, pose) in model.clips().items() if not wanted or clip in wanted.split(",")]
+    print(sheet(mesh, model.rig, clips, out, options.get("view", "side"), int(options.get("frames", 8))))

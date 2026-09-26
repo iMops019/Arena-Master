@@ -121,7 +121,7 @@ internal sealed class RangerStats
 
     public float MoveSpeed => BaseMoveSpeed * (1f + 0.08f * LevelOf(RangerUpgrade.FleetFoot) + Items.MoveSpeed + Tree.MoveSpeed);
 
-    public float MaxHealth => BaseMaxHealth + 20f * LevelOf(RangerUpgrade.Vitality) + Items.MaxHealth + Tree.MaxHealth;
+    public float MaxHealth => (BaseMaxHealth + 20f * LevelOf(RangerUpgrade.Vitality) + Items.MaxHealth + Tree.MaxHealth) * Items.MaxHealthMultiplier;
 
     public float PickupRadius => BasePickupRadius * (1f + 0.35f * LevelOf(RangerUpgrade.Scavenger) + Items.Pickup);
 

@@ -171,7 +171,7 @@ internal sealed class MageStats
     /// <summary>Seconds for the Frost Shield to form again after the last one ended.</summary>
     public float ShieldInterval => BaseShieldInterval / (1f + Tree.ShieldRecharge + (Tree.GlacialFortress ? FortressRecharge : 0f));
 
-    public float MaxHealth => BaseMaxHealth + 15f * LevelOf(MageUpgrade.ArcaneVigor) + Items.MaxHealth + Tree.MaxHealth;
+    public float MaxHealth => (BaseMaxHealth + 15f * LevelOf(MageUpgrade.ArcaneVigor) + Items.MaxHealth + Tree.MaxHealth) * Items.MaxHealthMultiplier;
 
     public float Regeneration => Items.Regeneration + Tree.Regeneration;
 

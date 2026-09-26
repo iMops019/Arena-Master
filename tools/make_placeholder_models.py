@@ -13,19 +13,14 @@
   frost_shard.glb         a small ice shard, centred on its middle (the Frost Shield's and the Blizzard's swirl)
   aegis_burst.glb         a flat pale-gold ring of radius 1, scaled as the Aegis of the Dawn's burst spreads (an item's, any class)
   thunderstone_bolt.glb   one piece of the Thunderstone's bolt from the sky: a thin bright bar 1 m long along Z (an item's, any class)
+  ghoul.glb, crossbow_ghoul.glb (+ ghoul_crossbow.glb), ghoul_mage.glb (+ ghoul_flame.glb), brute.glb, hollow_king.glb, hollow_king_unbound.glb
+                          the enemies, skinned and animated (idle, walk, die and their attacks), with their held crossbow and flame: see tools/enemy_models.py
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
-  ghoul_placeholder.glb   the first enemy: a hunched ghoul with long arms and red eyes
-  crossbow_ghoul_placeholder.glb  the ranged ghoul: hooded, a quiver on its back, arms held out in front to carry its crossbow
-  ghoul_crossbow.glb      the Crossbow Ghoul's crossbow, drawn over its body in the same pose: a stock, limbs with glowing runes, a loaded bolt
   ghoul_bolt.glb          a Crossbow Ghoul's bolt: a dark shaft with a glowing head, centred on its middle, pointing +Z
-  ghoul_mage_placeholder.glb  the Ghoul Mage: a gaunt ghoul in a long tattered robe and a tall hood, hands held out cupped in front of it
-  ghoul_flame.glb         the Ghoul Mage's flame, drawn over its body in the same pose: a burning orb between its hands
   ghoul_fireball.glb      a Ghoul Mage's fireball: a fiery orb with a bright core, centred on its middle
   fireball_mark.glb       a flat burning ring of radius 1 with flames on it, marking where a fireball will land
   fireball_burst.glb      a flat ring of fire of radius 1, scaled as a fireball bursts
   xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
-  brute_placeholder.glb   the elite: a hulking horned ghoul brute, 2.4 m tall, with a bone club
-  hollow_king_placeholder.glb  the boss: a towering crowned ghoul king, 4.2 m tall, with a tattered cape
   telegraph_ring.glb      a flat red ring of radius 1 on y = 0, scaled to an attack's radius (outline of where it lands)
   telegraph_disc.glb      a flat dark-red disc of radius 1, scaled up inside the ring as an attack winds up
   telegraph_lane.glb      a flat red lane 1.6 m wide and 7.2 m long from the origin along +Z (a lunge's path)
@@ -53,7 +48,6 @@
   camp_armorstand.glb     the gear station: an armour stand wearing mail and an orange tabard, a helm on top, a sword and shield by it
   fire_nova.glb           a flat ring of bright fire of radius 1, scaled as the Emberbrand's nova spreads (gear, any class)
   delve_cache.glb         the chest a Delve boss leaves: black and iron-bound, with a burning-orange seal and trim, on a stone slab
-  hollow_king_unbound.glb the Delve boss: the Hollow King grown to 5.6 m, with horns, bone pauldrons, a burning crown and eyes, broken chains
   camp_quartermaster.glb  the quartermaster behind the stall, skinned (8 joints) with a looping 6 s "Idle" clip: he breathes, shifts his
                           weight, looks along the camp one way and the other, strokes his moustache and nods, a hand on his hip
 
@@ -379,72 +373,6 @@ def build_arrow():
     return m
 
 
-def build_ghoul():
-    m = Mesh()
-    # Crooked legs and feet
-    m.box(-0.20, 0.0, -0.06, -0.06, 0.10, 0.16, "ghoul_skin")
-    m.box(0.06, 0.0, -0.06, 0.20, 0.10, 0.16, "ghoul_skin")
-    m.box(-0.18, 0.10, -0.06, -0.07, 0.62, 0.06, "ghoul_skin")
-    m.box(0.07, 0.10, -0.06, 0.18, 0.62, 0.06, "ghoul_skin")
-    # Ragged loincloth and a hunched torso leaning forward
-    m.box(-0.22, 0.52, -0.12, 0.22, 0.72, 0.12, "ghoul_rags")
-    m.box(-0.24, 0.70, -0.10, 0.24, 1.10, 0.20, "ghoul_skin")
-    m.box(-0.22, 1.00, 0.02, 0.22, 1.28, 0.32, "ghoul_skin")
-    m.box(-0.08, 0.86, -0.14, 0.08, 1.20, -0.10, "bone")          # spine ridge
-    # Long arms reaching forward and down, with claws
-    m.box(-0.38, 0.62, 0.10, -0.26, 1.24, 0.24, "ghoul_skin")
-    m.box(0.26, 0.62, 0.10, 0.38, 1.24, 0.24, "ghoul_skin")
-    m.box(-0.39, 0.50, 0.14, -0.27, 0.62, 0.34, "bone")
-    m.box(0.27, 0.50, 0.14, 0.39, 0.62, 0.34, "bone")
-    # Head thrust forward, red eyes, jaw
-    m.box(-0.13, 1.14, 0.28, 0.13, 1.40, 0.52, "ghoul_skin")
-    m.box(-0.10, 1.27, 0.52, -0.03, 1.32, 0.525, "ghoul_eye")
-    m.box(0.03, 1.27, 0.52, 0.10, 1.32, 0.525, "ghoul_eye")
-    m.box(-0.10, 1.10, 0.32, 0.10, 1.16, 0.50, "bone")
-    return m
-
-
-def build_crossbow_ghoul():
-    m = Mesh()
-    # Crooked legs and feet, as the ghoul's
-    m.box(-0.20, 0.0, -0.06, -0.06, 0.10, 0.16, "ghoul_skin")
-    m.box(0.06, 0.0, -0.06, 0.20, 0.10, 0.16, "ghoul_skin")
-    m.box(-0.18, 0.10, -0.06, -0.07, 0.62, 0.06, "ghoul_skin")
-    m.box(0.07, 0.10, -0.06, 0.18, 0.62, 0.06, "ghoul_skin")
-    # Rags, a less hunched torso, and a hood and cloak
-    m.box(-0.22, 0.52, -0.12, 0.22, 0.72, 0.12, "ghoul_rags")
-    m.box(-0.23, 0.70, -0.10, 0.23, 1.18, 0.16, "ghoul_skin")
-    m.box(-0.25, 0.60, -0.16, 0.25, 1.22, -0.10, "hood_dark")
-    # A quiver of bolts on its back
-    m.box(0.05, 0.80, -0.26, 0.17, 1.30, -0.16, "leather")
-    m.box(0.07, 1.30, -0.24, 0.15, 1.38, -0.18, "bolt_glow")
-    # Arms held out in front at chest height, hands where the crossbow sits
-    m.box(-0.34, 0.98, -0.02, -0.22, 1.10, 0.40, "ghoul_skin")
-    m.box(0.22, 0.98, -0.02, 0.34, 1.10, 0.40, "ghoul_skin")
-    m.box(-0.30, 0.99, 0.40, -0.12, 1.09, 0.50, "bone")
-    m.box(0.12, 0.99, 0.40, 0.30, 1.09, 0.50, "bone")
-    # Hooded head, red eyes
-    m.box(-0.13, 1.18, 0.02, 0.13, 1.44, 0.26, "ghoul_skin")
-    m.box(-0.10, 1.31, 0.26, -0.03, 1.36, 0.265, "ghoul_eye")
-    m.box(0.03, 1.31, 0.26, 0.10, 1.36, 0.265, "ghoul_eye")
-    m.box(-0.16, 1.16, -0.06, 0.16, 1.50, 0.02, "hood_dark")
-    m.box(-0.16, 1.42, -0.06, 0.16, 1.50, 0.24, "hood_dark")
-    return m
-
-
-def build_ghoul_crossbow():
-    """The crossbow, in the ghoul's own space: held level at chest height in front of it, pointing +Z."""
-    m = Mesh()
-    m.box(-0.04, 1.00, 0.22, 0.04, 1.08, 0.92, "wood")              # stock
-    m.box(-0.38, 1.03, 0.80, 0.38, 1.09, 0.86, "chest_dark")        # limbs
-    m.box(-0.44, 1.02, 0.78, -0.36, 1.10, 0.88, "bolt_glow")        # glowing runes at the limb tips
-    m.box(0.36, 1.02, 0.78, 0.44, 1.10, 0.88, "bolt_glow")
-    m.box(-0.36, 1.055, 0.60, 0.36, 1.065, 0.62, "fletching")      # the drawn string
-    m.box(-0.012, 1.08, 0.60, 0.012, 1.10, 0.96, "wood")           # the loaded bolt
-    m.box(-0.03, 1.07, 0.96, 0.03, 1.11, 1.02, "bolt_glow")         # its glowing head
-    return m
-
-
 def build_ghoul_bolt():
     """A crossbow bolt pointing +Z, centred on its middle: a dark shaft, a glowing head, small vanes."""
     m = Mesh()
@@ -460,27 +388,6 @@ def build_ghoul_bolt():
     return m
 
 
-def build_ghoul_mage():
-    m = Mesh()
-    # A long robe to the ground, widening at the hem
-    m.box(-0.26, 0.0, -0.18, 0.26, 0.40, 0.20, "ghoul_robe")
-    m.box(-0.22, 0.40, -0.14, 0.22, 1.20, 0.16, "ghoul_robe")
-    m.box(-0.23, 0.78, -0.15, 0.23, 0.84, 0.17, "bone")              # a cord of bones for a belt
-    # Thin arms held out in front at chest height, hands cupped where the flame burns
-    m.box(-0.32, 1.00, -0.02, -0.20, 1.10, 0.36, "ghoul_robe")
-    m.box(0.20, 1.00, -0.02, 0.32, 1.10, 0.36, "ghoul_robe")
-    m.box(-0.28, 0.98, 0.36, -0.14, 1.08, 0.50, "ghoul_skin")
-    m.box(0.14, 0.98, 0.36, 0.28, 1.08, 0.50, "ghoul_skin")
-    # Gaunt head, red eyes, and a tall pointed hood
-    m.box(-0.12, 1.20, 0.00, 0.12, 1.46, 0.24, "ghoul_skin")
-    m.box(-0.09, 1.33, 0.24, -0.03, 1.38, 0.245, "ghoul_eye")
-    m.box(0.03, 1.33, 0.24, 0.09, 1.38, 0.245, "ghoul_eye")
-    m.box(-0.16, 1.18, -0.08, 0.16, 1.52, 0.00, "ghoul_robe")
-    m.box(-0.16, 1.44, -0.08, 0.16, 1.52, 0.22, "ghoul_robe")
-    m.pyramid(-0.16, 1.52, -0.08, 0.16, 1.52, 0.22, (0.0, 1.85, -0.04), "ghoul_robe")
-    return m
-
-
 def _orb(m, cx, cy, cz, r, outer, inner):
     """A spiky orb: a double pyramid of <outer>, and a brighter one of <inner> turned 45 degrees whose points stick out through its faces."""
     import math
@@ -491,13 +398,6 @@ def _orb(m, cx, cy, cz, r, outer, inner):
             a, b = ring[i], ring[(i + 1) % 4]
             m.tri(a, top, b, colour)
             m.tri(b, bottom, a, colour)
-
-
-def build_ghoul_flame():
-    """The flame in the Ghoul Mage's own space: a burning orb held between its hands, in front of it at chest height."""
-    m = Mesh()
-    _orb(m, 0.0, 1.10, 0.56, 0.14, "fire", "fire_light")
-    return m
 
 
 def build_ghoul_fireball():
@@ -527,66 +427,6 @@ def build_xp_gem():
         a, b = ring[i], ring[(i + 1) % 4]
         m.tri(a, top, b, "gem_light")
         m.tri(b, bottom, a, "gem")
-    return m
-
-
-def build_brute():
-    """About 2.4 m tall, broad and stooped, horns, a bone club in the right hand."""
-    m = Mesh()
-    # Thick legs and hooves
-    m.box(-0.42, 0.0, -0.18, -0.12, 0.18, 0.26, "brute_hide")
-    m.box(0.12, 0.0, -0.18, 0.42, 0.18, 0.26, "brute_hide")
-    m.box(-0.40, 0.18, -0.16, -0.14, 0.95, 0.16, "brute_skin")
-    m.box(0.14, 0.18, -0.16, 0.40, 0.95, 0.16, "brute_skin")
-    # Hide loincloth, barrel belly, huge chest and shoulders leaning forward
-    m.box(-0.48, 0.80, -0.26, 0.48, 1.10, 0.26, "brute_hide")
-    m.box(-0.52, 1.05, -0.28, 0.52, 1.60, 0.34, "brute_skin")
-    m.box(-0.66, 1.55, -0.24, 0.66, 2.05, 0.46, "brute_skin")
-    m.box(-0.20, 1.40, -0.36, 0.20, 2.00, -0.28, "bone")        # spine plates
-    # Arms: left hanging, right gripping a club held forward
-    m.box(-0.90, 0.95, 0.00, -0.64, 1.95, 0.30, "brute_skin")
-    m.box(-0.92, 0.78, 0.04, -0.62, 0.98, 0.34, "brute_hide")   # fist
-    m.box(0.64, 1.10, 0.10, 0.90, 1.95, 0.40, "brute_skin")
-    m.box(0.62, 0.95, 0.20, 0.92, 1.15, 0.50, "brute_hide")     # fist
-    m.box(0.70, 0.55, 0.30, 0.84, 1.10, 1.30, "bone")           # club shaft, forward
-    m.box(0.64, 0.45, 1.10, 0.90, 0.80, 1.55, "bone")           # club head
-    # Head sunk between the shoulders, red eyes, tusks, horns
-    m.box(-0.22, 1.80, 0.36, 0.22, 2.20, 0.74, "brute_skin")
-    m.box(-0.16, 2.02, 0.74, -0.06, 2.08, 0.745, "ghoul_eye")
-    m.box(0.06, 2.02, 0.74, 0.16, 2.08, 0.745, "ghoul_eye")
-    m.box(-0.16, 1.80, 0.70, -0.10, 1.92, 0.78, "horn")
-    m.box(0.10, 1.80, 0.70, 0.16, 1.92, 0.78, "horn")
-    m.pyramid(-0.34, 2.10, 0.44, -0.18, 2.10, 0.60, (-0.52, 2.45, 0.40), "horn")
-    m.pyramid(0.18, 2.10, 0.44, 0.34, 2.10, 0.60, (0.52, 2.45, 0.40), "horn")
-    return m
-
-
-def build_hollow_king():
-    """About 4.2 m tall: gaunt and regal, a gold crown, glowing green eyes, a tattered cape, long clawed arms."""
-    m = Mesh()
-    # Legs under a long robe
-    m.box(-0.50, 0.0, -0.30, -0.16, 0.30, 0.40, "king_skin")
-    m.box(0.16, 0.0, -0.30, 0.50, 0.30, 0.40, "king_skin")
-    m.box(-0.70, 0.30, -0.40, 0.70, 1.90, 0.40, "king_robe")
-    # Gaunt torso, ribs, shoulders
-    m.box(-0.55, 1.90, -0.30, 0.55, 3.00, 0.34, "king_skin")
-    for y in (2.15, 2.40, 2.65):
-        m.box(-0.45, y, 0.34, 0.45, y + 0.08, 0.40, "bone")
-    m.box(-0.95, 2.85, -0.34, 0.95, 3.25, 0.38, "king_robe")    # mantle
-    m.box(-0.90, 0.40, -0.52, 0.90, 3.15, -0.40, "king_robe")   # cape
-    # Long arms reaching down to the knees, bone claws
-    m.box(-1.25, 1.10, -0.14, -0.95, 3.05, 0.20, "king_skin")
-    m.box(0.95, 1.10, -0.14, 1.25, 3.05, 0.20, "king_skin")
-    m.box(-1.30, 0.70, -0.08, -0.90, 1.10, 0.40, "bone")
-    m.box(0.90, 0.70, -0.08, 1.30, 1.10, 0.40, "bone")
-    # Skull-like head, glowing eyes, jaw, crown
-    m.box(-0.34, 3.20, -0.24, 0.34, 3.86, 0.40, "bone")
-    m.box(-0.22, 3.52, 0.40, -0.06, 3.62, 0.41, "ghost_eye")
-    m.box(0.06, 3.52, 0.40, 0.22, 3.62, 0.41, "ghost_eye")
-    m.box(-0.24, 3.12, 0.00, 0.24, 3.24, 0.38, "bone")
-    m.box(-0.38, 3.86, -0.28, 0.38, 3.98, 0.44, "gold")
-    for x, z in ((-0.30, 0.34), (0.0, 0.40), (0.30, 0.34), (-0.30, -0.20), (0.30, -0.20)):
-        m.pyramid(x - 0.08, 3.98, z - 0.08, x + 0.08, 3.98, z + 0.08, (x, 4.22, z), "gold")
     return m
 
 
@@ -1210,33 +1050,6 @@ def quartermaster_idle(t):
     }
 
 
-def build_hollow_king_unbound():
-    """The Delve boss: the Hollow King grown to about 5.6 m and unbound: the king's body scaled up, with great horns, bone pauldrons, a burning-orange crown
-    and eyes, and chains hanging broken from its wrists."""
-    king = build_hollow_king()
-    m = Mesh()
-    s = 1.32
-    for i in range(0, len(king.indices), 3):
-        a, b, c = (king.positions[king.indices[i + k]] for k in range(3))
-        colour = COLOURS[int(king.uvs[king.indices[i]][0] * len(COLOURS))]
-        if colour == "ghost_eye":
-            colour = "fire_light"
-        elif colour == "gold":
-            colour = "fire"
-        m.tri(tuple(v * s for v in a), tuple(v * s for v in b), tuple(v * s for v in c), colour)
-    for side in (-1, 1):
-        x0, x1 = sorted((side * 0.3, side * 0.55))
-        m.pyramid(x0 * s, 3.9 * s, -0.1 * s, x1 * s, 3.9 * s, 0.2 * s, (side * 1.05 * s, 4.75 * s, -0.05 * s), "horn")   # the horns
-        px0, px1 = sorted((side * 0.75, side * 1.35))
-        m.box(px0 * s, 3.0 * s, -0.42 * s, px1 * s, 3.4 * s, 0.46 * s, "bone")                                          # the pauldrons
-        m.pyramid(px0 * s, 3.4 * s, -0.3 * s, px1 * s, 3.4 * s, 0.34 * s, (side * 1.05 * s, 3.8 * s, 0.02 * s), "bone")
-        cx = side * 1.1 * s
-        for k in range(4):                                                                                                # the broken chains
-            y = (0.62 - 0.14 * k) * s
-            m.box(cx - 0.05 * s, y - 0.09 * s, 0.1 * s, cx + 0.05 * s, y, 0.2 * s, "iron")
-    return m
-
-
 def build_delve_cache():
     """The Delve cache the boss leaves: a big black iron-bound chest, 1.8 m wide, with a burning-orange seal and trim, on a stone slab."""
     m = Mesh()
@@ -1433,13 +1246,9 @@ if __name__ == "__main__":
                         ("lightning_arc.glb", build_lightning_arc), ("lightning_zap.glb", lambda: build_ring(0.85, 1.0, "spark")),
                         ("frost_blast.glb", lambda: build_ring(0.86, 1.0, "ice_light")), ("frost_shard.glb", build_frost_shard),
                         ("aegis_burst.glb", lambda: build_ring(0.9, 1.0, "holy_light")), ("thunderstone_bolt.glb", build_lightning_arc),
-                        ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul),
-                        ("crossbow_ghoul_placeholder.glb", build_crossbow_ghoul), ("ghoul_crossbow.glb", build_ghoul_crossbow),
-                        ("ghoul_bolt.glb", build_ghoul_bolt),
-                        ("ghoul_mage_placeholder.glb", build_ghoul_mage), ("ghoul_flame.glb", build_ghoul_flame),
+                        ("arrow_placeholder.glb", build_arrow), ("ghoul_bolt.glb", build_ghoul_bolt),
                         ("ghoul_fireball.glb", build_ghoul_fireball), ("fireball_mark.glb", build_fireball_mark),
                         ("fireball_burst.glb", lambda: build_ring(0.75, 1.0, "fire")), ("xp_gem_placeholder.glb", build_xp_gem),
-                        ("brute_placeholder.glb", build_brute), ("hollow_king_placeholder.glb", build_hollow_king),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
                         ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),
                         ("chest_placeholder.glb", build_chest), ("loot_beam.glb", build_beam), ("crate_placeholder.glb", build_crate),
@@ -1457,7 +1266,7 @@ if __name__ == "__main__":
                         ("camp_dummy.glb", build_dummy), ("camp_well.glb", build_well), ("camp_cart.glb", build_cart),
                         ("camp_cookpot.glb", build_cookpot), ("camp_bedroll.glb", build_bedroll), ("camp_lantern.glb", build_lantern),
                         ("camp_sacks.glb", build_sacks), ("camp_armorstand.glb", build_armour_stand),
-                        ("delve_cache.glb", build_delve_cache), ("fire_nova.glb", lambda: build_ring(0.82, 1.0, "fire_light")), ("hollow_king_unbound.glb", build_hollow_king_unbound)):
+                        ("delve_cache.glb", build_delve_cache), ("fire_nova.glb", lambda: build_ring(0.82, 1.0, "fire_light")), ):
         mesh = build()
         write_glb(mesh, MODELS / name)
         print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")
@@ -1474,3 +1283,11 @@ if __name__ == "__main__":
         clips = hero.clips()
         write_skinned_glb(mesh, MODELS / hero.file, hero.rig.gltf_joints(), clips)
         print(f"Wrote {MODELS / hero.file} ({len(mesh.positions)} vertices, {len(hero.rig.names)} joints, clips {', '.join(clips)})")
+
+    import enemy_models
+    for enemy in enemy_models.ENEMIES.values():
+        clips = enemy.clips()
+        for file, build in ((enemy.file, enemy.mesh), *((held, lambda b=b: b(enemy.rig)) for held, b in enemy.held)):
+            mesh = build()
+            write_skinned_glb(mesh, MODELS / file, enemy.rig.gltf_joints(), clips)
+            print(f"Wrote {MODELS / file} ({len(mesh.positions)} vertices, {len(enemy.rig.names)} joints, clips {', '.join(clips)})")

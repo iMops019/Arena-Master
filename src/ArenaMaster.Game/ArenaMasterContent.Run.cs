@@ -61,6 +61,21 @@ public sealed partial class ArenaMasterContent
     private string _announcement = "";
     private float _announcementLeft;
 
+    /// <summary>The Battle Elixirs bought for this run join its bonuses, and leave the profile: they are for this run only.</summary>
+    private void DrinkElixirs()
+    {
+        var drunk = Elixirs.Drink(_profile);
+        foreach (var elixir in drunk)
+        {
+            _items.Carried.AddBonus(elixir.Apply);
+        }
+
+        if (drunk.Count > 0)
+        {
+            SaveProfile();
+        }
+    }
+
     /// <summary>Sets out from the gate on <paramref name="plan"/>: a fresh run with the loadout's items, the gear, the tree's bonuses, full health, at the run start.</summary>
     private void BeginRun(EngineWindow window, Delve.RunPlan plan)
     {
@@ -68,6 +83,7 @@ public sealed partial class ArenaMasterContent
         _hero.UseTree(_tree.Save.Ranks);
         _items.Begin(Loadout.ItemsToBring(_profile));   // the loadout as it stands now: finds made on this run won't join it
         WearGear();
+        DrinkElixirs();
         var bonuses = _items.Carried.Bonuses;
         _hero.BeginRun(bonuses, _health);
         _health.LastStands += bonuses.LastStands;   // the Phoenix Feather's, on top of any the class has

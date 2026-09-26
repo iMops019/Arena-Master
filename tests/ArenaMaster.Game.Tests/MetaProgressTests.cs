@@ -198,3 +198,98 @@ public class RerollAndBanishTests
         Assert.Null(choice.Upgrade);
     }
 }
+
+public class ElixirTests
+{
+    private static Elixir Damage => Elixirs.All.Single(e => e.Id == "elixir_damage");
+
+    [Fact]
+    public void ThereAreThree_AHundredSilverEach()
+    {
+        Assert.Equal(3, Elixirs.All.Count);
+        Assert.All(Elixirs.All, e => Assert.Equal(100, e.Cost));
+    }
+
+    [Fact]
+    public void Buying_TakesTheSilver_AndOnlyOnce()
+    {
+        var profile = new Profile { Silver = 250 };
+
+        Assert.True(Elixirs.Buy(profile, Damage, treeLevel: 1));
+        Assert.Equal(150, profile.Silver);
+        Assert.NotNull(Elixirs.WhyNotBuy(profile, Damage, 1));
+        Assert.False(Elixirs.Buy(profile, Damage, 1));   // no stacking
+        Assert.Equal(150, profile.Silver);
+    }
+
+    [Fact]
+    public void AllThree_CanBeBoughtForOneRun()
+    {
+        var profile = new Profile { Silver = 300 };
+        Assert.All(Elixirs.All, e => Assert.True(Elixirs.Buy(profile, e, 3)));
+        Assert.Equal(0, profile.Silver);
+    }
+
+    [Theory]
+    [InlineData(5, true)]
+    [InlineData(6, false)]
+    [InlineData(12, false)]
+    public void AClassWhoseTreeIsLevelSix_IsTooHighLevel(int level, bool allowed)
+    {
+        var profile = new Profile { Silver = 1000 };
+        Assert.Equal(allowed, Elixirs.Buy(profile, Damage, level));
+        if (!allowed)
+        {
+            Assert.Equal(Elixirs.TooHighLevel, Elixirs.WhyNotBuy(profile, Damage, level));
+        }
+    }
+
+    [Fact]
+    public void WithoutTheSilver_ItSaysHowMuchMore()
+    {
+        var profile = new Profile { Silver = 40 };
+        Assert.Equal("Needs 60 more silver.", Elixirs.WhyNotBuy(profile, Damage, 1));
+    }
+
+    [Fact]
+    public void Drinking_UsesThemUp_SoTheyLastOneRun_AndCanBeBoughtAgain()
+    {
+        var profile = new Profile { Silver = 1000 };
+        Elixirs.Buy(profile, Damage, 1);
+
+        var drunk = Elixirs.Drink(profile);
+
+        Assert.Equal(Damage, Assert.Single(drunk));
+        Assert.Empty(profile.Elixirs);
+        Assert.Empty(Elixirs.Drink(profile));             // the run after has none
+        Assert.True(Elixirs.Buy(profile, Damage, 1));     // and it can be bought again
+    }
+
+    [Fact]
+    public void EachGivesItsTwentyPercent()
+    {
+        var bonuses = new ItemBonuses();
+        foreach (var elixir in Elixirs.All)
+        {
+            elixir.Apply(bonuses);
+        }
+
+        Assert.Equal(1.2f, bonuses.DamageMultiplier, 4);
+        Assert.Equal(1.2f, bonuses.AttackSpeedMultiplier, 4);
+        Assert.Equal(1.2f, bonuses.MaxHealthMultiplier, 4);
+    }
+
+    [Fact]
+    public void TheLifeElixir_RaisesTheWholeMaxHealth()
+    {
+        var stats = new ArenaMaster.Game.Ranger.RangerStats();
+        float before = stats.MaxHealth;
+        var bonuses = new ItemBonuses { MaxHealth = 20f };
+        stats.Items = bonuses;
+        float withItem = stats.MaxHealth;
+        Elixirs.All.Single(e => e.Id == "elixir_life").Apply(bonuses);
+
+        Assert.Equal(before + 20f, withItem, 3);
+        Assert.Equal(withItem * 1.2f, stats.MaxHealth, 3);
+    }
+}

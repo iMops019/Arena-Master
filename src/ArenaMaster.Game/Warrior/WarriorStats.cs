@@ -174,7 +174,7 @@ internal sealed class WarriorStats
     public float BlockChance => MathF.Min(MaxBlockChance,
         (Tree.BlockChance + 0.04f * LevelOf(WarriorUpgrade.ParryingBlades) + Items.BlockChance + (Tree.BladeWall ? BladeWallBlock : 0f)) * Items.BlockMultiplier);
 
-    public float MaxHealth => BaseMaxHealth + 20f * LevelOf(WarriorUpgrade.Hardy) + Items.MaxHealth + Tree.MaxHealth;
+    public float MaxHealth => (BaseMaxHealth + 20f * LevelOf(WarriorUpgrade.Hardy) + Items.MaxHealth + Tree.MaxHealth) * Items.MaxHealthMultiplier;
 
     public float Regeneration => 0.5f * LevelOf(WarriorUpgrade.Recovery) + Items.Regeneration + Tree.Regeneration;
 
