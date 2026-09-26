@@ -25,7 +25,11 @@ internal sealed class MageStats
     public const float BaseRange = 30f;
     public const float BaseTargetRange = 22f;
 
-    public const float BaseCritChance = 0.05f;
+    /// <summary>
+    /// The class's own critical chance. Everything else only scales it: the level-up, the tree and items add <i>increased</i> critical chance, so +100% doubles
+    /// the base.
+    /// </summary>
+    public const float BaseCritChance = 0.08f;
     public const float BaseCritMultiplier = 2f;
 
     /// <summary>Every frost hit chills: this long, slowing the walk this much, and never more than the cap.</summary>
@@ -128,7 +132,7 @@ internal sealed class MageStats
     /// <summary>How many enemies a bolt passes through: an item's chains count as pierce for the Mage.</summary>
     public int Pierce => LevelOf(MageUpgrade.PiercingIce) + Tree.Pierce + Items.Chains;
 
-    public float CritChance => BaseCritChance + 0.06f * LevelOf(MageUpgrade.FrozenPrecision) + Items.CritChance + Tree.CritChance;
+    public float CritChance => BaseCritChance * MathF.Max(0f, 1f + 0.20f * LevelOf(MageUpgrade.FrozenPrecision) + Items.CritChance + Tree.CritChance);
 
     /// <summary>How many times normal damage a critical bolt does.</summary>
     public float CritMultiplier => BaseCritMultiplier + 0.15f * LevelOf(MageUpgrade.FrozenPrecision) + Items.CritDamage + Tree.CritDamage;

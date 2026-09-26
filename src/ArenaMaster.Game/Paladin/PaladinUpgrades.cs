@@ -49,7 +49,7 @@ internal static class PaladinUpgrades
         new PaladinUpgradeInfo(PaladinUpgrade.Gleaner, "Gleaner", 4, "+35% pickup range"),
         new PaladinUpgradeInfo(PaladinUpgrade.SanctifiedGround, "Sanctified Ground", 4, "Holy circles heal 25% more"),
         new PaladinUpgradeInfo(PaladinUpgrade.ShieldSlam, "Shield Slam", 3, "Blocking a blow deals 15 damage to the attacker"),
-        new PaladinUpgradeInfo(PaladinUpgrade.ZealotsEye, "Zealot's Eye", 4, "+6% critical chance, +15% critical damage"),
+        new PaladinUpgradeInfo(PaladinUpgrade.ZealotsEye, "Zealot's Eye", 4, "+20% increased critical chance, +15% critical damage"),
         new PaladinUpgradeInfo(PaladinUpgrade.Steadfast, "Steadfast", 3, "+5% block chance while standing still"),
         new PaladinUpgradeInfo(PaladinUpgrade.BrambleMail, "Bramble Mail", 3, "Thorns strike 20% more often"),
     };

@@ -81,7 +81,7 @@ internal static class AlignmentTree
         Minor("insulated", "Insulated", 3, 900, A, 3, new[] { "grounding" }, "{Damage taken cut}% less damage taken.", (DamageTakenCut, 5)),
 
         // Tier 4 (level 10)
-        Minor("overload", "Overload", 4, 120, T, 5, new[] { "heavycore" }, "+{Crit chance}% critical chance and +{Crit damage}% critical damage.", (CritChance, 4), (CritDamage, 10)),
+        Minor("overload", "Overload", 4, 120, T, 5, new[] { "heavycore" }, "+{Crit chance}% increased critical chance and +{Crit damage}% critical damage.", (CritChance, 10), (CritDamage, 10)),
         Major(Supercell, "Supercell", 4, 250, T, new[] { Thunderclap, "heavycore" }, "Every 5th cast lobs a supercell: twice the size, twice the damage, and three more bounces."),
         Major(LightningRod, "Lightning Rod", 4, 400, C, new[] { "longarc" }, "A tree or rock the ball glances off stays charged for 4 s, zapping every enemy within 4 m of it twice a second."),
         Minor("conductivity", "Conductivity", 4, 530, C, 2, new[] { ChainReaction, "longarc" }, "Every fork reaches {Forks} more enemies.", (Forks, 1)),

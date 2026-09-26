@@ -24,7 +24,11 @@ internal sealed class PaladinStats
     public const float BaseCircleDps = 10f;
     public const float BaseCircleHealing = 2f;
 
-    public const float BaseCritChance = 0.05f;
+    /// <summary>
+    /// The class's own critical chance. Everything else only scales it: the level-up, the tree and items add <i>increased</i> critical chance, so +100% doubles
+    /// the base.
+    /// </summary>
+    public const float BaseCritChance = 0.06f;
     public const float BaseCritMultiplier = 2f;
 
     /// <summary>The big shield: the chance to block with nothing else, and the most block chance can reach.</summary>
@@ -133,7 +137,7 @@ internal sealed class PaladinStats
     /// <summary>What a block does to the attacker: the tree's Shield Bash and the run's Shield Slam.</summary>
     public float BashDamage => Tree.BashDamage + 15f * LevelOf(PaladinUpgrade.ShieldSlam);
 
-    public float CritChance => BaseCritChance + 0.06f * LevelOf(PaladinUpgrade.ZealotsEye) + Items.CritChance + Tree.CritChance;
+    public float CritChance => BaseCritChance * MathF.Max(0f, 1f + 0.20f * LevelOf(PaladinUpgrade.ZealotsEye) + Items.CritChance + Tree.CritChance);
 
     /// <summary>How many times normal damage a critical nova hit does.</summary>
     public float CritMultiplier => BaseCritMultiplier + 0.15f * LevelOf(PaladinUpgrade.ZealotsEye) + Items.CritDamage + Tree.CritDamage;

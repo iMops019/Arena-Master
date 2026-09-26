@@ -24,7 +24,11 @@ internal sealed class RangerStats
     public const float BaseMoveSpeed = 7f;
     public const float BaseArrowSpeed = 50f;
     public const float BaseRange = 60f;
-    public const float BaseCritChance = 0.05f;
+    /// <summary>
+    /// The class's own critical chance. Everything else only scales it: the level-up, the tree and items add <i>increased</i> critical chance, so +100% doubles
+    /// the base.
+    /// </summary>
+    public const float BaseCritChance = 0.10f;
     public const float BaseCritMultiplier = 2f;
     public const float BasePickupRadius = 3f;
     public const float BaseMaxHealth = 100f;
@@ -106,7 +110,7 @@ internal sealed class RangerStats
 
     public float ChainRange => BaseChainRange * (1f + Tree.ChainRange);
 
-    public float CritChance => MathF.Max(0f, BaseCritChance + 0.08f * LevelOf(RangerUpgrade.Deadeye) + Items.CritChance + Tree.CritChance - (Tree.Deadeye ? 0.05f : 0f));
+    public float CritChance => BaseCritChance * MathF.Max(0f, 1f + 0.20f * LevelOf(RangerUpgrade.Deadeye) + Items.CritChance + Tree.CritChance - (Tree.Deadeye ? 0.25f : 0f));
 
     /// <summary>How many times normal damage a critical hit does.</summary>
     public float CritMultiplier => (Tree.Deadeye ? 3f : BaseCritMultiplier) + Items.CritDamage + Tree.CritDamage;

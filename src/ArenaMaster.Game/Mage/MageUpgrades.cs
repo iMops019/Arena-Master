@@ -50,7 +50,7 @@ internal static class MageUpgrades
         new MageUpgradeInfo(MageUpgrade.ArcaneVigor, "Arcane Vigor", 5, "+15 max health, and heal 15"),
         new MageUpgradeInfo(MageUpgrade.FleetStep, "Fleet Step", 5, "+8% move speed"),
         new MageUpgradeInfo(MageUpgrade.Attunement, "Attunement", 4, "+35% pickup range"),
-        new MageUpgradeInfo(MageUpgrade.FrozenPrecision, "Frozen Precision", 4, "+6% critical chance, +15% critical damage"),
+        new MageUpgradeInfo(MageUpgrade.FrozenPrecision, "Frozen Precision", 4, "+20% increased critical chance, +15% critical damage"),
         new MageUpgradeInfo(MageUpgrade.GlacialSpikes, "Glacial Spikes", 4, "+20% damage to chilled and frozen enemies"),
         new MageUpgradeInfo(MageUpgrade.IceArmor, "Ice Armor", 3, "Take 6% less damage"),
         new MageUpgradeInfo(MageUpgrade.Shatterpoint, "Shatterpoint", 4, "+15% damage to elites and bosses"),

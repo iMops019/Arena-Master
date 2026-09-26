@@ -48,7 +48,7 @@ internal static class ShamanUpgrades
         new ShamanUpgradeInfo(ShamanUpgrade.EarthenHide, "Earthen Hide", 5, "+20 max health, and heal 20"),
         new ShamanUpgradeInfo(ShamanUpgrade.Stormstride, "Stormstride", 5, "+8% move speed"),
         new ShamanUpgradeInfo(ShamanUpgrade.Magnetism, "Magnetism", 4, "+35% pickup range"),
-        new ShamanUpgradeInfo(ShamanUpgrade.Overcharge, "Overcharge", 4, "+6% critical chance, +15% critical damage"),
+        new ShamanUpgradeInfo(ShamanUpgrade.Overcharge, "Overcharge", 4, "+20% increased critical chance, +15% critical damage"),
         new ShamanUpgradeInfo(ShamanUpgrade.StormBolt, "Storm Bolt", 3, "Balls last 1 s longer"),
         new ShamanUpgradeInfo(ShamanUpgrade.Conductive, "Conductive", 4, "+20% fork damage"),
         new ShamanUpgradeInfo(ShamanUpgrade.HeavySphere, "Heavy Sphere", 3, "+20% ball size"),

@@ -117,11 +117,11 @@ internal static class GearCatalog
                 b.Regeneration += 1f;
             }),
         new("gamblers_die", "Gambler's Die", GearSlot.Trinket,
-            "+10% critical chance. +1 level-up reroll per run.",
+            "+40% increased critical chance. +1 level-up reroll per run.",
             "Six sides, all of them lucky. Just not always for you.",
             b =>
             {
-                b.CritChance += 0.10f;
+                b.CritChance += 0.40f;
                 b.Rerolls += 1;
             }),
     };

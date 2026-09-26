@@ -228,7 +228,7 @@ public class SharpshooterEffectTests
 
         Assert.Equal(RangerStats.BaseDamage * 1.5f, stats.Damage, 3);
         Assert.Equal(RangerStats.BaseFireInterval / 1.5f, stats.FireInterval, 4);
-        Assert.Equal(RangerStats.BaseCritChance + 0.08f, stats.CritChance, 4);
+        Assert.Equal(RangerStats.BaseCritChance * 1.2f, stats.CritChance, 4);
         Assert.Equal(RangerStats.BaseCritMultiplier + 0.2f, stats.CritMultiplier, 4);
     }
 
@@ -255,7 +255,7 @@ public class SharpshooterEffectTests
         var stats = With(("steady", 2), (SharpshooterTree.Deadeye, 1));
 
         Assert.Equal(3f + 0.2f, stats.CritMultiplier, 4);
-        Assert.Equal(RangerStats.BaseCritChance + 0.08f - 0.05f, stats.CritChance, 4);
+        Assert.Equal(RangerStats.BaseCritChance * (1f + 0.2f - 0.25f), stats.CritChance, 4);
     }
 
     [Fact]

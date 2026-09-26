@@ -38,6 +38,25 @@ public class ItemTests
     }
 
     [Fact]
+    public void CritChance_ScalesEachClasssOwnBase()
+    {
+        Assert.Equal(0.10f, RangerStats.BaseCritChance);
+        Assert.Equal(0.08f, Mage.MageStats.BaseCritChance);
+
+        var ranger = new RangerStats { Items = new ItemBonuses { CritChance = 1f } };   // +100% increased
+        var mage = new Mage.MageStats { Items = new ItemBonuses { CritChance = 1f } };
+        Assert.Equal(0.20f, ranger.CritChance, 4);
+        Assert.Equal(0.16f, mage.CritChance, 4);
+
+        for (int i = 0; i < 5; i++)
+        {
+            ranger.Increase(RangerUpgrade.Deadeye);   // the whole level-up line: +100% more
+        }
+
+        Assert.Equal(0.30f, ranger.CritChance, 4);
+    }
+
+    [Fact]
     public void CopiesPastAnItemsCap_DontCount()
     {
         var inventory = new ItemInventory();
@@ -87,13 +106,13 @@ public class ItemTests
         stats.Increase(RangerUpgrade.SharpenedTips);   // +20%
         var inventory = new ItemInventory();
         inventory.Add(Item("whetstone"));                // +8%, added to the upgrade
-        inventory.Add(Item("hunters_moon"));             // x1.35 on top, and +10% crit
+        inventory.Add(Item("hunters_moon"));             // x1.35 on top, and +40% increased crit
         inventory.Add(Item("troll_heart"));
         inventory.Add(Item("serrated_edge"));
         stats.Items = inventory.Bonuses;
 
         Assert.Equal(RangerStats.BaseDamage * 1.28f * 1.35f, stats.Damage, 3);
-        Assert.Equal(RangerStats.BaseCritChance + 0.10f, stats.CritChance, 4);
+        Assert.Equal(RangerStats.BaseCritChance * 1.4f, stats.CritChance, 4);
         Assert.Equal(RangerStats.BaseCritMultiplier + 0.30f, stats.CritMultiplier, 4);
         Assert.Equal(RangerStats.BaseMaxHealth + 25f, stats.MaxHealth);
 

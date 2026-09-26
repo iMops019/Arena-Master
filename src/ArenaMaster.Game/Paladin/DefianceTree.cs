@@ -89,7 +89,7 @@ internal static class DefianceTree
         Minor("guard", "Mending Guard", 4, 250, B, 3, new[] { "bash" }, "Blocking a blow heals {Heal on block} health.", (BlockHeal, 1.5f)),
         Minor("spite", "Spiteful Thorns", 4, 370, R, 3, new[] { "barbed" }, "+{Thorns damage bonus}% thorns damage.", (ThornsBonus, 25)),
         Major(Retribution, "Retribution", 4, 470, R, new[] { "barbed", "quicken" }, "Every blow that reaches you, landed or blocked, is paid back: the attacker takes 200% of it."),
-        Minor("judgement", "Judgement", 4, 590, H, 5, new[] { EchoingNova }, "+{Crit chance}% critical chance and +{Crit damage}% critical damage.", (CritChance, 4), (CritDamage, 10)),
+        Minor("judgement", "Judgement", 4, 590, H, 5, new[] { EchoingNova }, "+{Crit chance}% increased critical chance and +{Crit damage}% critical damage.", (CritChance, 10), (CritDamage, 10)),
         Major(ConsecratedGround, "Consecrated Ground", 4, 730, C, new[] { "lingering" }, "Holy circles' healing stacks: you heal for every circle you stand in."),
         Minor("soothing", "Soothing Light", 4, 860, C, 3, new[] { "lingering", "sanctum" }, "+{Holy circle healing}% holy circle healing.", (CircleHealing, 25)),
 

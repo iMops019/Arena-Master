@@ -23,7 +23,7 @@ public class NewLevelUpTests
 
         Assert.Equal(PaladinStats.BaseCircleHealing * 1.25f, stats.CircleHealing, 3);
         Assert.Equal(12f + 15f, stats.BashDamage, 3);
-        Assert.Equal(PaladinStats.BaseCritChance + 0.06f, stats.CritChance, 3);
+        Assert.Equal(PaladinStats.BaseCritChance * 1.2f, stats.CritChance, 3);
         Assert.Equal(stats.BlockChance(false, false) + 0.05f, stats.BlockChance(true, false), 3);
         Assert.Equal(PaladinStats.BaseThornsInterval / 1.2f, stats.ThornsInterval, 3);
     }

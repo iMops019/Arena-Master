@@ -59,11 +59,11 @@ internal static class SharpshooterTree
     public static readonly TreeDefinition Tree = new(TreeId, "Sharpshooter", new[]
     {
         // Tier 1 (level 1): the two starting choices.
-        Minor("steady", "Steady Hands", 1, 360, P, 5, Array.Empty<string>(), "+{Crit chance}% critical chance and +{Crit damage}% critical damage.", (CritChance, 4), (CritDamage, 10)),
+        Minor("steady", "Steady Hands", 1, 360, P, 5, Array.Empty<string>(), "+{Crit chance}% increased critical chance and +{Crit damage}% critical damage.", (CritChance, 10), (CritDamage, 10)),
         Minor("honed", "Honed Draw", 1, 580, V, 5, Array.Empty<string>(), "+{Damage}% damage and +{Attack speed}% attack speed.", (Damage, 10), (AttackSpeed, 10)),
 
         // Tier 2 (level 3)
-        Minor("keen", "Keen Eye", 2, 150, P, 5, new[] { "steady" }, "+{Crit chance}% critical chance.", (CritChance, 3)),
+        Minor("keen", "Keen Eye", 2, 150, P, 5, new[] { "steady" }, "+{Crit chance}% increased critical chance.", (CritChance, 8)),
         Minor("weak", "Weak Spots", 2, 270, P, 5, new[] { "steady" }, "+{Crit damage}% critical damage.", (CritDamage, 15)),
         Minor("nock", "Rapid Nock", 2, 400, V, 5, new[] { "steady", "honed" }, "+{Attack speed}% attack speed.", (AttackSpeed, 6)),
         Minor("barbed", "Barbed Arrows", 2, 530, T, 5, new[] { "honed" }, "+{Damage}% damage.", (Damage, 8)),
@@ -80,7 +80,7 @@ internal static class SharpshooterTree
 
         // Tier 4 (level 10)
         Minor("patient", "Patient Hunter", 4, 140, P, 3, new[] { "mark" }, "+{Damage to healthy enemies}% damage to enemies above 80% health.", (HealthyDamage, 20)),
-        Major(Deadeye, "Deadeye", 4, 280, P, new[] { "mark" }, "Critical hits deal triple damage instead of double. -5% critical chance."),
+        Major(Deadeye, "Deadeye", 4, 280, P, new[] { "mark" }, "Critical hits deal triple damage instead of double. -25% increased critical chance."),
         Minor("weight", "Draw Weight", 4, 420, V, 3, new[] { "survivalist", TwinShot }, "+{Damage}% damage and {Attack speed}% attack speed. A heavier draw, harder hits.", (Damage, 12), (AttackSpeed, -4)),
         Minor("momentum", "Momentum", 4, 550, V, 3, new[] { TwinShot }, "Each kill gives +{Attack speed per recent kill}% attack speed for 3 s, stacking up to 15 times.", (MomentumPerKill, 1)),
         Minor("seeker", "Seeker Fletching", 4, 700, T, 3, new[] { "ricochet", "penetrate" }, "Chained arrows find a new target up to {Chain range}% further away.", (ChainRange, 25)),
@@ -94,7 +94,7 @@ internal static class SharpshooterTree
         Minor("windrunner", "Wind Runner", 5, 840, T, 3, new[] { "recovery", "seeker" }, "+{Move speed}% move speed and +{Dash distance}% dash distance.", (MoveSpeed, 5), (DashDistance, 10)),
 
         // Tier 6 (level 21)
-        Minor("lethal", "Lethal Precision", 6, 160, P, 3, new[] { "executioner", "headhunter" }, "+{Crit chance}% critical chance.", (CritChance, 5)),
+        Minor("lethal", "Lethal Precision", 6, 160, P, 3, new[] { "executioner", "headhunter" }, "+{Crit chance}% increased critical chance.", (CritChance, 12)),
         Major(SnipersFocus, "Sniper's Focus", 6, 300, P, new[] { "headhunter" }, "Stand still for 1 s and your next arrow deals +150% damage and pierces every enemy in its path."),
         Minor("storm", "Arrowstorm", 6, 440, V, 3, new[] { RainOfArrows }, "Rain of Arrows drops {Rain arrows} more arrows.", (RainArrows, 4)),
         Minor("hardened", "Hardened Leathers", 6, 575, V, 3, new[] { "quiver" }, "+{Max health} max health and {Damage taken cut}% less damage taken.", (MaxHealth, 15), (DamageTakenCut, 5)),

@@ -40,7 +40,11 @@ internal sealed class ShamanStats
     public const float BaseForkRange = 6f;
     public const float BaseForkShare = 0.6f;
 
-    public const float BaseCritChance = 0.05f;
+    /// <summary>
+    /// The class's own critical chance. Everything else only scales it: the level-up, the tree and items add <i>increased</i> critical chance, so +100% doubles
+    /// the base.
+    /// </summary>
+    public const float BaseCritChance = 0.07f;
     public const float BaseCritMultiplier = 2f;
 
     /// <summary>The surge on Shift: a quick crackling dash.</summary>
@@ -154,7 +158,7 @@ internal sealed class ShamanStats
     /// <summary>What the fixed areas (the rods, the eye, the Thunder God's burst) are scaled by: an item's area.</summary>
     public float AreaScale => (1f + Items.Area) * Items.AreaMultiplier;
 
-    public float CritChance => BaseCritChance + 0.06f * LevelOf(ShamanUpgrade.Overcharge) + Items.CritChance + Tree.CritChance;
+    public float CritChance => BaseCritChance * MathF.Max(0f, 1f + 0.20f * LevelOf(ShamanUpgrade.Overcharge) + Items.CritChance + Tree.CritChance);
 
     public float CritMultiplier => BaseCritMultiplier + 0.15f * LevelOf(ShamanUpgrade.Overcharge) + Items.CritDamage + Tree.CritDamage;
 

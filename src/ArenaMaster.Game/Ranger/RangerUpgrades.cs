@@ -35,7 +35,7 @@ internal static class RangerUpgrades
         new RangerUpgradeInfo(RangerUpgrade.QuickDraw, "Quick Draw", 5, "+15% attack speed"),
         new RangerUpgradeInfo(RangerUpgrade.SplitShot, "Split Shot", 4, "+1 arrow per shot, fanned out"),
         new RangerUpgradeInfo(RangerUpgrade.PiercingArrows, "Piercing Arrows", 3, "Arrows pass through 1 more enemy"),
-        new RangerUpgradeInfo(RangerUpgrade.Deadeye, "Deadeye", 5, "+8% critical chance (crits deal double)"),
+        new RangerUpgradeInfo(RangerUpgrade.Deadeye, "Deadeye", 5, "+20% increased critical chance (crits deal double)"),
         new RangerUpgradeInfo(RangerUpgrade.Fletching, "Fletching", 3, "+20% arrow speed, +15% range"),
         new RangerUpgradeInfo(RangerUpgrade.FleetFoot, "Fleet Foot", 5, "+8% move speed"),
         new RangerUpgradeInfo(RangerUpgrade.Vitality, "Vitality", 5, "+20 max health, and heal 20"),

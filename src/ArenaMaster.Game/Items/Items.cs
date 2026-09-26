@@ -28,6 +28,7 @@ internal sealed class ItemBonuses
     public float MoveSpeed;
     public float Pickup;
     public float ExperienceGain;
+    /// <summary>Increased critical chance: a share of the class's base (0.25 = +25%, so a 10% base becomes 12.5%).</summary>
     public float CritChance;
 
     /// <summary>Added to how many times normal damage a critical hit does.</summary>
@@ -214,7 +215,7 @@ internal static class ItemCatalog
         new("old_tome", "Old Tome", ItemRarity.Common, "+8% experience", b => b.ExperienceGain += 0.08f),
 
         // Rare: bigger bonuses, and a few new effects.
-        new("hawk_feather", "Hawk Feather", ItemRarity.Rare, "+6% critical chance", b => b.CritChance += 0.06f),
+        new("hawk_feather", "Hawk Feather", ItemRarity.Rare, "+25% increased critical chance", b => b.CritChance += 0.25f),
         new("troll_heart", "Troll Heart", ItemRarity.Rare, "+25 max health", b => b.MaxHealth += 25f),
         new("vampire_fang", "Vampire Fang", ItemRarity.Rare, "Heal 1 health per kill", b => b.HealOnKill += 1f),
         new("serrated_edge", "Serrated Edge", ItemRarity.Rare, "Critical hits deal +30% more", b => b.CritDamage += 0.30f),
@@ -233,11 +234,11 @@ internal static class ItemCatalog
             b.Ward += 20f;
             b.WardShield += 0.25f;
         }),
-        new("lens_of_clarity", "Lens of Clarity", ItemRarity.Rare, "+20% projectile speed and range, +5% critical chance", b =>
+        new("lens_of_clarity", "Lens of Clarity", ItemRarity.Rare, "+20% projectile speed and range, +20% increased critical chance", b =>
         {
             b.ProjectileSpeed += 0.20f;
             b.Range += 0.20f;
-            b.CritChance += 0.05f;
+            b.CritChance += 0.20f;
         }),
 
         // For everyone.
@@ -299,10 +300,10 @@ internal static class ItemCatalog
             b.MaxHealth += 60f;
             b.Regeneration += 1.5f;
         }),
-        new("hunters_moon", "Hunter's Moon", ItemRarity.Legendary, "x1.35 damage, +10% critical chance", b =>
+        new("hunters_moon", "Hunter's Moon", ItemRarity.Legendary, "x1.35 damage, +40% increased critical chance", b =>
         {
             b.DamageMultiplier *= 1.35f;
-            b.CritChance += 0.10f;
+            b.CritChance += 0.40f;
         }),
         new("martyrs_crown", "Martyr's Crown", ItemRarity.Legendary, "Blows that reach you are paid back at 150%, and heal you 1% each", b =>
         {

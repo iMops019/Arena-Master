@@ -80,7 +80,7 @@ internal static class FrostTree
 
         // Tier 4 (level 10)
         Major(DeepFreeze, "Deep Freeze", 4, 140, W, new[] { "brittle", "lingering" }, "Frost hits on chilled enemies have a 10% chance to freeze them solid for 1.2 s (half as long for elites). Bosses can't be frozen."),
-        Minor("keen", "Keen Frost", 4, 270, W, 5, new[] { "lingering" }, "+{Crit chance}% critical chance and +{Crit damage}% critical damage.", (CritChance, 4), (CritDamage, 10)),
+        Minor("keen", "Keen Frost", 4, 270, W, 5, new[] { "lingering" }, "+{Crit chance}% increased critical chance and +{Crit damage}% critical damage.", (CritChance, 10), (CritDamage, 10)),
         Minor("blastwave", "Blast Wave", 4, 400, B, 3, new[] { FrostBlast }, "+{Frost Blast radius}% Frost Blast radius and +{Frost Blast damage}% Frost Blast damage.", (BlastRadius, 20), (BlastDamage, 15)),
         Minor("volley", "Volley of Ice", 4, 530, B, 2, new[] { "swift", FrostBlast }, "Frost Barrage fires {Projectiles} more projectiles.", (Projectiles, 1)),
         Major(ShatteringWard, "Shattering Ward", 4, 680, D, new[] { "thickice" }, "When your Frost Shield breaks, it bursts: 300% of a bolt's damage to every enemy within 4 m, chilling them."),
