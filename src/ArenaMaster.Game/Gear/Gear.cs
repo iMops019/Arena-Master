@@ -65,6 +65,15 @@ internal static class GearCatalog
                 b.DashRecharge += 0.30f;
             }),
 
+        new("berserkers_hide", "Berserker's Hide", GearSlot.BodyArmour,
+            "+40 max health. Up to +30% damage as your health drops.",
+            "Tanned from something that didn't know when to stop. Neither will you.",
+            b =>
+            {
+                b.MaxHealth += 40f;
+                b.LowHealthDamage += 0.30f;
+            }),
+
         // Weapons
         new("kingsbane", "Kingsbane", GearSlot.Weapon,
             "x1.4 damage to elites and bosses.",
@@ -89,6 +98,15 @@ internal static class GearCatalog
             {
                 b.Damage += 0.10f;
                 b.HealOnKill += 2f;
+            }),
+
+        new("worldsplitter", "Worldsplitter", GearSlot.Weapon,
+            "x1.3 area. +10% damage.",
+            "Swung once in anger, it left a valley. The valley is still angry.",
+            b =>
+            {
+                b.AreaMultiplier *= 1.3f;
+                b.Damage += 0.10f;
             }),
 
         // Trinkets
@@ -124,6 +142,10 @@ internal static class GearCatalog
                 b.CritChance += 0.40f;
                 b.Rerolls += 1;
             }),
+        new("blood_chalice", "Blood Chalice", GearSlot.Trinket,
+            "Heal 1 health for every 40 damage you deal.",
+            "It is never empty. Best not to ask what fills it.",
+            b => b.LifePerDamage += 1f / 40f),
     };
 
     public static GearPiece? Find(string id) => All.FirstOrDefault(p => p.Id == id);

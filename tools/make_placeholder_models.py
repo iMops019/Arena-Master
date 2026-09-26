@@ -6,6 +6,9 @@
   holy_circle.glb         a flat holy circle of radius 1: a gold ring with an inner ring and a cross, the ground a nova leaves
   mage_placeholder.glb    the Mage (a long blue robe, a pointed hat, a white beard, a staff crowned with an ice crystal)
   shaman_placeholder.glb  the Shaman (a fur mantle over a hide tunic, a bone mask with antlers, blue war paint, a totem staff crowned with a crackling orb)
+  warrior_placeholder.glb the Warrior (a bare, war-painted chest under a fur mantle, a horned iron helm, a beard, fur boots, an axe in each hand)
+  cleave_wave.glb         one piece of a Cleave's wave front: a flat glowing band 1 m long along X, its bright edge at +Z (outward), laid along the
+                          wave's arc and scaled to each piece's length
   lightning_ball.glb      a ball of lightning: a spiky pale-blue orb with a white core, radius 0.35, centred on its middle
   lightning_arc.glb       one piece of a lightning bolt: a thin bright bar 1 m long along Z, centred on its middle (scaled to each piece's length)
   lightning_zap.glb       a flat pale-blue ring of radius 1, scaled as a zap spreads over the ground
@@ -44,7 +47,7 @@
                           the archery target (the passive tree station), the departure gate (a gatehouse set in the palisade: two
                           towers and closed doors, the way into a run), the bounty board (a notice board with papers pinned to it),
                           the quartermaster's stall (a counter under an awning) and the weapon rack (the class station: a bow, an
-                          ice staff, a totem, and a shield with a flail)
+                          ice staff, a totem, a shield with a flail, and a pair of axes)
   camp_wall.glb, camp_wall_post.glb   the palisade round the camp: a 3.5 m piece of sharpened logs, and the thick post at each corner
   camp_barrel.glb, camp_crates.glb, camp_woodpile.glb, camp_bench.glb, camp_banner.glb, camp_brazier.glb, camp_haybale.glb,
   camp_dummy.glb, camp_well.glb, camp_cart.glb, camp_cookpot.glb, camp_bedroll.glb, camp_lantern.glb, camp_sacks.glb
@@ -414,6 +417,65 @@ def build_shaman():
     return m
 
 
+def build_warrior():
+    m = Mesh()
+    # Fur boots and leather trousers
+    m.box(-0.21, 0.0, -0.09, -0.03, 0.22, 0.14, "fur")
+    m.box(0.03, 0.0, -0.09, 0.21, 0.22, 0.14, "fur")
+    m.box(-0.19, 0.22, -0.08, -0.04, 0.84, 0.08, "leather")
+    m.box(0.04, 0.22, -0.08, 0.19, 0.84, 0.08, "leather")
+    # A wide belt with an iron buckle, and a hide kilt over the hips
+    m.box(-0.27, 0.80, -0.15, 0.27, 0.90, 0.15, "chest_dark")
+    m.box(-0.05, 0.81, 0.15, 0.05, 0.89, 0.16, "iron")
+    m.box(-0.25, 0.62, -0.14, 0.25, 0.80, 0.14, "hide")
+    # A bare chest, broad, with red war paint across it
+    m.box(-0.28, 0.90, -0.14, 0.28, 1.46, 0.14, "skin")
+    m.box(-0.285, 1.18, 0.14, 0.285, 1.23, 0.145, "target_red")
+    m.box(-0.06, 0.96, 0.14, 0.06, 1.18, 0.145, "target_red")
+    # A fur mantle over the shoulders and down the back
+    m.box(-0.40, 1.32, -0.18, 0.40, 1.52, 0.16, "fur")
+    m.box(-0.30, 0.70, -0.20, 0.30, 1.40, -0.14, "fur")
+    # Bare, heavy arms with leather bracers, and fists
+    m.box(-0.44, 0.92, -0.08, -0.28, 1.38, 0.08, "skin")
+    m.box(0.28, 0.92, -0.08, 0.44, 1.38, 0.08, "skin")
+    m.box(-0.445, 0.84, -0.085, -0.275, 0.98, 0.085, "leather")
+    m.box(0.275, 0.84, -0.085, 0.445, 0.98, 0.085, "leather")
+    m.box(-0.43, 0.74, -0.06, -0.29, 0.85, 0.08, "skin")
+    m.box(0.29, 0.74, -0.06, 0.43, 0.85, 0.08, "skin")
+    # Head, a thick beard, and a horned iron helm
+    m.box(-0.13, 1.48, -0.13, 0.13, 1.74, 0.13, "skin")
+    m.box(-0.13, 1.40, 0.08, 0.13, 1.60, 0.17, "brute_hide")
+    m.box(-0.09, 1.62, 0.13, -0.03, 1.66, 0.135, "dark")
+    m.box(0.03, 1.62, 0.13, 0.09, 1.66, 0.135, "dark")
+    m.box(-0.15, 1.70, -0.15, 0.15, 1.86, 0.15, "iron")
+    m.box(-0.02, 1.58, 0.13, 0.02, 1.72, 0.16, "iron")   # the nasal guard
+    for side in (-1, 1):
+        x = side * 0.15
+        m.box(min(x, side * 0.26), 1.76, -0.03, max(x, side * 0.26), 1.82, 0.03, "horn")
+        m.box(min(side * 0.24, side * 0.29), 1.82, -0.03, max(side * 0.24, side * 0.29), 2.00, 0.03, "horn")
+    # An axe in each hand: a haft held down and forward, a broad steel head at the top with its edge outward, an iron spike behind it
+    for side in (-1, 1):
+        hx = side * 0.36
+        m.box(hx - 0.03, 0.55, 0.06, hx + 0.03, 1.32, 0.12, "wood")
+        m.box(hx - 0.035, 0.74, 0.055, hx + 0.035, 0.84, 0.125, "leather")      # the grip
+        blade0, blade1 = sorted((hx + side * 0.03, hx + side * 0.20))
+        m.box(blade0, 1.06, 0.07, blade1, 1.32, 0.11, "steel")
+        edge0, edge1 = sorted((hx + side * 0.20, hx + side * 0.23))
+        m.box(edge0, 1.02, 0.075, edge1, 1.36, 0.105, "fletching")               # the bright edge
+        spike0, spike1 = sorted((hx - side * 0.03, hx - side * 0.11))
+        m.box(spike0, 1.18, 0.075, spike1, 1.24, 0.105, "iron")
+    return m
+
+
+def build_cleave_wave():
+    """One piece of a Cleave's wave front: a flat band 1 m long along X, a bright edge at the front (+Z) and a hot glow trailing behind it."""
+    m = Mesh()
+    for x0, z0, x1, z1, y, colour in ((-0.5, -0.50, 0.5, -0.20, 0.0, "fire"), (-0.5, -0.20, 0.5, 0.02, 0.005, "shock"),
+                                      (-0.5, 0.02, 0.5, 0.14, 0.01, "fire_light")):
+        m.quad((x0, y, z1), (x1, y, z1), (x1, y, z0), (x0, y, z0), (0, 1, 0), colour)
+    return m
+
+
 def build_lightning_ball():
     """A ball of lightning, radius 0.35: a spiky pale-blue orb with the white core poking through."""
     m = Mesh()
@@ -478,6 +540,11 @@ def build_rack():
     m.box(-0.84, 0.0, 0.02, -0.79, 1.55, 0.07, "wood")
     m.box(-0.86, 1.30, 0.0, -0.77, 1.38, 0.09, "fur")
     m.pyramid(-0.88, 1.55, -0.01, -0.75, 1.55, 0.10, (-0.815, 1.75, 0.045), "spark")
+    # The Warrior's two axes, hung between the staff and the shield
+    m.box(0.02, 0.95, 0.05, 0.05, 1.72, 0.08, "wood")
+    m.box(-0.07, 1.42, 0.08, 0.02, 1.66, 0.10, "steel")
+    m.box(0.12, 0.95, 0.08, 0.15, 1.72, 0.11, "wood")
+    m.box(0.15, 1.42, 0.11, 0.24, 1.66, 0.13, "steel")
     return m
 
 
@@ -1543,7 +1610,7 @@ if __name__ == "__main__":
     for name, build in (("ranger_placeholder.glb", build_ranger), ("paladin_placeholder.glb", build_paladin),
                         ("holy_nova.glb", lambda: build_ring(0.88, 1.0, "holy")), ("holy_circle.glb", build_holy_circle),
                         ("mage_placeholder.glb", build_mage), ("frost_bolt.glb", build_frost_bolt),
-                        ("shaman_placeholder.glb", build_shaman), ("lightning_ball.glb", build_lightning_ball),
+                        ("shaman_placeholder.glb", build_shaman), ("warrior_placeholder.glb", build_warrior), ("cleave_wave.glb", build_cleave_wave), ("lightning_ball.glb", build_lightning_ball),
                         ("lightning_arc.glb", build_lightning_arc), ("lightning_zap.glb", lambda: build_ring(0.85, 1.0, "spark")),
                         ("frost_blast.glb", lambda: build_ring(0.86, 1.0, "ice_light")), ("frost_shard.glb", build_frost_shard),
                         ("aegis_burst.glb", lambda: build_ring(0.9, 1.0, "holy_light")), ("thunderstone_bolt.glb", build_lightning_arc),

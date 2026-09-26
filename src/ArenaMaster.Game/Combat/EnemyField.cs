@@ -185,7 +185,9 @@ internal sealed record HitEffects(
     float ChillSlow = 0f,
     float ChillSeconds = 0f,
     float FreezeChance = 0f,
-    float FreezeSeconds = 0f)
+    float FreezeSeconds = 0f,
+    float ExecuteBelow = 0f,
+    float WoundedMultiplier = 1f)
 {
     public static readonly HitEffects None = new();
 }
@@ -252,6 +254,9 @@ internal sealed class EnemyField
 
     /// <summary>What every hit the player lands does besides its damage (see <see cref="HitEffects"/>). Set at the start of a run.</summary>
     public HitEffects HitEffects { get; set; } = HitEffects.None;
+
+    /// <summary>What every hit the player lands is multiplied by this frame, from items that build up during a run (Bloodfury, Berserker's Hide). Kept up to date by <see cref="Items.ItemEffects"/>.</summary>
+    public float DamageBoost { get; set; } = 1f;
 
     /// <summary>What the damage of the enemies' shots (bolts, fireballs) is multiplied by, from the items carried.</summary>
     public float RangedDamageTaken { get; set; } = 1f;
@@ -374,6 +379,17 @@ internal sealed class EnemyField
         if (enemy.Kind.Tier != EnemyTier.Fodder)
         {
             amount *= effects.EliteMultiplier;
+        }
+
+        if (enemy.Health < enemy.MaxHealth * 0.5f)
+        {
+            amount *= effects.WoundedMultiplier;
+        }
+
+        amount *= DamageBoost;
+        if (effects.ExecuteBelow > 0f && enemy.Kind.Tier != EnemyTier.Boss && !enemy.Kind.IsProp && enemy.Health <= enemy.MaxHealth * effects.ExecuteBelow)
+        {
+            amount = MathF.Max(amount, enemy.Health);   // finished off
         }
 
         enemy.Health -= amount;

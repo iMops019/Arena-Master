@@ -128,7 +128,7 @@ internal sealed class ItemBonuses
     public float Frenzy;
 
     /// <summary>Attack speed as it stands this moment: the flat bonus, Berserk's share and any Frenzy. Classes read this, not <see cref="AttackSpeed"/>.</summary>
-    public float AttackSpeedNow => AttackSpeed + Berserk * MissingHealth + Frenzy;
+    public float AttackSpeedNow => AttackSpeed + Berserk * MissingHealth + Frenzy + RageFallback;
 
     /// <summary>Enemies spawn with this much more health (Cursed Idol).</summary>
     public float EnemyHealth;
@@ -153,6 +153,39 @@ internal sealed class ItemBonuses
 
     /// <summary>More silver from a Delve cache.</summary>
     public float CacheSilver;
+
+    /// <summary>A hit on a non-boss below this share of its health kills it (Executioner's Hood).</summary>
+    public float ExecuteBelow;
+
+    /// <summary>What every hit on an enemy below half its health is multiplied by (Butcher's Cleaver).</summary>
+    public float WoundedDamage = 1f;
+
+    /// <summary>Health back for every blow blocked (Parrying Dagger).</summary>
+    public float BlockHeal;
+
+    /// <summary>Bloodfury: damage added for a while by every kill (see <see cref="ItemEffects.KillSeconds"/>), up to <see cref="ItemEffects.KillDamageCap"/>.</summary>
+    public float KillDamage;
+
+    /// <summary>Damage added at no health left, scaling with the share of health missing (Berserker's Hide), like <see cref="Berserk"/> for attack speed.</summary>
+    public float LowHealthDamage;
+
+    // Only the Warrior reads these: they speak of rage and the Cleave.
+
+    /// <summary>More rage the Warrior can hold, and seconds longer it lasts.</summary>
+    public float RageMax;
+    public float RageDuration;
+
+    /// <summary>With any, the Warrior's rage drains a point at a time when it runs out, instead of all at once (Horn of Fury).</summary>
+    public int RageDrains;
+
+    /// <summary>Rage for every kill.</summary>
+    public int RageOnKill;
+
+    /// <summary>A longer Cleave.</summary>
+    public float CleaveReach;
+
+    /// <summary>Attack speed for a class without rage; the Warrior gets rage instead (Berserker's Torc). Counted in <see cref="AttackSpeedNow"/>.</summary>
+    public float RageFallback;
 }
 
 /// <summary>
@@ -266,6 +299,36 @@ internal static class ItemCatalog
         new("conductors_coil", "Conductor's Coil", ItemRarity.Rare, "+1 chain: one more fork, arrow chain or bolt pierce (the Paladin: +10% nova damage)", b => b.Chains += 1),
         new("thunderstone", "Thunderstone", ItemRarity.Rare, "Every 6 s lightning strikes the nearest enemy for 40 damage", b => b.SkyStrike += 40f),
 
+        // Warrior-leaning: rage, the Cleave, blocking with a blade, the kill. Every class gets something from each.
+        new("war_paint", "War Paint", ItemRarity.Common, "+4% damage (the Warrior: +2 max rage too)", b =>
+        {
+            b.Damage += 0.04f;
+            b.RageMax += 2f;
+        }),
+        new("parrying_dagger", "Parrying Dagger", ItemRarity.Common, "+3% block chance, and every block heals 2", b =>
+        {
+            b.BlockChance += 0.03f;
+            b.BlockHeal += 2f;
+        }),
+        new("leather_grips", "Leather Grips", ItemRarity.Common, "+6% attack speed (the Warrior: +5% Cleave reach too)", b =>
+        {
+            b.AttackSpeed += 0.06f;
+            b.CleaveReach += 0.05f;
+        }),
+        new("executioners_hood", "Executioner's Hood", ItemRarity.Rare, "Your hits kill non-bosses below 8% health", b => b.ExecuteBelow += 0.08f),
+        new("berserkers_torc", "Berserker's Torc", ItemRarity.Rare, "+8% attack speed (the Warrior instead: +5 max rage, rage lasts 1 s longer)", b =>
+        {
+            b.RageFallback += 0.08f;
+            b.RageMax += 5f;
+            b.RageDuration += 1f;
+        }),
+        new("heavy_haft", "Heavy Haft", ItemRarity.Rare, "+15% area and +8% damage, but -5% attack speed", b =>
+        {
+            b.Area += 0.15f;
+            b.Damage += 0.08f;
+            b.AttackSpeed -= 0.05f;
+        }),
+
         // Epic: multipliers.
         new("rune_of_might", "Rune of Might", ItemRarity.Epic, "x1.2 damage", b => b.DamageMultiplier *= 1.2f),
         new("swiftwind_sigil", "Swiftwind Sigil", ItemRarity.Epic, "x1.15 attack speed", b => b.AttackSpeedMultiplier *= 1.15f),
@@ -292,6 +355,13 @@ internal static class ItemCatalog
             b.ExperienceGain += 0.40f;
             b.SilverGain += 0.40f;
             b.EnemyHealth += 0.15f;
+        }),
+
+        new("butchers_cleaver", "Butcher's Cleaver", ItemRarity.Epic, "x1.3 damage to enemies below half health", b => b.WoundedDamage *= 1.3f),
+        new("horn_of_fury", "Horn of Fury", ItemRarity.Epic, "x1.12 attack speed (the Warrior: rage drains a point at a time, not all at once)", b =>
+        {
+            b.AttackSpeedMultiplier *= 1.12f;
+            b.RageDrains += 1;
         }),
 
         // Legendary: big multipliers.
@@ -330,6 +400,11 @@ internal static class ItemCatalog
         {
             b.Chains += 2;
             b.AttackSpeedMultiplier *= 1.2f;
+        }),
+        new("bloodfury", "Bloodfury", ItemRarity.Legendary, "Every kill gives +1% damage for 5 s, up to +30% (the Warrior: and 1 rage)", b =>
+        {
+            b.KillDamage += 0.01f;
+            b.RageOnKill += 1;
         }),
         new("crown_of_plenty", "Crown of Plenty", ItemRarity.Legendary, "x1.2 damage, experience and silver", b =>
         {

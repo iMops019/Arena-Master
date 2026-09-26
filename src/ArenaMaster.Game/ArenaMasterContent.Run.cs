@@ -242,6 +242,7 @@ public sealed partial class ArenaMasterContent
         _enemies.HitEffects = HitEffects.None;
         _enemies.HealthBonus = 0f;
         _enemies.RangedDamageTaken = 1f;
+        _enemies.DamageBoost = 1f;
         _numbers.Clear();
         _levelUp.Close();
         _pendingLevels = 0;
@@ -260,6 +261,7 @@ public sealed partial class ArenaMasterContent
         _gems.Drop(killed.Position, killed.Kind.Experience);
         _health.Heal(_items.Carried.Bonuses.HealOnKill);
         _hero.OnKill(killed, _runSeconds);
+        _itemEffects.OnKill(_items.Carried.Bonuses);
 
         switch (killed.Kind.Tier)
         {

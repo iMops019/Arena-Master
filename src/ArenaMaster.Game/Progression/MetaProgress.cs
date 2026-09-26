@@ -177,6 +177,13 @@ internal static class Bounties
             (run, _, _) => run.ClassId == Mage && run.DelveCleared && run.Depth >= 10),
         new("deep_shaman", "Shaman of the Deep", "Clear a Delve node at depth 10 or deeper as the Shaman.", 200, null,
             (run, _, _) => run.ClassId == Shaman && run.DelveCleared && run.Depth >= 10),
+        new("deep_warrior", "Warrior of the Deep", "Clear a Delve node at depth 10 or deeper as the Warrior.", 200, "horn_of_fury",
+            (run, _, _) => run.ClassId == Warrior && run.DelveCleared && run.Depth >= 10),
+
+        // The Warrior's.
+        new("bloodbath", "Bloodbath", "Kill 1,500 enemies in one run as the Warrior.", 125, "butchers_cleaver", (run, _, _) => run.ClassId == Warrior && run.Kills >= 1500),
+        new("warlord", "Warlord", "Win a run as the Warrior.", 400, "bloodfury", (run, _, _) => run.ClassId == Warrior && run.Won),
+
         new("armourer", "Armourer", "Own 4 pieces of gear.", 150, null, (_, profile, _) => profile.Gear.Owned.Count >= 4),
         new("fully_kitted", "Fully Kitted", "Wear gear in all three slots.", 125, null, (_, profile, _) => Gear.GearCatalog.Worn(profile).Count() >= 3),
         new("armoury_complete", "The Full Armoury", "Own every piece of gear.", 750, null,
@@ -184,7 +191,7 @@ internal static class Bounties
     };
 
     // The class ids the class bounties ask for (the classes' own ids, kept here as text so the board doesn't reach into any class's code).
-    private const string Ranger = "ranger", Paladin = "paladin", Mage = "mage", Shaman = "shaman";
+    private const string Ranger = "ranger", Paladin = "paladin", Mage = "mage", Shaman = "shaman", Warrior = "warrior";
 
     /// <summary>Whether <paramref name="item"/> can come out of chests and drops: yes unless a bounty not yet done unlocks it.</summary>
     public static bool IsUnlocked(RunItem item, Profile profile) =>

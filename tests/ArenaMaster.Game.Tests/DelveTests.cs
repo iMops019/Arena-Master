@@ -403,13 +403,13 @@ public class BossFightTests
 public class GearTests
 {
     [Fact]
-    public void ThereAreFourUniquesForEachSlot()
+    public void ThereAreFiveUniquesForEachSlot()
     {
-        Assert.Equal(12, GearCatalog.All.Count);
+        Assert.Equal(15, GearCatalog.All.Count);
         Assert.Equal(GearCatalog.All.Count, GearCatalog.All.Select(p => p.Id).Distinct().Count());
         foreach (var slot in Enum.GetValues<GearSlot>())
         {
-            Assert.Equal(4, GearCatalog.All.Count(p => p.Slot == slot));
+            Assert.Equal(5, GearCatalog.All.Count(p => p.Slot == slot));
         }
 
         Assert.All(GearCatalog.All, p => Assert.False(string.IsNullOrWhiteSpace(p.Flavour)));

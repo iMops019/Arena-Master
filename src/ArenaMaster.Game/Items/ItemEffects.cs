@@ -42,6 +42,10 @@ internal sealed class ItemEffects
     public const float SkyStrikeRange = 15f;
     public const float BoltSeconds = 0.2f;
 
+    /// <summary>Bloodfury: how long a kill's damage lasts, and the most it adds.</summary>
+    public const float KillSeconds = 5f;
+    public const float KillDamageCap = 0.3f;
+
     /// <summary>A gear fire nova's reach, and how long its ring takes to spread (for the view).</summary>
     public const float NovaRadius = 5f;
     public const float NovaSeconds = 0.35f;
@@ -58,6 +62,7 @@ internal sealed class ItemEffects
     private float _wardLeft;
     private float _wardHeld;
     private float _dealtSeen;
+    private readonly List<float> _kills = new();
 
     /// <summary>The Aegis bursts spreading right now, and how far along each is.</summary>
     public IReadOnlyList<(Vector3D<float> Centre, float Age)> Bursts => _bursts;
@@ -82,7 +87,21 @@ internal sealed class ItemEffects
         ChillSlow: items.ChillOnHit,
         ChillSeconds: ChillSeconds,
         FreezeChance: items.FreezeChance,
-        FreezeSeconds: FreezeSeconds);
+        FreezeSeconds: FreezeSeconds,
+        ExecuteBelow: items.ExecuteBelow,
+        WoundedMultiplier: items.WoundedDamage);
+
+    /// <summary>What Bloodfury's kills add to damage right now (0 to <see cref="KillDamageCap"/>).</summary>
+    public float KillBonus(ItemBonuses items) => MathF.Min(KillDamageCap, items.KillDamage * _kills.Count);
+
+    /// <summary>A kill, for Bloodfury: its damage for a while.</summary>
+    public void OnKill(ItemBonuses items)
+    {
+        if (items.KillDamage > 0f && KillBonus(items) < KillDamageCap)
+        {
+            _kills.Add(KillSeconds);
+        }
+    }
 
     /// <summary>A new run: every clock back to the start.</summary>
     public void Begin()
@@ -99,6 +118,7 @@ internal sealed class ItemEffects
         _wardLeft = 0f;
         _wardHeld = 0f;
         _dealtSeen = 0f;
+        _kills.Clear();
     }
 
     /// <summary>
@@ -108,6 +128,17 @@ internal sealed class ItemEffects
     public void Update(float deltaSeconds, Vector3D<float> feet, ItemBonuses items, EnemyField enemies, PlayerHealth health, bool classKeepsBarrier, List<ItemHit> hits)
     {
         items.MissingHealth = health.Max > 0f ? Math.Clamp(1f - health.Current / health.Max, 0f, 1f) : 0f;
+        for (int i = _kills.Count - 1; i >= 0; i--)
+        {
+            _kills[i] -= deltaSeconds;
+            if (_kills[i] <= 0f)
+            {
+                _kills.RemoveAt(i);
+            }
+        }
+
+        // Bloodfury's kills and Berserker's Hide's missing health raise every hit the player lands, whoever lands it.
+        enemies.DamageBoost = (1f + KillBonus(items)) * (1f + items.LowHealthDamage * items.MissingHealth);
 
         float dealt = enemies.DamageDealt;
         if (dealt > _dealtSeen)
@@ -162,6 +193,11 @@ internal sealed class ItemEffects
             {
                 Hurt(strike.Attacker, strike.Damage * items.Retaliation, enemies, hits);
                 health.Heal(health.Max * items.HealPerBlow);
+            }
+
+            if (strike.Blocked)
+            {
+                health.Heal(items.BlockHeal);   // the Parrying Dagger
             }
 
             if (strike.Blocked && items.BlockBurst > 0f)
