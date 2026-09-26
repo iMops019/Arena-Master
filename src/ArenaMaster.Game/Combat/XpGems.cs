@@ -103,6 +103,15 @@ internal sealed class XpGemField
         return total;
     }
 
+    /// <summary>Every gem on the ground starts flying to the player, wherever it is (a magnet).</summary>
+    public void AttractAll()
+    {
+        foreach (var gem in _gems)
+        {
+            gem.Attracted = true;
+        }
+    }
+
     public List<XpGem> Clear()
     {
         var all = _gems.ToList();

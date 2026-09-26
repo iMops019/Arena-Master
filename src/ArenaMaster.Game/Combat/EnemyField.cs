@@ -257,7 +257,7 @@ internal sealed class EnemyField
 
     public int Kills { get; private set; }
 
-    public int AliveCount => _enemies.Count(e => e.IsAlive && e.Kind.Tier == EnemyTier.Fodder);
+    public int AliveCount => _enemies.Count(e => e.IsAlive && e.Kind.Tier == EnemyTier.Fodder && !e.Kind.IsProp);
 
     /// <summary>The blows that reached the player during the last <see cref="Update"/>, landed or blocked, for anything that answers them (thorns, say).</summary>
     public IReadOnlyList<Strike> Strikes => _strikes;
@@ -371,7 +371,11 @@ internal sealed class EnemyField
 
         enemy.Health = 0f;
         enemy.DeadFor = 0f;
-        Kills++;
+        if (!enemy.Kind.IsProp)
+        {
+            Kills++;   // a broken crate is not a kill
+        }
+
         _newlyKilled.Add(enemy);
         return true;
     }
@@ -435,6 +439,13 @@ internal sealed class EnemyField
         }
 
         return found;
+    }
+
+    /// <summary>Takes one away quietly - no kill, nothing dropped (a crate left far behind). It is gone after the next <see cref="Update"/>.</summary>
+    public void Vanish(Enemy enemy)
+    {
+        enemy.Health = 0f;
+        enemy.DeadFor = DeathDuration;
     }
 
     /// <summary>Takes every enemy away at once (a restart). Returns them so their view can be cleared.</summary>
@@ -530,6 +541,11 @@ internal sealed class EnemyField
     private void Move(Enemy enemy, float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
     {
         var kind = enemy.Kind;
+        if (kind.IsProp)
+        {
+            return;   // a crate just stands there
+        }
+
         enemy.ChilledFor = MathF.Max(0f, enemy.ChilledFor - deltaSeconds);
         if (enemy.FrozenFor > 0f)
         {

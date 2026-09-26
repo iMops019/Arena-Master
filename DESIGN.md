@@ -54,6 +54,13 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 - **Bosses** at set times, with a final one near 30:00.
 - **A bounded map**, mid-to-large, with edges (Megabonk-style levels, not an open world). The current map is a 512 m test map; the real one is still to be made.
 
+## Crates and pickups (built, first pass)
+
+The user's request: breakable boxes that turn up in the world at random, and random things in them, like a magnet that pulls every experience gem on the ground to the player, or food that heals. Claude added the rest of the list; all numbers are a first pass **(draft)**.
+
+- **Crates** (`World/Crates.cs`): the first turns up 20 s into a run, then one every 12 s while fewer than 8 are out, 12 to 32 m from the player. One left more than 70 m behind quietly goes. A crate stands on the enemy field as a prop (`EnemyKind.Crate`, 20 health scaled like any enemy's), so every class's attacks break it the way they hit anything: arrows, novas and circles, bolts, lightning. It never moves, turns or hurts; it isn't a kill (no silver or bounty credit, no Momentum) and doesn't count toward the swarm.
+- **What a broken crate leaves** (by weight): an apple (20: heals 15% of max health), a pouch of silver (20: +25 silver on top of the run's reward), a magnet (14: every gem on the map flies to you), a big gem (14: 5 experience plus 1 per minute survived), a roast (12: heals 40%), a bomb (10: 60 damage, scaled like enemy health, to every enemy within 8 m of you), a frenzy potion (10: +40% attack speed for 10 s). Walk over a pickup to take it; it floats, turns and glows until you do. Most show an announcement when taken.
+
 ## First class: Ranger
 
 - **Basic attack:** a bow that auto-fires arrows where the camera aims. The arrows converge on whatever the crosshair is on. Current numbers: 1 shot per 0.5 s, 12 damage, 50 m/s, 60 m range, straight flight.

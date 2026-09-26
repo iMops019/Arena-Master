@@ -72,6 +72,7 @@ public sealed partial class ArenaMasterContent
         _enemies.HealthBonus = bonuses.EnemyHealth;
         _enemies.RangedDamageTaken = bonuses.RangedDamageTaken;
         _itemEffects.Begin();
+        BeginCrates();
         _health.DamageTaken = _hero.DamageTaken;
         _condition.Clear();
         _experience.Reset();
@@ -147,6 +148,7 @@ public sealed partial class ArenaMasterContent
         }
 
         _lootView.Sync(window, _loot, goneChests, gonePickups, deltaSeconds);
+        UpdateCrates(window, deltaSeconds, groundAt);
         _health.Heal(_hero.Regeneration * deltaSeconds);
 
         _saveIn -= deltaSeconds;
@@ -174,7 +176,7 @@ public sealed partial class ArenaMasterContent
         // What lasts: silver for the run, and any bounties it (or the lifetime totals) completed.
         var record = new RunRecord(_enemies.Kills, _elitesKilled, _bossesKilled, _runSeconds, ending == RunEnding.Won, _experience.Level, _hero.Id);
         var carried = _items.Carried.Bonuses;
-        long silver = (long)MathF.Round(RunRewards.Silver(record) * (1f + carried.SilverGain) * carried.SilverMultiplier);
+        long silver = (long)MathF.Round(RunRewards.Silver(record) * (1f + carried.SilverGain) * carried.SilverMultiplier) + _runSilver;   // and what crates gave
         _profile.Silver += silver;
         var bounties = Bounties.Settle(record, _profile, _tree);
         SaveProfile();
@@ -204,6 +206,7 @@ public sealed partial class ArenaMasterContent
         _hero.Clear(window);
         _itemEffects.Begin();
         _itemEffectsView.Clear(window);
+        ClearCrates(window);
         _enemies.HitEffects = HitEffects.None;
         _enemies.HealthBonus = 0f;
         _enemies.RangedDamageTaken = 1f;
@@ -216,6 +219,12 @@ public sealed partial class ArenaMasterContent
     /// <summary>What a kill leaves behind: its experience gem, and loot - an elite's or a boss's chest, or now and then an item from fodder.</summary>
     private void OnKill(Enemy killed)
     {
+        if (killed.Kind.IsProp)
+        {
+            OnCrateBroken(killed);   // a crate: its pickup, not a kill
+            return;
+        }
+
         _gems.Drop(killed.Position, killed.Kind.Experience);
         _health.Heal(_items.Carried.Bonuses.HealOnKill);
         _hero.OnKill(killed, _runSeconds);

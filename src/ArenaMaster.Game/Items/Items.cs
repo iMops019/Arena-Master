@@ -123,8 +123,11 @@ internal sealed class ItemBonuses
     /// <summary>The share of max health missing right now (0 to 1), kept up to date during a run by <see cref="ItemEffects"/> for <see cref="Berserk"/>.</summary>
     public float MissingHealth;
 
-    /// <summary>Attack speed as it stands this moment: the flat bonus plus Berserk's share. Classes read this, not <see cref="AttackSpeed"/>.</summary>
-    public float AttackSpeedNow => AttackSpeed + Berserk * MissingHealth;
+    /// <summary>Attack speed added for a while by a Frenzy potion from a crate, kept up to date during a run by the content (0 otherwise).</summary>
+    public float Frenzy;
+
+    /// <summary>Attack speed as it stands this moment: the flat bonus, Berserk's share and any Frenzy. Classes read this, not <see cref="AttackSpeed"/>.</summary>
+    public float AttackSpeedNow => AttackSpeed + Berserk * MissingHealth + Frenzy;
 
     /// <summary>Enemies spawn with this much more health (Cursed Idol).</summary>
     public float EnemyHealth;

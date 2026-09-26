@@ -79,6 +79,12 @@ internal sealed record EnemyKind(
 
     public float AttackCooldown { get; init; }
 
+    /// <summary>
+    /// A breakable prop rather than a creature (a crate): it never moves, turns, claws or attacks, isn't counted as a kill or toward the swarm, and drops a pickup
+    /// instead of experience when broken. It stands on the field so every class's attacks can break it the way they hit anything else.
+    /// </summary>
+    public bool IsProp { get; init; }
+
     /// <summary>A ranged kind stops walking closer once the player is this near (0: it walks right up).</summary>
     public float StandOff { get; init; }
 
@@ -149,6 +155,22 @@ internal sealed record EnemyKind(
             new AttackSpec(AttackType.Shoot, MinRange: 4f, MaxRange: 18f, WindUp: 1.4f, Active: 0.1f, Recover: 0.6f,
                 Damage: 16f, Reach: 30f, HitWidth: 0.35f, Knockback: 6f, ProjectileSpeed: 13f, Splash: 2f, ProjectileModel: "ghoul_fireball.glb"),
         },
+    };
+
+    /// <summary>A breakable wooden crate that turns up around the player (see <c>World/Crates</c>). A few hits break it; it drops a pickup.</summary>
+    public static readonly EnemyKind Crate = new(
+        Name: "Crate",
+        Model: "crate_placeholder.glb",
+        Tier: EnemyTier.Fodder,
+        MaxHealth: 20f,
+        Speed: 0f,
+        Radius: 0.45f,
+        Height: 0.9f,
+        ContactDamage: 0f,
+        ContactInterval: 1f,
+        Experience: 0)
+    {
+        IsProp = true,
     };
 
     /// <summary>The first elite: a hulking brute that lunges down a lane and leaps to slam a marked circle.</summary>

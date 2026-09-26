@@ -9,6 +9,7 @@ using ArenaMaster.Game.Progression;
 using ArenaMaster.Game.Ranger;
 using ArenaMaster.Game.Shaman;
 using ArenaMaster.Game.Ui;
+using ArenaMaster.Game.World;
 using CEngine.Core;
 using Silk.NET.Input;
 using Silk.NET.Maths;
@@ -75,6 +76,7 @@ public sealed partial class ArenaMasterContent : IGameContent
         UseClass(ClassFor(_profile.ActiveClass));
         _health.Reset(_hero.MaxHealth);
         _enemies = new EnemyField(_random);
+        _crates = new CrateField(_random);
         _loot = new LootField(_random)
         {
             Available = item => Bounties.IsUnlocked(item, _profile),   // locked items don't come out of chests or drops until their bounty is done

@@ -32,6 +32,11 @@
   telegraph_lane.glb      a flat red lane 1.6 m wide and 7.2 m long from the origin along +Z (a lunge's path)
   shockwave_ring.glb      a thin flat ring of radius 1 (width 0.07), scaled as a shockwave spreads
   chest_placeholder.glb   a wooden treasure chest with gold bands, 1 m wide
+  crate_placeholder.glb   a breakable wooden crate, 0.9 m, planked with dark edges and a cross-brace
+  pickup_magnet.glb, pickup_apple.glb, pickup_roast.glb, pickup_silver.glb, pickup_bomb.glb, pickup_frenzy.glb
+                          what a crate leaves, each about 0.4 m and centred on its middle: a red horseshoe magnet with steel tips, an apple,
+                          a roast leg on the bone, a pouch spilling silver coins, a black bomb with a lit fuse, a red potion with a cork
+  bomb_blast.glb          a flat ring of fire of radius 1, scaled as a crate bomb's blast spreads
   loot_beam.glb           a thin gold pillar of light, 8 m tall, marking a chest from afar
   item_<rarity>.glb       an item orb in its rarity's colour (common, rare, epic, legendary), centred on its middle
   camp_tent.glb, camp_firepit.glb, camp_stash.glb, camp_target.glb, camp_gate.glb, camp_board.glb, camp_stall.glb
@@ -122,6 +127,14 @@ PALETTE = {
     "war_paint": (40, 90, 190),
     "spark": (120, 196, 255),
     "spark_light": (236, 246, 255),
+    "magnet_red": (196, 38, 38),
+    "apple_red": (212, 44, 36),
+    "leaf": (74, 150, 52),
+    "meat": (150, 72, 42),
+    "coin": (206, 210, 218),
+    "bomb_black": (34, 34, 40),
+    "potion": (222, 40, 96),
+    "cork": (172, 132, 82),
 }
 COLOURS = list(PALETTE)
 
@@ -701,6 +714,73 @@ def build_chest():
     return m
 
 
+def build_crate():
+    """A wooden crate 0.9 m on a side, sitting on the ground: planks, dark edges, and a brace across each face."""
+    m = Mesh()
+    m.box(-0.42, 0.0, -0.42, 0.42, 0.84, 0.42, "wood")
+    for x in (-0.45, 0.39):                                            # dark edge posts at the corners
+        for z in (-0.45, 0.39):
+            m.box(x, 0.0, z, x + 0.06, 0.9, z + 0.06, "chest_dark")
+    m.box(-0.45, 0.84, -0.45, 0.45, 0.9, 0.45, "chest_dark")           # the lid's rim
+    m.box(-0.40, 0.40, 0.42, 0.40, 0.48, 0.44, "chest_dark")           # cross-braces on the four faces
+    m.box(-0.40, 0.40, -0.44, 0.40, 0.48, -0.42, "chest_dark")
+    m.box(0.42, 0.40, -0.40, 0.44, 0.48, 0.40, "chest_dark")
+    m.box(-0.44, 0.40, -0.40, -0.42, 0.48, 0.40, "chest_dark")
+    return m
+
+
+def build_pickup_magnet():
+    m = Mesh()
+    m.box(-0.18, -0.20, -0.05, -0.08, 0.14, 0.05, "magnet_red")        # the two arms
+    m.box(0.08, -0.20, -0.05, 0.18, 0.14, 0.05, "magnet_red")
+    m.box(-0.18, 0.14, -0.05, 0.18, 0.24, 0.05, "magnet_red")          # and the bend
+    m.box(-0.18, -0.26, -0.05, -0.08, -0.20, 0.05, "steel")            # steel tips
+    m.box(0.08, -0.26, -0.05, 0.18, -0.20, 0.05, "steel")
+    return m
+
+
+def build_pickup_apple():
+    m = Mesh()
+    _orb(m, 0.0, 0.0, 0.0, 0.16, "apple_red", "apple_red")
+    m.box(-0.012, 0.14, -0.012, 0.012, 0.22, 0.012, "wood")            # the stalk
+    m.box(0.01, 0.17, -0.02, 0.10, 0.19, 0.03, "leaf")                 # a leaf
+    return m
+
+
+def build_pickup_roast():
+    m = Mesh()
+    m.box(-0.14, -0.12, -0.12, 0.10, 0.12, 0.12, "meat")               # the meat
+    m.box(0.10, -0.03, -0.03, 0.26, 0.03, 0.03, "bone")                # the bone
+    m.box(0.24, -0.06, -0.06, 0.30, 0.06, 0.06, "bone")                # its knob
+    return m
+
+
+def build_pickup_silver():
+    m = Mesh()
+    m.box(-0.14, -0.18, -0.12, 0.14, 0.06, 0.12, "canvas")             # the pouch
+    m.box(-0.08, 0.06, -0.06, 0.08, 0.12, 0.06, "leather")             # tied at the neck
+    for x, z in ((-0.20, 0.10), (0.18, 0.08), (0.02, 0.18)):           # coins spilling out
+        m.box(x - 0.05, -0.18, z - 0.05, x + 0.05, -0.16, z + 0.05, "coin")
+    return m
+
+
+def build_pickup_bomb():
+    m = Mesh()
+    _orb(m, 0.0, 0.0, 0.0, 0.17, "bomb_black", "bomb_black")
+    m.box(-0.03, 0.15, -0.03, 0.03, 0.20, 0.03, "iron")               # the cap
+    m.box(-0.008, 0.20, -0.008, 0.008, 0.28, 0.008, "cork")            # the fuse
+    m.box(-0.025, 0.28, -0.025, 0.025, 0.32, 0.025, "fire_light")      # lit
+    return m
+
+
+def build_pickup_frenzy():
+    m = Mesh()
+    m.box(-0.10, -0.20, -0.10, 0.10, 0.06, 0.10, "potion")             # the flask
+    m.box(-0.04, 0.06, -0.04, 0.04, 0.14, 0.04, "potion")              # its neck
+    m.box(-0.05, 0.14, -0.05, 0.05, 0.19, 0.05, "cork")                # the cork
+    return m
+
+
 def build_beam():
     m = Mesh()
     m.box(-0.07, 0.0, -0.07, 0.07, 8.0, 0.07, "beam")
@@ -895,7 +975,10 @@ if __name__ == "__main__":
                         ("brute_placeholder.glb", build_brute), ("hollow_king_placeholder.glb", build_hollow_king),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
                         ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),
-                        ("chest_placeholder.glb", build_chest), ("loot_beam.glb", build_beam),
+                        ("chest_placeholder.glb", build_chest), ("loot_beam.glb", build_beam), ("crate_placeholder.glb", build_crate),
+                        ("pickup_magnet.glb", build_pickup_magnet), ("pickup_apple.glb", build_pickup_apple), ("pickup_roast.glb", build_pickup_roast),
+                        ("pickup_silver.glb", build_pickup_silver), ("pickup_bomb.glb", build_pickup_bomb), ("pickup_frenzy.glb", build_pickup_frenzy),
+                        ("bomb_blast.glb", lambda: build_ring(0.8, 1.0, "fire")),
                         ("item_common.glb", lambda: build_item_orb("common")), ("item_rare.glb", lambda: build_item_orb("rare")),
                         ("item_epic.glb", lambda: build_item_orb("epic")), ("item_legendary.glb", lambda: build_item_orb("legendary")),
                         ("camp_tent.glb", build_tent), ("camp_firepit.glb", build_firepit), ("camp_stash.glb", build_stash),

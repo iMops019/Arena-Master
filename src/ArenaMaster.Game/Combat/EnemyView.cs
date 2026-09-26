@@ -186,6 +186,11 @@ internal sealed class EnemyView
             return new CrowdInstance(position, enemy.Yaw, scale * (1f - 0.4f * t), pitch + 0.9f * t);
         }
 
+        if (enemy.Kind.IsProp)
+        {
+            return new CrowdInstance(position, enemy.Yaw, scale, 0f, Flash: enemy.HitFlash);   // a crate: no bob, it just jolts when hit
+        }
+
         if (enemy.IsFrozen)
         {
             return new CrowdInstance(position, enemy.Yaw, scale, pitch, Flash: MathF.Max(0.55f, enemy.HitFlash));   // still, and pale with frost
