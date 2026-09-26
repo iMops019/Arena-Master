@@ -10,7 +10,21 @@ internal enum RunEnding
     Won,
     Slain,
     ReturnedToCamp,
+
+    /// <summary>A Delve node's boss slain and his cache opened.</summary>
+    DelveCleared,
 }
+
+/// <summary>What a Delve run was, and for a cleared node, what its cache paid.</summary>
+internal sealed record DelveOutcome(
+    int Depth,
+    string NodeName,
+    bool Cleared,
+    long CacheSilver = 0,
+    long TreeExperience = 0,
+    long Marks = 0,
+    Gear.GearPiece? Gear = null,
+    IReadOnlyList<RunItem>? Items = null);
 
 /// <summary>How a run went, for the summary at its end.</summary>
 internal sealed record RunSummary(
@@ -24,7 +38,8 @@ internal sealed record RunSummary(
     int TreeLevel,
     string TreeName,
     long Silver,
-    IReadOnlyList<Bounty> Bounties);
+    IReadOnlyList<Bounty> Bounties,
+    DelveOutcome? Delve = null);
 
 /// <summary>The screen at the end of a run - won, slain, or back to camp early: the run's numbers, the items found, what the tree earned. Then back to camp.</summary>
 internal sealed class RunSummaryScreen : GameScreen
@@ -56,6 +71,7 @@ internal sealed class RunSummaryScreen : GameScreen
         {
             RunEnding.Won => ("VICTORY", UiTheme.BrassHi),
             RunEnding.Slain => ("YOU WERE SLAIN", new Vector4(0.95f, 0.36f, 0.34f, 1f)),
+            RunEnding.DelveCleared => ($"DEPTH {s.Delve?.Depth} CLEARED", UiTheme.Unique),
             _ => ("BACK TO CAMP", UiTheme.Teal),
         };
         UiTheme.Text(origin + new Vector2((width - UiTheme.TextWidth(title, 2f)) * 0.5f, 0f), title, color, 2f);
@@ -68,6 +84,13 @@ internal sealed class RunSummaryScreen : GameScreen
             y += font * 1.25f;
         }
 
+        if (s.Delve is { } delve)
+        {
+            string where = $"{delve.NodeName}  ·  depth {delve.Depth}";
+            UiTheme.Text(new Vector2(origin.X + (width - UiTheme.TextWidth(where, 0.85f)) * 0.5f, y - font * 0.9f), where, UiTheme.Muted, 0.85f);
+            y += font * 0.5f;
+        }
+
         Row("Survived", $"{(int)s.Seconds / 60:00}:{(int)s.Seconds % 60:00}", UiTheme.Ink);
         Row("Level reached", s.Level.ToString(), UiTheme.Ink);
         Row("Kills", s.Kills.ToString("N0"), UiTheme.Ink);
@@ -76,6 +99,29 @@ internal sealed class RunSummaryScreen : GameScreen
         if (s.TreeLevelsGained > 0)
         {
             Row($"{s.TreeName} level", $"{s.TreeLevel}  (+{s.TreeLevelsGained}, spend at the target)", UiTheme.BrassHi);
+        }
+
+        if (s.Delve is { Cleared: true } cache)
+        {
+            if (cache.CacheSilver > 0)
+            {
+                Row("Delve cache", $"+{cache.CacheSilver:N0} silver", UiTheme.BrassHi);
+            }
+
+            if (cache.TreeExperience > 0)
+            {
+                Row("Delve cache", $"+{cache.TreeExperience:N0} {s.TreeName} experience", UiTheme.Teal);
+            }
+
+            if (cache.Marks > 0)
+            {
+                Row("Delve Marks", $"+{cache.Marks:N0}", UiTheme.Unique);
+            }
+
+            if (cache.Gear is { } piece)
+            {
+                Row("Gear found", piece.Name, UiTheme.Unique);
+            }
         }
 
         foreach (var bounty in s.Bounties)

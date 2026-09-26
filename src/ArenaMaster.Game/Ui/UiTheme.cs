@@ -25,6 +25,10 @@ internal static class UiTheme
     public static readonly Vector4 Locked = new(0.2f, 0.255f, 0.29f, 1f);
     public static readonly Vector4 Warn = new(0.94f, 0.48f, 0.35f, 1f);
 
+    /// <summary>A unique's colour: gear and the Delve's own rewards.</summary>
+    public static readonly Vector4 Unique = new(1f, 0.56f, 0.18f, 1f);
+    public static readonly Vector4 UniqueDeep = new(0.24f, 0.11f, 0.03f, 1f);
+
     /// <summary>How much bigger than design size (a 720-pixel-high window) to draw.</summary>
     public static float Scale => Math.Clamp(ImGui.GetIO().DisplaySize.Y / 720f, 0.75f, 3f);
 

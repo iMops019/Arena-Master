@@ -42,7 +42,15 @@ internal sealed class ItemEffects
     public const float SkyStrikeRange = 15f;
     public const float BoltSeconds = 0.2f;
 
+    /// <summary>A gear fire nova's reach, and how long its ring takes to spread (for the view).</summary>
+    public const float NovaRadius = 5f;
+    public const float NovaSeconds = 0.35f;
+
     private readonly List<(Vector3D<float> Centre, float Age)> _bursts = new();
+    private readonly List<(Vector3D<float> Centre, float Age)> _novas = new();
+    private float _shieldIn;
+    private bool _shieldDown = true;
+    private float _novaIn;
     private readonly List<(Vector3D<float> At, float Age)> _bolts = new();
     private float _skyIn = SkyStrikeInterval;
     private float _thornsIn;
@@ -53,6 +61,12 @@ internal sealed class ItemEffects
 
     /// <summary>The Aegis bursts spreading right now, and how far along each is.</summary>
     public IReadOnlyList<(Vector3D<float> Centre, float Age)> Bursts => _bursts;
+
+    /// <summary>The gear fire novas spreading right now, and how far along each is.</summary>
+    public IReadOnlyList<(Vector3D<float> Centre, float Age)> Novas => _novas;
+
+    /// <summary>Seconds until a broken gear shield comes back, or 0 while it is up (or there is none).</summary>
+    public float ShieldReturnsIn => _shieldDown ? MathF.Max(0f, _shieldIn) : 0f;
 
     /// <summary>The Thunderstone's bolts striking right now: where they land, and how long ago.</summary>
     public IReadOnlyList<(Vector3D<float> At, float Age)> Bolts => _bolts;
@@ -75,6 +89,10 @@ internal sealed class ItemEffects
     {
         _bursts.Clear();
         _bolts.Clear();
+        _novas.Clear();
+        _shieldDown = true;
+        _shieldIn = 0f;   // the gear shield goes up at once
+        _novaIn = 0f;
         _skyIn = SkyStrikeInterval;
         _thornsIn = 0f;
         _wardIn = FirstWard;
@@ -114,6 +132,8 @@ internal sealed class ItemEffects
 
         UpdateWard(deltaSeconds, items, health, classKeepsBarrier);
         UpdateSkyStrike(deltaSeconds, feet, items, enemies, hits);
+        UpdateGearShield(deltaSeconds, items, health);
+        UpdateFireNova(deltaSeconds, feet, items, enemies, hits);
 
         for (int i = _bursts.Count - 1; i >= 0; i--)
         {
@@ -200,6 +220,71 @@ internal sealed class ItemEffects
         Hurt(nearest, items.SkyStrike * items.DamageMultiplier, enemies, hits);
     }
 
+    /// <summary>
+    /// A body armour's shield: up full at the start, taking damage before anything else; once it is broken, back full after its cooldown. It stacks with a class's
+    /// own barrier rather than replacing it.
+    /// </summary>
+    private void UpdateGearShield(float deltaSeconds, ItemBonuses items, PlayerHealth health)
+    {
+        health.ShieldMax = items.GearShield;
+        if (items.GearShield <= 0f)
+        {
+            health.Shield = 0f;
+            return;
+        }
+
+        if (_shieldDown)
+        {
+            _shieldIn -= deltaSeconds;
+            if (_shieldIn <= 0f)
+            {
+                health.Shield = items.GearShield;
+                _shieldDown = false;
+            }
+        }
+        else if (health.Shield <= 0f)
+        {
+            _shieldDown = true;
+            _shieldIn = items.GearShieldCooldown;
+        }
+    }
+
+    /// <summary>A weapon's fire nova: every so often a ring of fire bursts around the player, hurting everything within <see cref="NovaRadius"/>.</summary>
+    private void UpdateFireNova(float deltaSeconds, Vector3D<float> feet, ItemBonuses items, EnemyField enemies, List<ItemHit> hits)
+    {
+        for (int i = _novas.Count - 1; i >= 0; i--)
+        {
+            var nova = _novas[i];
+            nova.Age += deltaSeconds;
+            if (nova.Age >= NovaSeconds)
+            {
+                _novas.RemoveAt(i);
+            }
+            else
+            {
+                _novas[i] = nova;
+            }
+        }
+
+        if (items.FireNova <= 0f)
+        {
+            return;
+        }
+
+        _novaIn -= deltaSeconds;
+        if (_novaIn > 0f)
+        {
+            return;
+        }
+
+        _novaIn = MathF.Max(0.5f, items.FireNovaInterval);
+        _novas.Add((feet, 0f));
+        foreach (var enemy in enemies.Within(feet, NovaRadius))
+        {
+            Hurt(enemy, items.FireNova * items.DamageMultiplier, enemies, hits);
+        }
+    }
+
     /// <summary>The Warding Crystal: a barrier of <see cref="ItemBonuses.Ward"/> every so often, taken away again (what is left of it) when its time is up.</summary>
     private void UpdateWard(float deltaSeconds, ItemBonuses items, PlayerHealth health, bool classKeepsBarrier)
     {
@@ -250,6 +335,7 @@ internal sealed class ItemEffectsView
 {
     public const string BurstModel = "aegis_burst.glb";
     public const string BoltModel = "thunderstone_bolt.glb";
+    public const string NovaModel = "fire_nova.glb";
 
     /// <summary>A bolt falls from this high, in pieces this long.</summary>
     private const float BoltHeight = 14f;
@@ -257,6 +343,7 @@ internal sealed class ItemEffectsView
 
     private readonly List<CrowdInstance> _bursts = new();
     private readonly List<CrowdInstance> _bolts = new();
+    private readonly List<CrowdInstance> _novas = new();
     private readonly Random _jitter = new(5);
 
     public void Sync(EngineWindow window, ItemEffects effects)
@@ -269,6 +356,15 @@ internal sealed class ItemEffectsView
         }
 
         window.SetCrowd(BurstModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_bursts));
+
+        _novas.Clear();
+        foreach (var (centre, age) in effects.Novas)
+        {
+            float t = Math.Clamp(age / ItemEffects.NovaSeconds, 0f, 1f);
+            _novas.Add(new CrowdInstance(centre + new Vector3D<float>(0f, 0.25f, 0f), 0f, ItemEffects.NovaRadius * (0.25f + 0.75f * t), Flash: 1f - t));
+        }
+
+        window.SetCrowd(NovaModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_novas));
 
         _bolts.Clear();
         foreach (var (at, _) in effects.Bolts)
@@ -297,5 +393,6 @@ internal sealed class ItemEffectsView
     {
         window.SetCrowd(BurstModel, ReadOnlySpan<CrowdInstance>.Empty);
         window.SetCrowd(BoltModel, ReadOnlySpan<CrowdInstance>.Empty);
+        window.SetCrowd(NovaModel, ReadOnlySpan<CrowdInstance>.Empty);
     }
 }

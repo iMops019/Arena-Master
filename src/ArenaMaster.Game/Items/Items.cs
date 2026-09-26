@@ -141,6 +141,17 @@ internal sealed class ItemBonuses
 
     /// <summary>Damage of the burst of light every block releases (Aegis of the Dawn).</summary>
     public float BlockBurst;
+
+    /// <summary>A gear shield of this many points, over health and any barrier; once broken it comes back full after <see cref="GearShieldCooldown"/> seconds (see <see cref="ItemEffects"/>).</summary>
+    public float GearShield;
+    public float GearShieldCooldown;
+
+    /// <summary>A ring of fire bursting around the player every <see cref="FireNovaInterval"/> seconds for this much damage (see <see cref="ItemEffects"/>). 0 for none.</summary>
+    public float FireNova;
+    public float FireNovaInterval;
+
+    /// <summary>More silver from a Delve cache.</summary>
+    public float CacheSilver;
 }
 
 /// <summary>One item: its name, rarity, what one of it does in words, and what one of it does to the bonuses. Stacks apply it once per copy.</summary>
@@ -381,7 +392,15 @@ internal sealed class RunItems
 internal sealed class ItemInventory
 {
     private readonly List<(RunItem Item, int Count)> _items = new();
+    private readonly List<Action<ItemBonuses>> _extras = new();
     private ItemBonuses? _bonuses;
+
+    /// <summary>Adds bonuses that aren't an item (a worn piece of gear): they count in <see cref="Bonuses"/>, after the items, but aren't listed in <see cref="Items"/>.</summary>
+    public void AddBonus(Action<ItemBonuses> apply)
+    {
+        _extras.Add(apply);
+        _bonuses = null;
+    }
 
     public IReadOnlyList<(RunItem Item, int Count)> Items => _items;
 
@@ -417,6 +436,11 @@ internal sealed class ItemInventory
                         item.ApplyOne(_bonuses);
                     }
                 }
+
+                foreach (var apply in _extras)
+                {
+                    apply(_bonuses);
+                }
             }
 
             return _bonuses;
@@ -426,6 +450,7 @@ internal sealed class ItemInventory
     public void Clear()
     {
         _items.Clear();
+        _extras.Clear();
         _bonuses = null;
     }
 }

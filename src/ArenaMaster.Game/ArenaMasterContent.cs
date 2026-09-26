@@ -113,6 +113,7 @@ public sealed partial class ArenaMasterContent : IGameContent
         }
 
         CampLayout.ShapeGround(terrain);
+        Delve.BossArena.ShapeGround(terrain);
         return terrain;
     }
 
@@ -241,6 +242,7 @@ public sealed partial class ArenaMasterContent : IGameContent
     {
         window.ThirdPerson = true;
         BuildCamp(window, terrain);
+        BuildArena(window, terrain);
         window.AddPauseMenuButton("Return to Camp", () =>
         {
             if (_mode == GameMode.Run)

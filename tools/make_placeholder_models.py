@@ -51,6 +51,10 @@
                           the camp's dressing: a barrel, a stack of crates, a woodpile with a chopping stump, a log bench, a banner on
                           a pole, an iron brazier (the engine's fire burns on it), a straw bale, a training dummy, a well, a supply cart,
                           a cooking fire with a pot, a bedroll, a lantern post, and grain sacks
+  camp_armorstand.glb     the gear station: an armour stand wearing mail and an orange tabard, a helm on top, a sword and shield by it
+  fire_nova.glb           a flat ring of bright fire of radius 1, scaled as the Emberbrand's nova spreads (gear, any class)
+  delve_cache.glb         the chest a Delve boss leaves: black and iron-bound, with a burning-orange seal and trim, on a stone slab
+  hollow_king_unbound.glb the Delve boss: the Hollow King grown to 5.6 m, with horns, bone pauldrons, a burning crown and eyes, broken chains
   camp_quartermaster.glb  the quartermaster behind the stall, skinned (8 joints) with a looping 6 s "Idle" clip: he breathes, shifts his
                           weight, looks along the camp one way and the other, strokes his moustache and nods, a hand on his hip
 
@@ -1322,6 +1326,70 @@ def quartermaster_idle(t):
     }
 
 
+def build_hollow_king_unbound():
+    """The Delve boss: the Hollow King grown to about 5.6 m and unbound: the king's body scaled up, with great horns, bone pauldrons, a burning-orange crown
+    and eyes, and chains hanging broken from its wrists."""
+    king = build_hollow_king()
+    m = Mesh()
+    s = 1.32
+    for i in range(0, len(king.indices), 3):
+        a, b, c = (king.positions[king.indices[i + k]] for k in range(3))
+        colour = COLOURS[int(king.uvs[king.indices[i]][0] * len(COLOURS))]
+        if colour == "ghost_eye":
+            colour = "fire_light"
+        elif colour == "gold":
+            colour = "fire"
+        m.tri(tuple(v * s for v in a), tuple(v * s for v in b), tuple(v * s for v in c), colour)
+    for side in (-1, 1):
+        x0, x1 = sorted((side * 0.3, side * 0.55))
+        m.pyramid(x0 * s, 3.9 * s, -0.1 * s, x1 * s, 3.9 * s, 0.2 * s, (side * 1.05 * s, 4.75 * s, -0.05 * s), "horn")   # the horns
+        px0, px1 = sorted((side * 0.75, side * 1.35))
+        m.box(px0 * s, 3.0 * s, -0.42 * s, px1 * s, 3.4 * s, 0.46 * s, "bone")                                          # the pauldrons
+        m.pyramid(px0 * s, 3.4 * s, -0.3 * s, px1 * s, 3.4 * s, 0.34 * s, (side * 1.05 * s, 3.8 * s, 0.02 * s), "bone")
+        cx = side * 1.1 * s
+        for k in range(4):                                                                                                # the broken chains
+            y = (0.62 - 0.14 * k) * s
+            m.box(cx - 0.05 * s, y - 0.09 * s, 0.1 * s, cx + 0.05 * s, y, 0.2 * s, "iron")
+    return m
+
+
+def build_delve_cache():
+    """The Delve cache the boss leaves: a big black iron-bound chest, 1.8 m wide, with a burning-orange seal and trim, on a stone slab."""
+    m = Mesh()
+    m.box(-1.1, 0.0, -0.75, 1.1, 0.15, 0.75, "stone")
+    m.box(-0.9, 0.15, -0.6, 0.9, 0.95, 0.6, "bomb_black")
+    m.box(-0.93, 0.95, -0.62, 0.93, 1.3, 0.62, "iron")
+    for x in (-0.75, 0.0, 0.7):
+        m.box(x - 0.06, 0.14, -0.63, x + 0.06, 1.31, 0.63, "legendary")
+    m.box(-0.95, 0.9, -0.64, 0.95, 0.97, 0.64, "legendary")
+    m.box(-0.18, 0.62, 0.6, 0.18, 1.02, 0.66, "legendary_light")      # the seal, on the front
+    m.box(-0.08, 0.72, 0.66, 0.08, 0.92, 0.69, "fire")
+    for x in (-1.0, 1.0):
+        for z in (-0.68, 0.68):
+            m.pyramid(x - 0.08, 0.15, z - 0.08, x + 0.08, 0.15, z + 0.08, (x, 0.45, z), "legendary")
+    return m
+
+
+def build_armour_stand():
+    """The gear station: a wooden armour stand 1.9 m tall wearing a mail shirt with an orange tabard, a helm on top, a sword and a round shield leaning on it (+Z)."""
+    m = Mesh()
+    m.box(-0.45, 0.0, -0.3, 0.45, 0.1, 0.3, "chest_wood")                # the base
+    m.box(-0.05, 0.1, -0.05, 0.05, 1.2, 0.05, "wood")                    # the post
+    m.box(-0.28, 1.1, -0.16, 0.28, 1.62, 0.16, "steel")                  # the mail shirt
+    m.box(-0.2, 0.75, 0.16, 0.2, 1.55, 0.19, "legendary")                # its tabard
+    m.box(-0.07, 1.2, 0.19, 0.07, 1.38, 0.2, "legendary_light")
+    m.box(-0.42, 1.48, -0.1, 0.42, 1.64, 0.1, "plate")                   # the shoulders
+    m.box(-0.14, 1.64, -0.14, 0.14, 1.9, 0.14, "plate")                  # the helm
+    m.box(-0.1, 1.72, 0.14, 0.1, 1.76, 0.15, "visor")
+    m.pyramid(-0.15, 1.9, -0.15, 0.15, 1.9, 0.15, (0.0, 2.02, 0.0), "plate")
+    m.box(0.5, 0.0, 0.05, 0.54, 0.95, 0.09, "steel")                     # a sword leaning at its side
+    m.box(0.42, 0.95, 0.03, 0.62, 0.99, 0.11, "gold")
+    m.box(0.49, 0.99, 0.05, 0.55, 1.18, 0.09, "leather")
+    m.prism(-0.62, 0.12, 0.34, 0.0, 0.06, "chest_wood", sides=10, top="chest_wood")   # a round shield lying at its foot
+    m.prism(-0.62, 0.12, 0.1, 0.06, 0.09, "legendary", sides=8, top="legendary")
+    return m
+
+
 def png_bytes():
     width, height = SWATCH * len(COLOURS), SWATCH
     row = b"".join(bytes(PALETTE[c]) * SWATCH for c in COLOURS)
@@ -1502,7 +1570,8 @@ if __name__ == "__main__":
                         ("camp_banner.glb", build_banner), ("camp_brazier.glb", build_brazier), ("camp_haybale.glb", build_haybale),
                         ("camp_dummy.glb", build_dummy), ("camp_well.glb", build_well), ("camp_cart.glb", build_cart),
                         ("camp_cookpot.glb", build_cookpot), ("camp_bedroll.glb", build_bedroll), ("camp_lantern.glb", build_lantern),
-                        ("camp_sacks.glb", build_sacks)):
+                        ("camp_sacks.glb", build_sacks), ("camp_armorstand.glb", build_armour_stand),
+                        ("delve_cache.glb", build_delve_cache), ("fire_nova.glb", lambda: build_ring(0.82, 1.0, "fire_light")), ("hollow_king_unbound.glb", build_hollow_king_unbound)):
         mesh = build()
         write_glb(mesh, MODELS / name)
         print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")

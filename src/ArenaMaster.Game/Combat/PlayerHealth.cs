@@ -41,6 +41,14 @@ internal sealed class PlayerHealth
     public float Barrier { get; set; }
 
     /// <summary>
+    /// A gear shield over everything (a body armour's): damage comes off it before the <see cref="Barrier"/>, so it stacks with a class's own shield. The gear's
+    /// effect raises it and brings it back after it breaks; it's 0 otherwise. <see cref="ShieldMax"/> is what it holds when full, for the HUD.
+    /// </summary>
+    public float Shield { get; set; }
+
+    public float ShieldMax { get; set; }
+
+    /// <summary>
     /// Takes <paramref name="amount"/> off (the <see cref="Barrier"/> first) unless the player is dead or still in the grace after the last hit. True if it landed, even
     /// if the barrier held all of it.
     /// </summary>
@@ -52,13 +60,16 @@ internal sealed class PlayerHealth
         }
 
         float damage = amount * DamageTaken;
+        float shielded = MathF.Min(Shield, damage);
+        Shield -= shielded;
+        damage -= shielded;
         float held = MathF.Min(Barrier, damage);
         Barrier -= held;
         damage -= held;
         _grace = HitGrace;
         if (damage <= 0f)
         {
-            return true;   // the barrier took it all: no flash
+            return true;   // the shields took it all: no flash
         }
 
         Current = MathF.Max(0f, Current - damage);
@@ -121,6 +132,8 @@ internal sealed class PlayerHealth
         DamageTaken = 1f;
         LastStands = 0;
         Barrier = 0f;
+        Shield = 0f;
+        ShieldMax = 0f;
         _lastStandUsed = false;
         _grace = 0f;
         _hurt = 0f;

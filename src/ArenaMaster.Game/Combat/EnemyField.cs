@@ -60,8 +60,24 @@ internal sealed class Enemy
 
     public bool IsFrozen => FrozenFor > 0f;
 
-    /// <summary>How fast it walks right now: its speed, less any chill.</summary>
-    public float WalkSpeed => IsChilled ? Speed * (1f - ChillSlow) : Speed;
+    /// <summary>How fast it walks right now: its speed (quicker in a boss's later stages), less any chill.</summary>
+    public float WalkSpeed => (IsChilled ? Speed * (1f - ChillSlow) : Speed) * PhaseSpeed;
+
+    /// <summary>Which of its kind's <see cref="EnemyKind.Phases"/> it is in: -1 for none yet (its first stage).</summary>
+    public int PhaseIndex { get; set; } = -1;
+
+    public BossPhase? CurrentPhase => PhaseIndex >= 0 ? Kind.Phases[PhaseIndex] : null;
+
+    /// <summary>The attacks it chooses from now: its stage's, or its kind's.</summary>
+    public IReadOnlyList<AttackSpec> AttacksNow => CurrentPhase?.Attacks ?? Kind.Attacks;
+
+    /// <summary>The breather after each attack now.</summary>
+    public float AttackCooldownNow => CurrentPhase?.AttackCooldown ?? Kind.AttackCooldown;
+
+    public float PhaseSpeed => CurrentPhase?.SpeedMultiplier ?? 1f;
+
+    /// <summary>How many more times the attack under way goes again straight after (its <see cref="AttackSpec.Chain"/>).</summary>
+    public int ChainLeft { get; set; }
 
     /// <summary>
     /// Chills it for <paramref name="seconds"/>, slowing its walk by <paramref name="slow"/> (0 to 1). A chill already on it keeps the stronger slow and the longer time.
@@ -202,6 +218,7 @@ internal sealed class EnemyField
     private readonly List<Strike> _strikes = new();
     private readonly List<EnemyBolt> _bolts = new();
     private readonly List<EnemyBlast> _blasts = new();
+    private readonly List<(Enemy Boss, BossPhase Phase)> _phaseChanges = new();
     private readonly EnemyGrid _grid = new();
     private readonly Random _random;
     private bool _gridStale = true;
@@ -261,6 +278,14 @@ internal sealed class EnemyField
 
     /// <summary>The blows that reached the player during the last <see cref="Update"/>, landed or blocked, for anything that answers them (thorns, say).</summary>
     public IReadOnlyList<Strike> Strikes => _strikes;
+
+    /// <summary>The bosses that went into a new stage since this was last asked, and the stage each went into.</summary>
+    public List<(Enemy Boss, BossPhase Phase)> TakePhaseChanges()
+    {
+        var changes = _phaseChanges.ToList();
+        _phaseChanges.Clear();
+        return changes;
+    }
 
     /// <summary>The first living boss, if one is on the field.</summary>
     public Enemy? Boss => _enemies.FirstOrDefault(e => e.IsAlive && e.Kind.Tier == EnemyTier.Boss);
@@ -546,6 +571,7 @@ internal sealed class EnemyField
             return;   // a crate just stands there
         }
 
+        UpdatePhase(enemy);
         enemy.ChilledFor = MathF.Max(0f, enemy.ChilledFor - deltaSeconds);
         if (enemy.FrozenFor > 0f)
         {
@@ -623,16 +649,48 @@ internal sealed class EnemyField
         }
     }
 
+    /// <summary>A boss whose health has fallen past its next stage's mark goes into it (and on past any it skipped), and the change is noted.</summary>
+    private void UpdatePhase(Enemy enemy)
+    {
+        var phases = enemy.Kind.Phases;
+        if (phases.Count == 0)
+        {
+            return;
+        }
+
+        float share = enemy.Health / enemy.MaxHealth;
+        int reached = enemy.PhaseIndex;
+        while (reached + 1 < phases.Count && share <= phases[reached + 1].Below)
+        {
+            reached++;
+        }
+
+        if (reached != enemy.PhaseIndex)
+        {
+            enemy.PhaseIndex = reached;
+            enemy.AttackCooldown = MathF.Min(enemy.AttackCooldown, 0.5f);
+            _phaseChanges.Add((enemy, phases[reached]));
+        }
+    }
+
     /// <summary>Starts one of the enemy's attacks that suits how far away the player is, picked at random. False if none does.</summary>
     private bool TryStartAttack(Enemy enemy, float distance, PlayerTarget player, Func<float, float, float?> groundAt)
     {
-        var usable = enemy.Kind.Attacks.Where(a => distance >= a.MinRange && distance <= a.MaxRange).ToList();
+        var usable = enemy.AttacksNow.Where(a => distance >= a.MinRange && distance <= a.MaxRange).ToList();
         if (usable.Count == 0)
         {
             return false;
         }
 
         var attack = usable[_random.Next(usable.Count)];
+        StartAttack(enemy, attack, player, groundAt);
+        enemy.ChainLeft = attack.Chain;
+        return true;
+    }
+
+    /// <summary>Begins <paramref name="attack"/>'s wind-up, fixing where it is aimed.</summary>
+    private static void StartAttack(Enemy enemy, AttackSpec attack, PlayerTarget player, Func<float, float, float?> groundAt)
+    {
         var toPlayer = Geometry.FlatDirection(enemy.Position, player.Feet, out _);
 
         enemy.Attack = attack;
@@ -649,8 +707,6 @@ internal sealed class EnemyField
             AttackType.LeapSlam => new Vector3D<float>(player.Feet.X, groundAt(player.Feet.X, player.Feet.Z) ?? player.Feet.Y, player.Feet.Z),
             _ => enemy.Position,
         };
-
-        return true;
     }
 
     private void RunAttack(Enemy enemy, float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
@@ -674,6 +730,10 @@ internal sealed class EnemyField
                     {
                         Shoot(enemy, attack, player, groundAt);
                     }
+                    else if (attack.Type == AttackType.Barrage)
+                    {
+                        Barrage(enemy, attack, player, groundAt);
+                    }
                 }
 
                 break;
@@ -683,6 +743,15 @@ internal sealed class EnemyField
                 RunActive(enemy, attack, t, player, groundAt);
                 if (enemy.PhaseTime >= attack.Active)
                 {
+                    if (enemy.ChainLeft > 0)
+                    {
+                        // Straight into it again, aimed afresh, with half the wind-up: a second leap, the next ring.
+                        enemy.ChainLeft--;
+                        StartAttack(enemy, attack, player, groundAt);
+                        enemy.PhaseTime = attack.WindUp * 0.5f;
+                        break;
+                    }
+
                     enemy.PhaseTime -= attack.Active;
                     enemy.AttackPhase = AttackPhase.Recover;
                 }
@@ -693,7 +762,7 @@ internal sealed class EnemyField
                 if (enemy.PhaseTime >= attack.Recover)
                 {
                     enemy.Attack = null;
-                    enemy.AttackCooldown = enemy.Kind.AttackCooldown;
+                    enemy.AttackCooldown = enemy.AttackCooldownNow;
                 }
 
                 break;
@@ -834,6 +903,46 @@ internal sealed class EnemyField
             Radius = attack.HitWidth,
             Knockback = attack.Knockback,
         });
+    }
+
+    /// <summary>How high above its landing spot a barrage's fireball starts to fall.</summary>
+    public const float BarrageHeight = 16f;
+
+    /// <summary>
+    /// Calls <paramref name="attack"/>'s fireballs down from the sky: the first on the spot where the player stands, the rest scattered within its reach around it.
+    /// Each falls from high above its spot, a little aslant, at about the attack's speed - its landing marked the whole way down.
+    /// </summary>
+    private void Barrage(Enemy caster, AttackSpec attack, PlayerTarget player, Func<float, float, float?> groundAt)
+    {
+        for (int i = 0; i < Math.Max(1, attack.Count); i++)
+        {
+            float angle = (float)_random.NextDouble() * MathF.Tau;
+            float distance = i == 0 ? 0f : attack.Reach * MathF.Sqrt((float)_random.NextDouble());
+            float x = player.Feet.X + MathF.Sin(angle) * distance;
+            float z = player.Feet.Z + MathF.Cos(angle) * distance;
+            if (groundAt(x, z) is not { } ground)
+            {
+                continue;
+            }
+
+            var target = new Vector3D<float>(x, ground, z);
+            var from = target + new Vector3D<float>(MathF.Sin(angle + 1f) * 3f, BarrageHeight, MathF.Cos(angle + 1f) * 3f);
+            var fall = target - from;
+            float speed = attack.ProjectileSpeed * (0.85f + 0.3f * (float)_random.NextDouble());   // not all landing at once
+            _bolts.Add(new EnemyBolt
+            {
+                Shooter = caster,
+                Model = attack.ProjectileModel ?? "ghoul_fireball.glb",
+                Target = target,
+                Splash = attack.Splash,
+                Position = from,
+                Velocity = Vector3D.Normalize(fall) * speed,
+                FlightLeft = fall.Length / speed + 1f,
+                Damage = attack.Damage * caster.DamageScale * RangedDamageTaken,
+                Radius = 0.4f,
+                Knockback = attack.Knockback,
+            });
+        }
     }
 
     /// <summary>

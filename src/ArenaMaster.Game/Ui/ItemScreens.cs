@@ -196,8 +196,8 @@ internal sealed class LoadoutScreen : GameScreen
         Begin,
     }
 
-    /// <summary>Draws the screen for a run as <paramref name="className"/>. Returns what the player chose, if anything.</summary>
-    public Result Draw(Profile profile, string className)
+    /// <summary>Draws the screen for a run as <paramref name="className"/> to <paramref name="destination"/>. Returns what the player chose, if anything.</summary>
+    public Result Draw(Profile profile, string className, string destination = "A classic run")
     {
         if (!IsOpen)
         {
@@ -207,7 +207,7 @@ internal sealed class LoadoutScreen : GameScreen
         MarkDrawn();
         float scale = UiTheme.Scale;
         UiTheme.BeginScreen("##loadout", 0.78f, 0.84f);
-        UiTheme.Header($"Camp · Departure gate · Setting out as the {className}", "Choose your loadout", $"{profile.Loadout.Count} / {Loadout.Limit(profile)} items");
+        UiTheme.Header($"Camp · Departure gate · {destination} as the {className}", "Choose your loadout", $"{profile.Loadout.Count} / {Loadout.Limit(profile)} items");
 
         DrawSlots(profile);
 

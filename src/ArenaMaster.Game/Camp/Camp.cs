@@ -23,6 +23,9 @@ internal enum CampStation
 
     /// <summary>The weapon rack: choose the class to play.</summary>
     Classes,
+
+    /// <summary>The armour stand: the gear, and what is worn.</summary>
+    Gear,
 }
 
 /// <summary>
@@ -54,10 +57,11 @@ internal static class CampLayout
     {
         (CampStation.Stash, "camp_stash.glb", new(-6.5f, 2f), "Open the item chest"),
         (CampStation.Tree, "camp_target.glb", new(6.5f, 2f), "Passive tree"),
-        (CampStation.Gate, "camp_gate.glb", new(0f, CampWalls.Apothem), "Choose a loadout and set out"),
+        (CampStation.Gate, "camp_gate.glb", new(0f, CampWalls.Apothem), "The Delve chart: choose where to go"),
         (CampStation.Bounties, "camp_board.glb", new(8.5f, -5f), "Read the bounty board"),
         (CampStation.Quartermaster, "camp_stall.glb", new(-9.5f, -3f), "Visit the quartermaster"),
         (CampStation.Classes, "camp_rack.glb", new(4f, -10f), "Choose your class"),
+        (CampStation.Gear, "camp_armorstand.glb", new(-4.5f, 8.5f), "Wear your gear"),
     };
 
     /// <summary>

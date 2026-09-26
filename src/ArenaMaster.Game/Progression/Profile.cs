@@ -11,8 +11,8 @@ internal sealed class TreeSave
 }
 
 /// <summary>
-/// Everything that lasts between runs: the items in the stash and how many of each, the loadout last taken on a run, which class and tree are chosen, and every
-/// tree's progress. Saved as JSON by <see cref="ProfileStore"/>.
+/// Everything that lasts between runs: the items in the stash and how many of each, the loadout last taken on a run, which class and tree are chosen, every
+/// tree's progress, silver and upgrades, bounties, the Delve's progress and the gear. Saved as JSON by <see cref="ProfileStore"/>.
 /// </summary>
 internal sealed class Profile
 {
@@ -44,6 +44,12 @@ internal sealed class Profile
 
     /// <summary>Lifetime totals the bounties read, kept across runs.</summary>
     public LifetimeRecord Lifetime { get; set; } = new();
+
+    /// <summary>Where the player has got to in the Delve: the deepest floor open, the nodes cleared, and Delve Marks.</summary>
+    public Delve.DelveSave Delve { get; set; } = new();
+
+    /// <summary>The gear owned, and what is worn in each slot.</summary>
+    public Gear.GearSave Gear { get; set; } = new();
 
     public int CountOf(string itemId) => Stash.GetValueOrDefault(itemId);
 

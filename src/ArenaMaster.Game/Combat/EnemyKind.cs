@@ -27,6 +27,12 @@ internal enum AttackType
     /// (a fireball) is aimed at the ground under the player instead, and bursts where it lands.
     /// </summary>
     Shoot,
+
+    /// <summary>
+    /// Raises its arms, then calls fire down from the sky: <see cref="AttackSpec.Count"/> fireballs fall on spots around the player (the first right where they
+    /// stand), each spot marked by a burning ring while its fireball falls, bursting on landing. Keep moving.
+    /// </summary>
+    Barrage,
 }
 
 /// <summary>
@@ -35,12 +41,14 @@ internal enum AttackType
 /// </summary>
 /// <param name="MinRange">It only starts this attack with the player at least this far away...</param>
 /// <param name="MaxRange">...and no further than this.</param>
-/// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls. Shoot: how far the bolt flies.</param>
+/// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls. Shoot: how far the bolt flies. Barrage: how far from the player the fireballs spread.</param>
 /// <param name="HitWidth">Lunge: how close to the charging body counts as hit. Shockwave: half the ring's width. Shoot: the bolt's radius. Unused otherwise.</param>
 /// <param name="LeapHeight">LeapSlam: the top of the arc, above the straight line from take-off to landing.</param>
 /// <param name="ProjectileSpeed">Shoot: how fast the shot flies - slow enough to sidestep once it is loosed.</param>
 /// <param name="Splash">Shoot: 0 for a bolt that has to hit the player; more for a fireball that bursts where it lands, hurting anyone within this far.</param>
-/// <param name="ProjectileModel">Shoot: the model the shot is drawn with.</param>
+/// <param name="ProjectileModel">Shoot, Barrage: the model the shot is drawn with.</param>
+/// <param name="Count">Barrage: how many fireballs fall.</param>
+/// <param name="Chain">How many times more it goes straight into the same attack once one ends (a double or triple leap, rolling shockwaves), each with half the wind-up.</param>
 internal sealed record AttackSpec(
     AttackType Type,
     float MinRange,
@@ -56,7 +64,15 @@ internal sealed record AttackSpec(
     float LeapHeight = 0f,
     float ProjectileSpeed = 0f,
     float Splash = 0f,
-    string? ProjectileModel = null);
+    string? ProjectileModel = null,
+    int Count = 0,
+    int Chain = 0);
+
+/// <summary>
+/// A boss's next stage, once its health falls to <paramref name="Below"/> of its most (0 to 1): a new set of attacks, a shorter breather between them, a faster walk,
+/// and a line to announce it.
+/// </summary>
+internal sealed record BossPhase(float Below, IReadOnlyList<AttackSpec> Attacks, float AttackCooldown, float SpeedMultiplier, string Announcement);
 
 /// <summary>
 /// What one kind of enemy is: its model and its numbers. Distances are metres, speeds metres per second, times seconds. The body is a standing cylinder of
@@ -87,6 +103,9 @@ internal sealed record EnemyKind(
 
     /// <summary>A ranged kind stops walking closer once the player is this near (0: it walks right up).</summary>
     public float StandOff { get; init; }
+
+    /// <summary>A boss's later stages, from the first reached to the last (see <see cref="BossPhase"/>). Empty for everything else.</summary>
+    public IReadOnlyList<BossPhase> Phases { get; init; } = Array.Empty<BossPhase>();
 
     /// <summary>A second model drawn with the body (a crossbow, a flame), which lights up from faint to bright as a <see cref="AttackType.Shoot"/> winds up. Null for none.</summary>
     public string? HeldModel { get; init; }
@@ -218,6 +237,54 @@ internal sealed record EnemyKind(
                 Damage: 25f, Reach: 18f, HitWidth: 0.7f, Knockback: 9f),
             new AttackSpec(AttackType.Summon, MinRange: 0f, MaxRange: 60f, WindUp: 1f, Active: 0.1f, Recover: 0.6f,
                 Damage: 0f, Reach: 8f),
+        },
+    };
+}
+
+/// <summary>The Delve boss: the Hollow King unbound, fought alone in the arena of a Boss node. Long, and in three stages.</summary>
+internal static class DelveBosses
+{
+    private const string Fireball = "ghoul_fireball.glb";
+
+    private static AttackSpec Leap(int chain) => new(AttackType.LeapSlam, MinRange: 6f, MaxRange: 26f, WindUp: 1f, Active: 1f, Recover: 1.1f,
+        Damage: 45f, Reach: 6.5f, Knockback: 14f, Stun: 0.8f, LeapHeight: 6f, Chain: chain);
+
+    private static AttackSpec Wave(int chain) => new(AttackType.Shockwave, MinRange: 0f, MaxRange: 18f, WindUp: 1.1f, Active: 1.8f, Recover: 0.9f,
+        Damage: 32f, Reach: 22f, HitWidth: 0.8f, Knockback: 9f, Chain: chain);
+
+    private static AttackSpec Charge(int chain) => new(AttackType.Lunge, MinRange: 5f, MaxRange: 16f, WindUp: 0.9f, Active: 0.7f, Recover: 1.2f,
+        Damage: 40f, Reach: 14.4f, HitWidth: 0.2f, Knockback: 16f, Chain: chain);
+
+    private static AttackSpec Rain(int count, float spread) => new(AttackType.Barrage, MinRange: 0f, MaxRange: 40f, WindUp: 1.2f, Active: 0.1f, Recover: 0.9f,
+        Damage: 28f, Reach: spread, Knockback: 7f, ProjectileSpeed: 11f, Splash: 2.4f, ProjectileModel: Fireball, Count: count);
+
+    private static AttackSpec Court(int count) => new(AttackType.Summon, MinRange: 0f, MaxRange: 60f, WindUp: 1f, Active: 0.1f, Recover: 0.6f, Damage: 0f, Reach: count);
+
+    /// <summary>
+    /// The Hollow King Unbound: 5.6 m tall, eight times the run King's health, and in three stages. At first he leaps, sends shockwaves, charges down a long
+    /// lane and calls fire from the sky. Below two thirds he calls his court too, and leaps and charges twice over. Below a third he is enraged: faster, barely
+    /// resting, leaping three times, sending three rings in a row, and raining fire wider.
+    /// </summary>
+    public static readonly EnemyKind HollowKingUnbound = new(
+        Name: "The Hollow King Unbound",
+        Model: "hollow_king_unbound.glb",
+        Tier: EnemyTier.Boss,
+        MaxHealth: 26000f,
+        Speed: 3.2f,
+        Radius: 1.7f,
+        Height: 5.6f,
+        ContactDamage: 30f,
+        ContactInterval: 1f,
+        Experience: 200)
+    {
+        AttackCooldown = 1.9f,
+        Attacks = new[] { Leap(0), Wave(0), Charge(0), Rain(6, 7f) },
+        Phases = new[]
+        {
+            new BossPhase(0.66f, new[] { Leap(1), Wave(0), Charge(1), Rain(10, 9f), Court(8) }, AttackCooldown: 1.5f, SpeedMultiplier: 1.1f,
+                "The Hollow King Unbound calls his court!"),
+            new BossPhase(0.33f, new[] { Leap(2), Wave(2), Charge(2), Rain(14, 11f), Court(10) }, AttackCooldown: 1.1f, SpeedMultiplier: 1.25f,
+                "The Hollow King Unbound is enraged!"),
         },
     };
 }

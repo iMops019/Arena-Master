@@ -10,9 +10,10 @@ using Silk.NET.Maths;
 
 namespace ArenaMaster.Game;
 
-// A run: 30 minutes as the chosen class in the middle of the map, with the loadout's items (and only those) giving bonuses. Experience levels the run (a pick of three
-// upgrades each time) and the active passive tree too. Items found go straight into the chest for a later run - they do nothing in this one. It ends in victory
-// at 30:00, in death, or on "Return to Camp", and its summary follows.
+// A run as the chosen class, with the loadout's items (and only those) and the worn gear giving bonuses: a classic run of 30 minutes in the middle of the map, or
+// a Delve node's (see ArenaMasterContent.Delve.cs). Experience levels the run (a pick of three upgrades each time) and the active passive tree too. Items found go
+// straight into the chest for a later run - they do nothing in this one. A classic run ends in victory at 30:00, a Delve run when its boss's cache is opened;
+// either in death, or on "Return to Camp"; and its summary follows.
 public sealed partial class ArenaMasterContent
 {
     /// <summary>How much tougher the final boss is than the director's scaling alone would make it.</summary>
@@ -60,11 +61,13 @@ public sealed partial class ArenaMasterContent
     private string _announcement = "";
     private float _announcementLeft;
 
-    /// <summary>Sets out from the gate: a fresh run with the loadout's items, the tree's bonuses, full health, at the run start.</summary>
-    private void BeginRun(EngineWindow window)
+    /// <summary>Sets out from the gate on <paramref name="plan"/>: a fresh run with the loadout's items, the gear, the tree's bonuses, full health, at the run start.</summary>
+    private void BeginRun(EngineWindow window, Delve.RunPlan plan)
     {
+        _plan = plan;
         _hero.UseTree(_tree.Save.Ranks);
         _items.Begin(Loadout.ItemsToBring(_profile));   // the loadout as it stands now: finds made on this run won't join it
+        WearGear();
         var bonuses = _items.Carried.Bonuses;
         _hero.BeginRun(bonuses, _health);
         _health.LastStands += bonuses.LastStands;   // the Phoenix Feather's, on top of any the class has
@@ -91,13 +94,20 @@ public sealed partial class ArenaMasterContent
         _elitesKilled = 0;
         _bossesKilled = 0;
 
-        if (window.Terrain is { } terrain)
-        {
-            window.TeleportPlayer(CampLayout.Ground(terrain, CampLayout.RunStart));
-        }
-
         DismissQuartermaster(window);
         _mode = GameMode.Run;
+        if (window.Terrain is not { } terrain)
+        {
+            return;
+        }
+
+        if (plan.IsDelve)
+        {
+            BeginDelve(window, terrain);
+            return;
+        }
+
+        window.TeleportPlayer(CampLayout.Ground(terrain, CampLayout.RunStart));
         Announce("Survive until 30:00");
     }
 
@@ -105,13 +115,19 @@ public sealed partial class ArenaMasterContent
     {
         DevKeys(window, groundAt);
         _runSeconds += deltaSeconds;
-        if (RunDirector.IsWon(_runSeconds))
+        if (_plan.IsDelve)
+        {
+            UpdateDelve(window, deltaSeconds, groundAt);
+        }
+        else if (RunDirector.IsWon(_runSeconds))
         {
             EndRun(window, RunEnding.Won);
             return;
         }
-
-        FollowOrders(_director.Update(_runSeconds, _enemies), window.PlayerFeet, groundAt);
+        else
+        {
+            FollowOrders(_director.Update(_runSeconds, _enemies), window.PlayerFeet, groundAt);
+        }
 
         // The class attacks; the enemies move and strike (against the block chance and damage cut as they stand this frame); the class answers their blows.
         bool standingStill = window.PlayerMoveDirection == Vector3D<float>.Zero && _hero.DashVelocity == Vector3D<float>.Zero && _condition.Knockback == Vector3D<float>.Zero;
@@ -162,8 +178,19 @@ public sealed partial class ArenaMasterContent
         if (_health.IsDead)
         {
             EndRun(window, RunEnding.Slain);
+            return;
         }
-        else if (_pendingLevels > 0 && !_levelUp.IsOpen)
+
+        if (_plan.IsDelve)
+        {
+            UpdateCache(window, deltaSeconds);   // which ends the run once the cache is open
+            if (_mode != GameMode.Run)
+            {
+                return;
+            }
+        }
+
+        if (_pendingLevels > 0 && !_levelUp.IsOpen)
         {
             OpenLevelUp(window);
         }
@@ -174,8 +201,10 @@ public sealed partial class ArenaMasterContent
     {
         ClearField(window);
 
-        // What lasts: silver for the run, and any bounties it (or the lifetime totals) completed.
-        var record = new RunRecord(_enemies.Kills, _elitesKilled, _bossesKilled, _runSeconds, ending == RunEnding.Won, _experience.Level, _hero.Id);
+        // What lasts: a cleared Delve node's cache, silver for the run, and any bounties it (or the lifetime totals, or the Delve's progress) completed.
+        var delve = SettleDelve(ending);
+        var record = new RunRecord(_enemies.Kills, _elitesKilled, _bossesKilled, _runSeconds, ending == RunEnding.Won, _experience.Level, _hero.Id,
+            _plan.Depth, DelveCleared: ending == RunEnding.DelveCleared, DelveBoss: _plan.Kind == Delve.RunKind.Arena);
         var carried = _items.Carried.Bonuses;
         long silver = (long)MathF.Round(RunRewards.Silver(record) * (1f + carried.SilverGain) * carried.SilverMultiplier) + _runSilver;   // and what crates gave
         _profile.Silver += silver;
@@ -183,7 +212,7 @@ public sealed partial class ArenaMasterContent
         SaveProfile();
 
         _summaryScreen.Open(new RunSummary(ending, _runSeconds, _experience.Level, _enemies.Kills, _items.Found.ToList(),
-            _runTreeExperience, _runTreeLevels, _tree.Level, _tree.Tree.Name, silver, bounties));
+            _runTreeExperience, _runTreeLevels, _tree.Level, _tree.Tree.Name, silver, bounties, delve));
         _mode = GameMode.Summary;
         window.GamePaused = true;
     }
@@ -208,6 +237,8 @@ public sealed partial class ArenaMasterContent
         _itemEffects.Begin();
         _itemEffectsView.Clear(window);
         ClearCrates(window);
+        RemoveCache(window);
+        _delveDirector = null;
         _enemies.HitEffects = HitEffects.None;
         _enemies.HealthBonus = 0f;
         _enemies.RangedDamageTaken = 1f;
@@ -234,8 +265,16 @@ public sealed partial class ArenaMasterContent
         {
             case EnemyTier.Boss:
                 _bossesKilled++;
-                _loot.DropChest(killed.Position, RarityWeights.Boss);
                 Announce($"{killed.Kind.Name} has fallen!");
+                if (_plan.IsDelve && _window is { } window)
+                {
+                    DropCache(window, killed.Position);   // a Delve boss leaves the cache, not a chest
+                }
+                else
+                {
+                    _loot.DropChest(killed.Position, RarityWeights.Boss);
+                }
+
                 break;
             case EnemyTier.Elite:
                 _elitesKilled++;
@@ -341,7 +380,7 @@ public sealed partial class ArenaMasterContent
 
         _enemies.SpawnAround(EnemyKind.HollowKing, playerFeet, groundAt);
         _enemies.Scaling = scaling;
-        Announce(final ? "The Hollow King returns, in full fury" : "The Hollow King rises");
+        Announce(_plan.IsDelve ? "The Hollow King rises: slay him to clear the floor" : final ? "The Hollow King returns, in full fury" : "The Hollow King rises");
     }
 
     private void Announce(string text)

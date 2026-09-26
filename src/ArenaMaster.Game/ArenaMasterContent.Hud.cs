@@ -14,6 +14,21 @@ public sealed partial class ArenaMasterContent
     private static readonly Vector4D<float> Red = new(0.95f, 0.3f, 0.3f, 1f);
     private static readonly Vector4D<float> Teal = new(0.33f, 0.82f, 0.76f, 1f);
     private static readonly Vector4D<float> Shade = new(0f, 0f, 0f, 0.45f);
+    private static readonly Vector4D<float> Unique = new(1f, 0.56f, 0.18f, 1f);
+
+    /// <summary>The run's clock, and what it is counting toward: 30:00 on a classic run; on a Delve node the King at 10:00, then slaying him, then his cache.</summary>
+    private string RunClock()
+    {
+        string clock = Clock(_runSeconds);
+        return _plan.Kind switch
+        {
+            Delve.RunKind.Classic => $"{clock} / {Clock(RunDirector.RunLength)}",
+            Delve.RunKind.Arena => _cacheAt is not null ? $"{clock}  ·  open the cache" : $"{clock}  ·  the Hollow King Unbound",
+            _ when _cacheAt is not null => $"{clock}  ·  open the cache",
+            _ when _delveDirector is { BossCalled: true } => $"{clock}  ·  slay the King",
+            _ => $"{clock}  ·  the King at {Clock(Delve.DelveDirector.BossAt)}",
+        };
+    }
 
     public void DrawHud(IHud hud)
     {
@@ -42,6 +57,7 @@ public sealed partial class ArenaMasterContent
         int owned = _profile.Stash.Values.Sum();
         hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 78f), $"Item chest  ·  {owned} item{(owned == 1 ? "" : "s")}", White, 0.8f);
         hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 102f), $"Silver  ·  {_profile.Silver:N0}", Gold, 0.8f);
+        hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 126f), $"Delve  ·  depth {_profile.Delve.Deepest}  ·  {_profile.Delve.Marks:N0} Marks", Unique, 0.8f);
 
         if (_nearStation is { } near)
         {
@@ -50,7 +66,7 @@ public sealed partial class ArenaMasterContent
         else
         {
             hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -120f),
-                "Chest and quartermaster on the right, tree target and bounty board on the left, class rack behind you, the gate ahead starts a run",
+                "Chest, quartermaster and armour stand on the right, tree target and bounty board on the left, class rack behind you, the gate ahead opens the Delve",
                 new Vector4D<float>(1f, 1f, 1f, 0.6f), 0.8f);
         }
 
@@ -70,7 +86,11 @@ public sealed partial class ArenaMasterContent
             new Vector4D<float>(0.35f, 0.8f, 0.95f, 0.95f), Shade);
         hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 32f), $"LV {_experience.Level}", Gold, 1f);
         hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 60f), $"{_tree.Tree.Name} Lv {_tree.Level}  +{_runTreeExperience:N0} xp", Teal, 0.65f);
-        hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 32f), $"{Clock(_runSeconds)} / {Clock(RunDirector.RunLength)}", White, 1.1f);
+        hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 32f), RunClock(), White, 1.1f);
+        if (_plan.Node is { } node)
+        {
+            hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 82f), $"Depth {node.Depth}  ·  {node.Name}", Unique, 0.75f);
+        }
         hud.Text(HudAnchor.TopRight, new Vector2D<float>(-26f, 32f), $"Kills  {_enemies.Kills}", White, 0.9f);
 
         // The boss's health, under the clock, while one is on the field.
@@ -86,15 +106,23 @@ public sealed partial class ArenaMasterContent
         var healthColor = Vector4D.Lerp(new Vector4D<float>(0.78f, 0.2f, 0.22f, 0.95f), new Vector4D<float>(1f, 0.55f, 0.55f, 1f), _health.HurtFlash);
         hud.Bar(HudAnchor.BottomLeft, new Vector2D<float>(24f, -28f), new Vector2D<float>(260f, 18f), health, healthColor, Shade);
         string barrier = "";
+        if (_health.Shield > 0f || _health.ShieldMax > 0f)
+        {
+            // A gear shield: a pale gold band along the top of the bar, full when it is whole, empty (and counting back) once it has broken.
+            float share = _health.ShieldMax > 0f ? Math.Clamp(_health.Shield / _health.ShieldMax, 0f, 1f) : 0f;
+            hud.Bar(HudAnchor.BottomLeft, new Vector2D<float>(24f, -42f), new Vector2D<float>(260f, 6f), share, new Vector4D<float>(1f, 0.78f, 0.35f, 0.95f), Shade);
+            barrier += _health.Shield > 0f ? $"   +{MathF.Ceiling(_health.Shield)} gear shield" : $"   gear shield in {MathF.Ceiling(_itemEffects.ShieldReturnsIn)}s";
+        }
+
         if (_health.Barrier > 0f)
         {
             // A barrier over the health (the Mage's Frost Shield): an icy band along the bottom of the bar, as a share of max health.
             hud.Bar(HudAnchor.BottomLeft, new Vector2D<float>(24f, -28f), new Vector2D<float>(260f, 6f), Math.Clamp(_health.Barrier / _health.Max, 0f, 1f),
                 new Vector4D<float>(0.6f, 0.9f, 1f, 0.95f), new Vector4D<float>(0f, 0f, 0f, 0f));
-            barrier = $"   +{MathF.Ceiling(_health.Barrier)} shield";
+            barrier += $"   +{MathF.Ceiling(_health.Barrier)} shield";
         }
 
-        hud.Text(HudAnchor.BottomLeft, new Vector2D<float>(28f, -50f), $"HP  {MathF.Ceiling(_health.Current)} / {_health.Max}{barrier}", White, 0.75f);
+        hud.Text(HudAnchor.BottomLeft, new Vector2D<float>(28f, -64f), $"HP  {MathF.Ceiling(_health.Current)} / {_health.Max}{barrier}", White, 0.75f);
         if (_health.HurtFlash > 0f)
         {
             hud.Rect(HudAnchor.TopLeft, Vector2D<float>.Zero, new Vector2D<float>(hud.ScreenSize.X, hud.ScreenSize.Y), new Vector4D<float>(0.7f, 0f, 0f, 0.18f * _health.HurtFlash));

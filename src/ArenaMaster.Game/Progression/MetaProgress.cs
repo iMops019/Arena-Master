@@ -15,8 +15,12 @@ internal sealed class LifetimeRecord
     public float LongestRun { get; set; }
 }
 
-/// <summary>What one run did, as the rewards and bounties see it at its end. <paramref name="ClassId"/> is the class it was played as.</summary>
-internal sealed record RunRecord(int Kills, int ElitesKilled, int BossesKilled, float Seconds, bool Won, int Level, string ClassId = "");
+/// <summary>
+/// What one run did, as the rewards and bounties see it at its end. <paramref name="ClassId"/> is the class it was played as. A Delve run has its floor's
+/// <paramref name="Depth"/> (0 for a classic run) and whether its node was <paramref name="DelveCleared"/>; <paramref name="Won"/> is only ever a classic run's win.
+/// </summary>
+internal sealed record RunRecord(int Kills, int ElitesKilled, int BossesKilled, float Seconds, bool Won, int Level, string ClassId = "", int Depth = 0, bool DelveCleared = false,
+    bool DelveBoss = false);
 
 /// <summary>The silver a run earns, win or lose: a little per kill, more for elites and bosses, some for every minute survived, and a bonus for winning.</summary>
 internal static class RunRewards
@@ -150,6 +154,33 @@ internal static class Bounties
         // The Shaman's.
         new("conductor", "Conductor", "Kill 600 enemies in one run as the Shaman.", 250, "stormcallers_horn", (run, _, _) => run.ClassId == Shaman && run.Kills >= 600),
         new("stormborn", "Stormborn", "Win a run as the Shaman.", 800, "crown_of_storms", (run, _, _) => run.ClassId == Shaman && run.Won),
+
+        // The Delve.
+        new("into_the_dark", "Into the Dark", "Clear your first Delve node.", 100, null, (_, profile, _) => profile.Delve.Cleared.Count >= 1),
+        new("deeper_still", "Deeper Still", "Open Delve depth 5.", 200, null, (_, profile, _) => profile.Delve.Deepest >= 5),
+        new("the_mistdeep", "The Mistdeep", "Open Delve depth 10.", 400, null, (_, profile, _) => profile.Delve.Deepest >= 10),
+        new("night_walker", "Night Walker", "Open Delve depth 15.", 700, null, (_, profile, _) => profile.Delve.Deepest >= 15),
+        new("frozen_deep", "The Frozen Deep", "Open Delve depth 20.", 1000, null, (_, profile, _) => profile.Delve.Deepest >= 20),
+        new("abyss_gazer", "Abyss Gazer", "Open Delve depth 30.", 2000, null, (_, profile, _) => profile.Delve.Deepest >= 30),
+        new("delver", "Delver", "Clear 10 Delve nodes.", 250, null, (_, profile, _) => profile.Delve.Cleared.Count >= 10),
+        new("veteran_delver", "Veteran Delver", "Clear 40 Delve nodes.", 800, null, (_, profile, _) => profile.Delve.Cleared.Count >= 40),
+        new("every_path", "Every Path", "Clear a Currency, Armoury, Knowledge and Relic Delve.", 400, null, (_, profile, _) =>
+            new[] { "Currency", "Armoury", "Knowledge", "Relic" }.All(k => profile.Delve.ClearedByKind.GetValueOrDefault(k) > 0)),
+        new("swift_delve", "Swift Delve", "Clear a Delve node within 11 minutes.", 300, null, (run, _, _) => run.DelveCleared && !run.DelveBoss && run.Seconds <= 660f),
+        new("unbound", "Unbound", "Defeat the Hollow King Unbound in a Boss Delve.", 500, null, (_, profile, _) => profile.Delve.BossesSlain >= 1),
+        new("kingbreaker", "Kingbreaker", "Defeat the Hollow King Unbound 3 times.", 1200, null, (_, profile, _) => profile.Delve.BossesSlain >= 3),
+        new("deep_ranger", "Ranger of the Deep", "Clear a Delve node at depth 10 or deeper as the Ranger.", 400, null,
+            (run, _, _) => run.ClassId == Ranger && run.DelveCleared && run.Depth >= 10),
+        new("deep_paladin", "Paladin of the Deep", "Clear a Delve node at depth 10 or deeper as the Paladin.", 400, null,
+            (run, _, _) => run.ClassId == Paladin && run.DelveCleared && run.Depth >= 10),
+        new("deep_mage", "Mage of the Deep", "Clear a Delve node at depth 10 or deeper as the Mage.", 400, null,
+            (run, _, _) => run.ClassId == Mage && run.DelveCleared && run.Depth >= 10),
+        new("deep_shaman", "Shaman of the Deep", "Clear a Delve node at depth 10 or deeper as the Shaman.", 400, null,
+            (run, _, _) => run.ClassId == Shaman && run.DelveCleared && run.Depth >= 10),
+        new("armourer", "Armourer", "Own 4 pieces of gear.", 300, null, (_, profile, _) => profile.Gear.Owned.Count >= 4),
+        new("fully_kitted", "Fully Kitted", "Wear gear in all three slots.", 250, null, (_, profile, _) => Gear.GearCatalog.Worn(profile).Count() >= 3),
+        new("armoury_complete", "The Full Armoury", "Own every piece of gear.", 1500, null,
+            (_, profile, _) => Gear.GearCatalog.All.All(piece => Gear.GearCatalog.Owns(profile, piece))),
     };
 
     // The class ids the class bounties ask for (the classes' own ids, kept here as text so the board doesn't reach into any class's code).

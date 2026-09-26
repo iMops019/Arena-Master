@@ -17,6 +17,9 @@ internal sealed class EnemyView
     public const string RingModel = "telegraph_ring.glb";
     public const string DiscModel = "telegraph_disc.glb";
     public const string LaneModel = "telegraph_lane.glb";
+
+    /// <summary>How long the lane model is: a lunge of another reach scales it.</summary>
+    private const float LaneLength = 7.2f;
     public const string ShockwaveModel = "shockwave_ring.glb";
     public const string LandingModel = "fireball_mark.glb";
     public const string BlastModel = "fireball_burst.glb";
@@ -208,7 +211,7 @@ internal sealed class EnemyView
                 case (AttackPhase.WindUp, AttackType.LeapSlam):
                     position.Y -= 0.25f * windUp;                                                     // squatting to jump
                     break;
-                case (AttackPhase.WindUp, AttackType.Shockwave or AttackType.Summon):
+                case (AttackPhase.WindUp, AttackType.Shockwave or AttackType.Summon or AttackType.Barrage):
                     pitch -= 0.3f * windUp;                                                           // rearing up
                     break;
                 case (AttackPhase.WindUp, AttackType.Shoot):
@@ -251,7 +254,7 @@ internal sealed class EnemyView
             {
                 var direction = enemy.AttackTarget - enemy.AttackOrigin;
                 float yaw = MathF.Atan2(direction.X, direction.Z);
-                yield return (Marker.Lane, new PropPlacement(LaneModel, Lift(enemy.AttackOrigin, 0.06f), yaw, 1f));
+                yield return (Marker.Lane, new PropPlacement(LaneModel, Lift(enemy.AttackOrigin, 0.06f), yaw, attack.Reach / LaneLength));   // a longer charge, a longer (and wider) lane
                 break;
             }
 

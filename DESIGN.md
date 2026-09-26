@@ -14,14 +14,14 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 
 ## The core loop
 
-0. At **camp**, choose a class at the weapon rack, check the item chest, spend passive tree points, read the bounty board, buy upgrades from the quartermaster with silver, and choose a loadout of up to 5 items (more with Bigger Pack) at the departure gate.
-1. Start a 30-minute run as a class.
+0. At **camp**, choose a class at the weapon rack, check the item chest, wear gear at the armour stand, spend passive tree points, read the bounty board, buy upgrades from the quartermaster with silver, and at the departure gate pick where to go on the **Delve chart** (or a classic run) and a loadout of up to 5 items (more with Bigger Pack).
+1. Start a run as a class: a Delve node (about 10 minutes, one boss, a cache at the end; see "The Delve"), or a classic 30-minute run.
 2. Move and aim. Attacks fire automatically in the direction the camera faces (Megabonk-style), so positioning and aim matter but you never click to attack.
 3. Kill monsters, which drop XP. Collect it to level up.
 4. On level up the game pauses and offers **3 choices**: new abilities, upgrades to owned abilities, or stat boosts. Choices stack and can come up again.
 5. Monsters and chests drop **items**. They go to the chest at camp and give their bonuses on a later run that brings them, not the one they were found in.
-6. Survive the escalating waves, elites and bosses to the 30-minute mark.
-7. The run ends in victory, death, or "Return to Camp" from the pause menu. A summary shows what it earned: silver, bounties completed, tree experience, items found. Back at camp, spend it.
+6. Survive the escalating waves, elites and bosses: to the 30-minute mark on a classic run; on a Delve node, until the boss falls and his cache is opened.
+7. The run ends in victory (a classic win, or a cleared Delve node), death, or "Return to Camp" from the pause menu. A summary shows what it earned: silver, bounties completed, tree experience, items found. Back at camp, spend it.
 
 ## Camera and controls (built)
 
@@ -189,14 +189,46 @@ The user's brief: a Shaman whose first tree is **Lightning Alignment** and whose
 
 ## Camp (built)
 
-- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle, walled in by a palisade (an octagon of sharpened logs, `CampWalls`) with the departure gate set in it as a gatehouse, and ringed outside by low wooded hills. Going to a run and coming back is a fade to black with the place's name on it (`Ui/ScreenFade`), so camp reads as its own small place. The camp is dressed (`CampLayout.Decor`: tents and bedrolls, benches round the fire, a cooking fire, braziers, banners, lanterns, a well, a supply cart, crates, barrels and sacks, a practice yard with dummies and straw bales, a woodpile), and the **quartermaster** stands behind his stall, idling (a skinned model with a looping clip: he breathes, looks about, strokes his moustache). He is only for looks. A fire, and six stations; walk up and press E:
+- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle, walled in by a palisade (an octagon of sharpened logs, `CampWalls`) with the departure gate set in it as a gatehouse, and ringed outside by low wooded hills. Going to a run and coming back is a fade to black with the place's name on it (`Ui/ScreenFade`), so camp reads as its own small place. The camp is dressed (`CampLayout.Decor`: tents and bedrolls, benches round the fire, a cooking fire, braziers, banners, lanterns, a well, a supply cart, crates, barrels and sacks, a practice yard with dummies and straw bales, a woodpile), and the **quartermaster** stands behind his stall, idling (a skinned model with a looping clip: he breathes, looks about, strokes his moustache). He is only for looks. A fire, and seven stations; walk up and press E:
   - **Weapon rack** (behind the spawn) -> choose the class: the Ranger, the Paladin, the Mage or the Shaman. Each keeps its own tree; the item chest, silver and upgrades are shared.
   - **Stash chest** -> Item Chest: every item, how many owned, and which are still undiscovered.
   - **Archery target** -> the chosen class's passive tree (the in-game version of the mockup).
   - **Bounty board** -> the bounties, done and to do.
   - **Quartermaster's stall** -> upgrades for silver.
-  - **Departure gate** -> loadout (pick up to 5 items, more if bought), then Begin run.
-- Progress is saved to `%AppData%/ArenaMaster/profile.json` (stash, loadout, trees, silver, upgrades, bounties, lifetime totals). It saves on every change at camp, every 20 s in a run, when the tree levels, and at the end of a run.
+  - **Armour stand** (by the stash) -> Gear: the three slots and every piece, worn or not (see "Gear").
+  - **Departure gate** -> the Delve chart (pick a node, or a classic run), then the loadout (pick up to 5 items, more if bought), then Begin run.
+- Progress is saved to `%AppData%/ArenaMaster/profile.json` (stash, loadout, trees, silver, upgrades, bounties, lifetime totals, the Delve's progress and Delve Marks, gear owned and worn). It saves on every change at camp, every 20 s in a run, when the tree levels, and at the end of a run.
+
+## The Delve (built, first pass)
+
+Added content, not a replacement: the classic 30-minute run is still there, a button on the Delve chart. Inspired by Path of Exile's Delve. All numbers are a first guess.
+- **The chart** (the departure gate, `Ui/DelveChartScreen`): floors going down from depth 1, drawn as rows of nodes joined to the floor below. Each floor has **3 nodes** of different kinds, the same every time (seeded by depth, `Delve/DelveMap`), and **every 5th floor** a **Boss node** too (optional). **Clearing any node opens the floor below**; the floor's other nodes stay open to come back to. A cleared node is done. Floors not open yet are shown dark, two ahead.
+- **Node kinds and what their cache pays** (`DelveRules.Reward`; base silver is 80 + 30 per depth):
+  - *Currency:* four times the base silver.
+  - *Armoury:* a piece of gear not yet owned (400 silver if every piece is owned), plus the base silver.
+  - *Knowledge:* 500 + 150 per depth passive tree experience, plus the base silver.
+  - *Relic:* two items at a boss chest's odds (with Lucky Charm), plus the base silver.
+  - *Boss:* three times the base silver, a piece of gear, an item, and **Delve Marks** (1 + the boss tier: 2 at depth 5, 3 at depth 10...).
+- **A Delve node's run** (`Delve/DelveDirector`), about 10 minutes on the usual map: one Ghoul Brute at 5:00; the Hollow King and two Brutes at 10:00; three more Brutes when the King is at half health. The swarm is the classic run's curves played faster, and how far along them it gets by 10:00 depends on the depth: the classic 10:00 on depth 1, 1.5 minutes more each floor, up to 28:00. After 10:00 the swarm holds at that strength until the King falls. The King leaves the **Delve cache** (black and iron-bound, an orange seal, a beam of light); walking up to it opens it and clears the node. The HUD shows the depth and node, and the clock counts to the King, then says to slay him, then to open the cache.
+- **Depth** makes everything tougher on top of the run's own ramp: +15% enemy health and +6% damage per floor.
+- **Dying** keeps what dying always kept (the run's silver, items found, tree experience), but the node isn't cleared and the cache pays nothing. Only a classic 30:00 counts as a win for the bounties.
+- **Floor looks** (`Delve/DelveBands`): the same map, lit and weathered by band. Depth 1-4 *the Greenwood* (day); 5-9 *the Amber Hollows* (a low evening sun, amber mist); 10-14 *the Mistdeep* (overcast, rain, thick mist); 15-19 *the Night Hollows* (night, blue mist, wisps); 20 and deeper *the Frozen Deep* (snow falling, mist, cold). Camp's own sky comes back on the way home.
+- **Boss nodes** (`Delve/BossArena`, `DelveBosses`): the **Hollow King Unbound**, alone in an arena (a ring of palisade 25 m across, in its own corner of the map, braziers round it). No swarm. 26,000 health (times the depth's health), 5.6 m tall, in three stages:
+  - *First:* leap slam, shockwave, a long charge down a wide lane, and **fire from the sky** (6 fireballs falling on marked circles around the player, the first right where they stand).
+  - *Below 2/3 ("calls his court"):* faster, a Brute steps out at his side; double leaps and charges, 10 fireballs, and he summons ghouls.
+  - *Below 1/3 (enraged):* faster still, two more Brutes, barely resting: triple leaps, three shockwaves in a row, triple charges, 14 fireballs spread wider.
+  - The player starts the fight at a set level (15 at depth 5, 2 more each boss floor) and picks every level's upgrade before it begins. The King's summoned ghouls drop experience. He leaves his cache in the arena's middle.
+- **Delve Marks** are the Delve bosses' own currency, saved and shown at camp and on the chart. **What they buy isn't built yet** (the user is designing it).
+
+## Gear (built, first pass)
+
+- Three slots: **Body Armour, Weapon, Trinket** (`Gear/Gear.cs`). Every piece is a **unique**: a name, one simple, strong effect, a line of flavour, and the orange unique look. Any class can wear any piece. Worn gear counts on every run, classic or Delve, through the same bonuses items use (not an item: it doesn't take a loadout slot).
+- Found in **Armoury** and **Boss** Delves: a piece not owned yet, preferring an empty slot's, and put on if its slot is empty. Owned once; worn and taken off at the armour stand (`Ui/GearScreen`).
+- The 12 pieces:
+  - *Body Armour:* **Great Mage's Vestments** (a 100-point shield over health and any class shield; once broken it returns after 10 s), **Ironhide Hauberk** (15% less damage taken, +30 max health), **Thornmail of the Hollow** (blows that reach you are paid back in full), **Wraithskin Coat** (+15% move speed, Shift move 30% faster).
+  - *Weapon:* **Kingsbane** (x1.4 damage to elites and bosses), **Emberbrand** (a ring of fire around you every 5 s for 60 damage), **Tempest Fang** (x1.2 attack speed), **Soulreaver** (+10% damage, heal 2 per kill).
+  - *Trinket:* **Lantern of the Deep** (+50% pickup range, +15% experience), **Delver's Compass** (+50% cache silver, +15% silver), **Heart of the Mountain** (+60 max health, +1 health per second), **Gambler's Die** (+10% critical chance, +1 reroll).
+- Icons: none yet. The pieces are text cards; an AI image generator could make icons later.
 
 ## Meta progression (built, first pass)
 
@@ -207,7 +239,7 @@ All in `Progression/MetaProgress.cs`; all numbers are a starting point to tune.
   - *Second Thoughts:* +1 reroll per run on the level-up screen, 5 ranks. A reroll swaps all three cards (R).
   - *Clear Mind:* +1 banish per run, 3 ranks. A banish strikes one card's upgrade from the pool for the rest of the run and replaces the card.
   - *Lucky Charm:* 5 ranks. Each makes rares 15%, epics 30% and legendaries 50% likelier (relative to commons) from chests and drops.
-- **The Bounty Board** (camp) has 23 one-time challenges, checked at the end of every run. Each pays silver once, and 18 unlock an item into the drop pool. **Every epic and legendary starts locked** (items already owned stay owned). The board lists the open ones first and scrolls:
+- **The Bounty Board** (camp) has 42 one-time challenges, checked at the end of every run. Each pays silver once, and 18 unlock an item into the drop pool. **Every epic and legendary starts locked** (items already owned stay owned). The board lists the open ones first and scrolls:
   - Brute Force (kill a Brute) -> Ironbark Totem
   - Holding On (survive 10 min) -> Swiftwind Sigil
   - Regicide (kill the Hollow King) -> Hunter's Moon
@@ -227,6 +259,7 @@ All in `Progression/MetaProgress.cs`; all numbers are a starting point to tune.
   - Conductor (600 kills in a run as the Shaman) -> Stormcaller's Horn
   - Stormborn (win as the Shaman) -> Crown of Storms
   - Silver only: First Hunt, Collector, Deep Roots, A Thousand Cuts (lifetime), Champion (win).
+  - The Delve's, silver only: Into the Dark (first node), Deeper Still / The Mistdeep / Night Walker / The Frozen Deep / Abyss Gazer (open depth 5, 10, 15, 20, 30), Delver and Veteran Delver (10 and 40 nodes), Every Path (a node of each run kind), Swift Delve (a node within 11 minutes), Unbound and Kingbreaker (the Hollow King Unbound once and three times), Ranger / Paladin / Mage / Shaman of the Deep (a node at depth 10+ as that class), Armourer (4 pieces of gear), Fully Kitted (all three slots worn), The Full Armoury (every piece).
   - While a rarity's items are all locked, a roll of that rarity falls back to the next one down.
 - Later: unlocking a second class, more trees, cosmetic or camp upgrades.
 
@@ -245,7 +278,8 @@ Each step should be playable before the next one starts. **[engine]** means the 
 9. *(Built, first pass.)* **Class #2, the Paladin, and its Defiance tree**, with a class rack at camp to switch. [game]
 10. *(Built, first pass.)* **Class #3, the Mage, and its Frost tree.** [game]
 11. *(Built, first pass.)* **Class #4, the Shaman, and its Lightning Alignment tree.** [engine: `TouchesObstacle`] [game]
-12. Play the four classes and tune them: the Ranger, the Paladin (how much standing still should pay), the Mage (how hard standing still should punish), the Shaman (how much the trees give). Then more enemies, or second trees.
+12. *(Built, first pass; not yet played.)* **The Delve, Boss nodes and gear:** the Delve chart, 10-minute Delve runs with a boss and a cache, depth scaling and floor looks, the Hollow King Unbound in his arena (boss stages, chained attacks, fire from the sky), Delve Marks, 12 gear uniques at a new armour stand, 19 Delve bounties. [game]
+13. Play the four classes and the Delve, and tune them: the Ranger, the Paladin (how much standing still should pay), the Mage (how hard standing still should punish), the Shaman (how much the trees give); the Delve's pace, rewards and the Unbound King's health. Then what Delve Marks buy, more enemies, or second trees.
 
 ## Open questions
 
@@ -256,3 +290,7 @@ Each step should be playable before the next one starts. **[engine]** means the 
 - Meta progression numbers (silver rates, prices, which items are locked behind which bounty) are a first guess.
 - The real map: size, layout and look (the hybrid: bounded, mid-to-large).
 - Respec is free for now. Keep it free, or give it a cost later?
+- **What Delve Marks buy** (the user is designing a system for them).
+- **Item limits:** some items stack too hard (the user got three Serrated Edges, +90% crit damage, and one-shot everything for 30 minutes). The plan is to cap some items; not done yet.
+- **Late classic runs:** past about 25:00 the screen fills and it gets very hard; a non-crit Frost Mage falls at about 27:00. With ~200 Ghoul Mages on the field their fireball marks pile up (hundreds of circles under the player) and catch them. The Ghoul Mage needs a nerf and a look (a cap on marks or on mages casting at once).
+- The Unbound King's health (26,000 times the depth's), the arena's starting level, and whether picking 14+ upgrades before the fight feels good, are guesses to try.

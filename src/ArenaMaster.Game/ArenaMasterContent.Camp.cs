@@ -6,8 +6,8 @@ using Silk.NET.Maths;
 
 namespace ArenaMaster.Game;
 
-// Camp: walking up to a station and pressing E opens its screen - the item chest, the passive tree, the class rack, the bounty board, the quartermaster, or the
-// loadout at the departure gate, which is where a run begins.
+// Camp: walking up to a station and pressing E opens its screen - the item chest, the passive tree, the class rack, the bounty board, the quartermaster, the
+// armour stand's gear, or the Delve chart at the departure gate, which leads through the loadout to a run: a Delve node, or a classic run.
 // A screen pauses the world (the engine's GamePaused) and frees the cursor until it is closed.
 // Camp is walled in and dressed, with the quartermaster idling behind his stall; the trip to a run and back goes through a fade to black (Travel).
 public sealed partial class ArenaMasterContent
@@ -19,6 +19,11 @@ public sealed partial class ArenaMasterContent
     private readonly BountyBoardScreen _bountyScreen = new();
     private readonly QuartermasterScreen _shopScreen = new();
     private readonly ClassScreen _classScreen = new();
+    private readonly DelveChartScreen _delveScreen = new();
+    private readonly GearScreen _gearScreen = new();
+
+    /// <summary>The run chosen on the Delve chart, waiting on the loadout screen.</summary>
+    private Delve.RunPlan _nextPlan = Delve.RunPlan.Classic;
     private readonly ConfirmScreen _newGameScreen = new(
         "New game",
         "Start over from nothing? Your item chest, loadout, passive tree, silver, bounties and quartermaster upgrades all go back to the start. Your current save is kept as a backup copy next to it.",
@@ -60,8 +65,10 @@ public sealed partial class ArenaMasterContent
                 _treeScreen.Open();
                 break;
             case CampStation.Gate:
-                Loadout.Sanitize(_profile);
-                _loadoutScreen.Open();
+                _delveScreen.Open();
+                break;
+            case CampStation.Gear:
+                _gearScreen.Open();
                 break;
             case CampStation.Bounties:
                 _bountyScreen.Open();
@@ -153,16 +160,61 @@ public sealed partial class ArenaMasterContent
             return true;
         }
 
+        if (_gearScreen.IsOpen)
+        {
+            bool closed = _gearScreen.Draw(_profile);
+            if (_gearScreen.Changed)
+            {
+                _gearScreen.Changed = false;
+                SaveProfile();
+            }
+
+            if (closed)
+            {
+                CloseScreen(window);
+            }
+
+            return true;
+        }
+
+        if (_delveScreen.IsOpen)
+        {
+            var (choice, node) = _delveScreen.Draw(_profile);
+            switch (choice)
+            {
+                case DelveChartScreen.Choice.Delve when node is not null:
+                    _nextPlan = Delve.RunPlan.For(node);
+                    Loadout.Sanitize(_profile);
+                    _loadoutScreen.Open();   // still paused: on to the loadout
+                    break;
+                case DelveChartScreen.Choice.Classic:
+                    _nextPlan = Delve.RunPlan.Classic;
+                    Loadout.Sanitize(_profile);
+                    _loadoutScreen.Open();
+                    break;
+                case DelveChartScreen.Choice.Close:
+                    CloseScreen(window);
+                    break;
+            }
+
+            return true;
+        }
+
         if (_loadoutScreen.IsOpen)
         {
-            var result = _loadoutScreen.Draw(_profile, _hero.Name);
+            var result = _loadoutScreen.Draw(_profile, _hero.Name, _nextPlan.Destination);
             if (result != LoadoutScreen.Result.None)
             {
                 SaveProfile();   // the loadout is remembered either way
-                CloseScreen(window);
                 if (result == LoadoutScreen.Result.Begin)
                 {
-                    Travel(window, "Into the Wilds", () => BeginRun(window));
+                    CloseScreen(window);
+                    var plan = _nextPlan;
+                    Travel(window, plan.Title, () => BeginRun(window, plan));
+                }
+                else
+                {
+                    _delveScreen.Open();   // back to the chart
                 }
             }
 
@@ -181,6 +233,8 @@ public sealed partial class ArenaMasterContent
         _bountyScreen.Close();
         _shopScreen.Close();
         _classScreen.Close();
+        _delveScreen.Close();
+        _gearScreen.Close();
     }
 
     private void CloseScreen(EngineWindow window)
@@ -241,6 +295,8 @@ public sealed partial class ArenaMasterContent
     private void ReturnToCamp(EngineWindow window)
     {
         _mode = GameMode.Camp;
+        _plan = Delve.RunPlan.Classic;
+        RestoreCampLook(window);
         _hero.ReturnToCamp();
         _hero.UseTree(_tree.Save.Ranks);
         _health.Reset(_hero.MaxHealth);
