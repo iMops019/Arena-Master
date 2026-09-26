@@ -39,6 +39,11 @@ internal sealed class MageClass : IHeroClass
     /// <summary>Ice Block's last stand, not yet used this run. Any other last stand (an item's) is the content's to answer.</summary>
     private int _iceBlockLeft;
 
+    /// <summary>How long after the last attack frame the body still holds its fighting stance (a run's attacks come after the body in each frame).</summary>
+    private const float AttackingHold = 0.25f;
+
+    private float _attackingLeft;
+
     public MageClass(Random random) => _barrage = new FrostBarrage(random);
 
     public MageStats Stats { get; } = new();
@@ -101,12 +106,35 @@ internal sealed class MageClass : IHeroClass
         _shieldUp = false;
     }
 
-    public void Move(EngineWindow window, float deltaSeconds, bool stunned) => _controller.Update(window, deltaSeconds, Stats, stunned);
+    public void Move(EngineWindow window, float deltaSeconds, bool stunned)
+    {
+        _attackingLeft = MathF.Max(0f, _attackingLeft - deltaSeconds);
+        _controller.Update(window, deltaSeconds, Stats, stunned, _attackingLeft > 0f ? AttackTime() : null);
+    }
+
+    /// <summary>
+    /// Where the body's attack clip is, in time with the barrages: through the blow just after (the clip's middle is the moment it lands), and ready
+    /// in between (it waits for something to aim at, so there is no wind-up).
+    /// </summary>
+    private float AttackTime()
+    {
+        float interval = Stats.BarrageInterval;
+        float until = _barrage.BarrageIn;
+        float since = interval - until;
+        float follow = MathF.Min(0.45f, 0.5f * interval);
+        if (since >= 0f && since < follow)
+        {
+            return 0.5f + 0.5f * since / follow;
+        }
+
+        return 0f;
+    }
 
     public void Hide(EngineWindow window) => _controller.Hide(window);
 
     public void Attack(RunFrame frame)
     {
+        _attackingLeft = AttackingHold;
         var feet = frame.Window.PlayerFeet;
         var aim = MageController.Facing(frame.Window);
         Fight(frame.DeltaSeconds, feet, aim, frame.Condition.IsStunned, frame.Enemies, frame.GroundAt, frame.Health, frame.Numbers);

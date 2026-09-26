@@ -6,3 +6,6 @@ imgui.ini
 
 # Raw Meshy exports (FBX + PBR texture sets): convert with engine/tools/asset-pipeline and commit only the small .glb
 assets/raw/
+
+# Python bytecode from the tools
+__pycache__/

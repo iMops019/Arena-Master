@@ -17,11 +17,15 @@ internal sealed class RangerClass : IHeroClass
     /// <summary>How long a kill counts toward Momentum.</summary>
     private const float MomentumWindow = 3f;
 
+    /// <summary>How long after the bow last shot the body still holds it up (a run's attacks come after the body in each frame).</summary>
+    private const float ShootingHold = 0.25f;
+
     private readonly RangerController _controller = new();
     private readonly RangerBow _bow;
     private readonly Queue<float> _recentKills = new();
     private readonly HashSet<RangerUpgrade> _banished = new();
     private List<UpgradeChoice> _choices = new();
+    private float _shootingLeft;
 
     public RangerClass(Random random) => _bow = new RangerBow(random);
 
@@ -68,7 +72,11 @@ internal sealed class RangerClass : IHeroClass
 
     public void ReturnToCamp() => Stats.Reset();
 
-    public void Move(EngineWindow window, float deltaSeconds, bool stunned) => _controller.Update(window, deltaSeconds, Stats, stunned);
+    public void Move(EngineWindow window, float deltaSeconds, bool stunned)
+    {
+        _shootingLeft = MathF.Max(0f, _shootingLeft - deltaSeconds);
+        _controller.Update(window, deltaSeconds, Stats, stunned, _shootingLeft > 0f ? _bow.DrawProgress(Stats) : null);
+    }
 
     public void Hide(EngineWindow window) => _controller.Hide(window);
 
@@ -80,6 +88,7 @@ internal sealed class RangerClass : IHeroClass
         }
 
         Stats.MomentumStacks = Math.Min(RangerStats.MaxMomentumStacks, _recentKills.Count);
+        _shootingLeft = ShootingHold;
 
         foreach (var hit in _bow.Update(frame.Window, frame.DeltaSeconds, Stats, frame.Enemies, frame.Numbers, frame.GroundAt,
                      canFire: !frame.Condition.IsStunned, frame.StandingStill))

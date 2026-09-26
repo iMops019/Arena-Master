@@ -36,6 +36,11 @@ internal sealed class PaladinClass : IHeroClass
     /// <summary>Unbroken Vow's last stand, not yet used this run. Any other last stand (an item's) is the content's to answer.</summary>
     private int _vowLeft;
 
+    /// <summary>How long after the last attack frame the body still holds its fighting stance (a run's attacks come after the body in each frame).</summary>
+    private const float AttackingHold = 0.25f;
+
+    private float _attackingLeft;
+
     public PaladinClass(Random random) => _light = new HolyLight(random);
 
     public PaladinStats Stats { get; } = new();
@@ -105,12 +110,41 @@ internal sealed class PaladinClass : IHeroClass
         _still = false;
     }
 
-    public void Move(EngineWindow window, float deltaSeconds, bool stunned) => _controller.Update(window, deltaSeconds, Stats, stunned);
+    public void Move(EngineWindow window, float deltaSeconds, bool stunned)
+    {
+        _attackingLeft = MathF.Max(0f, _attackingLeft - deltaSeconds);
+        _controller.Update(window, deltaSeconds, Stats, stunned, _attackingLeft > 0f ? AttackTime() : null);
+    }
+
+    /// <summary>
+    /// Where the body's attack clip is, in time with the novas: wound up over the last moments before each one, through the blow just
+    /// after (the clip's middle is the moment it lands), and ready in between.
+    /// </summary>
+    private float AttackTime()
+    {
+        float interval = Stats.NovaInterval;
+        float until = _light.NovaIn;
+        float since = interval - until;
+        float follow = MathF.Min(0.45f, 0.5f * interval);
+        float windup = MathF.Min(0.4f, 0.45f * interval);
+        if (since >= 0f && since < follow)
+        {
+            return 0.5f + 0.5f * since / follow;
+        }
+
+        if (until < windup)
+        {
+            return 0.5f * (1f - until / windup);
+        }
+
+        return 0f;
+    }
 
     public void Hide(EngineWindow window) => _controller.Hide(window);
 
     public void Attack(RunFrame frame)
     {
+        _attackingLeft = AttackingHold;
         Fight(frame.DeltaSeconds, frame.Window.PlayerFeet, Ground(frame), frame.StandingStill, frame.Condition.IsStunned, frame.Enemies, frame.Health, frame.Numbers);
         _view.Sync(frame.Window, _light);
     }

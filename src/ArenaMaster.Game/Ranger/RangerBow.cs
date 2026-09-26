@@ -42,6 +42,9 @@ internal sealed class RangerBow
         _arrows = new RangerArrows(random);
     }
 
+    /// <summary>How far the bow is through drawing its next shot: 0 as an arrow leaves, 1 as the next is about to (the body's draw keeps time with it).</summary>
+    public float DrawProgress(RangerStats stats) => Math.Clamp(1f - _cooldown / stats.FireInterval, 0f, 1f);
+
     /// <summary>Whether the next shot is focused (Sniper's Focus), for the HUD.</summary>
     public bool FocusReady(RangerStats stats) => _cadence.FocusReady(stats);
 

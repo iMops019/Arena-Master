@@ -30,6 +30,11 @@ internal sealed class ShamanClass : IHeroClass
     private List<ShamanChoice> _choices = new();
     private float _reflexesIn;
 
+    /// <summary>How long after the last attack frame the body still holds its fighting stance (a run's attacks come after the body in each frame).</summary>
+    private const float AttackingHold = 0.25f;
+
+    private float _attackingLeft;
+
     public ShamanClass(Random random) => _storm = new RollingLightning(random);
 
     public ShamanStats Stats { get; } = new();
@@ -80,12 +85,41 @@ internal sealed class ShamanClass : IHeroClass
 
     public void ReturnToCamp() => Stats.Reset();
 
-    public void Move(EngineWindow window, float deltaSeconds, bool stunned) => _controller.Update(window, deltaSeconds, Stats, stunned);
+    public void Move(EngineWindow window, float deltaSeconds, bool stunned)
+    {
+        _attackingLeft = MathF.Max(0f, _attackingLeft - deltaSeconds);
+        _controller.Update(window, deltaSeconds, Stats, stunned, _attackingLeft > 0f ? AttackTime() : null);
+    }
+
+    /// <summary>
+    /// Where the body's attack clip is, in time with the casts: wound up over the last moments before each one, through the blow just
+    /// after (the clip's middle is the moment it lands), and ready in between.
+    /// </summary>
+    private float AttackTime()
+    {
+        float interval = Stats.CastInterval;
+        float until = _storm.CastIn;
+        float since = interval - until;
+        float follow = MathF.Min(0.45f, 0.5f * interval);
+        float windup = MathF.Min(0.4f, 0.45f * interval);
+        if (since >= 0f && since < follow)
+        {
+            return 0.5f + 0.5f * since / follow;
+        }
+
+        if (until < windup)
+        {
+            return 0.5f * (1f - until / windup);
+        }
+
+        return 0f;
+    }
 
     public void Hide(EngineWindow window) => _controller.Hide(window);
 
     public void Attack(RunFrame frame)
     {
+        _attackingLeft = AttackingHold;
         var window = frame.Window;
         var feet = window.PlayerFeet;
         var aim = ShamanController.Facing(window);

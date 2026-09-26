@@ -1,12 +1,8 @@
 """Writes blocky stand-in models to assets/models/ until real ones are made. Plain Python, no dependencies:
-  ranger_placeholder.glb  the Ranger (tunic, hood, cape, bow, quiver)
-  paladin_placeholder.glb the Paladin (plate armour, a white tabard with a red cross, a great helm, a tower shield on the
-                          left arm and a flail in the right hand)
+  ranger_hero.glb, paladin_hero.glb, mage_hero.glb, shaman_hero.glb, warrior_hero.glb
+                          the five heroes, skinned and animated (run, idle, air and an attack each): see tools/hero_models.py
   holy_nova.glb           a flat gold ring of radius 1, scaled as a Holy Nova spreads out over the ground
   holy_circle.glb         a flat holy circle of radius 1: a gold ring with an inner ring and a cross, the ground a nova leaves
-  mage_placeholder.glb    the Mage (a long blue robe, a pointed hat, a white beard, a staff crowned with an ice crystal)
-  shaman_placeholder.glb  the Shaman (a fur mantle over a hide tunic, a bone mask with antlers, blue war paint, a totem staff crowned with a crackling orb)
-  warrior_placeholder.glb the Warrior (a bare, war-painted chest under a fur mantle, a horned iron helm, a beard, fur boots, an axe in each hand)
   cleave_wave.glb         one piece of a Cleave's wave front: a flat glowing band 1 m long along X, its bright edge at +Z (outward), laid along the
                           wave's arc and scaled to each piece's length
   lightning_ball.glb      a ball of lightning: a spiky pale-blue orb with a white core, radius 0.35, centred on its middle
@@ -162,6 +158,26 @@ def swatch_uv(colour):
 
 
 class Mesh:
+    def beam(self, a, b, half, colour, joint_a, joint_b):
+        """A square rod from <a> to <b>, <half> thick each way: its end at <a> moves with <joint_a> and its end at <b> with <joint_b>, so it stretches between
+        them (a bowstring from the bow's tip to the drawing hand)."""
+        axis = _normalize(_sub(b, a))
+        side = _normalize(_cross(axis, (0.0, 1.0, 0.0) if abs(axis[1]) < 0.9 else (1.0, 0.0, 0.0)))
+        up = _cross(side, axis)
+        corners = [(sx, sy) for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+        ring_a = [tuple(a[i] + half * (sx * side[i] + sy * up[i]) for i in range(3)) for sx, sy in corners]
+        ring_b = [tuple(b[i] + half * (sx * side[i] + sy * up[i]) for i in range(3)) for sx, sy in corners]
+        uv = swatch_uv(colour)
+        for k in range(4):
+            n = _normalize(tuple(ring_a[k][i] + ring_a[(k + 1) % 4][i] - 2 * a[i] for i in range(3)))
+            base = len(self.positions)
+            for p, j in ((ring_a[k], joint_a), (ring_a[(k + 1) % 4], joint_a), (ring_b[(k + 1) % 4], joint_b), (ring_b[k], joint_b)):
+                self.positions.append(p)
+                self.normals.append(n)
+                self.uvs.append(uv)
+                self.joints.append(j)
+            self.indices += [base, base + 2, base + 1, base, base + 3, base + 2]
+
     def __init__(self):
         self.positions, self.normals, self.uvs, self.indices = [], [], [], []
         self.joints = []   # per vertex: the one joint it moves with (only a skinned model uses them)
@@ -254,83 +270,6 @@ def _normalize(v):
     return (v[0] / length, v[1] / length, v[2] / length)
 
 
-def build_ranger():
-    m = Mesh()
-    # Legs and boots
-    m.box(-0.19, 0.0, -0.08, -0.03, 0.14, 0.12, "leather")
-    m.box(0.03, 0.0, -0.08, 0.19, 0.14, 0.12, "leather")
-    m.box(-0.18, 0.14, -0.07, -0.04, 0.82, 0.07, "trousers")
-    m.box(0.04, 0.14, -0.07, 0.18, 0.82, 0.07, "trousers")
-    # Tunic, belt, arms, hands
-    m.box(-0.23, 0.72, -0.13, 0.23, 1.42, 0.13, "tunic")
-    m.box(-0.24, 0.84, -0.14, 0.24, 0.92, 0.14, "leather")
-    m.box(-0.35, 0.86, -0.07, -0.23, 1.40, 0.07, "tunic")
-    m.box(0.23, 0.86, -0.07, 0.35, 1.40, 0.07, "tunic")
-    m.box(-0.34, 0.76, -0.05, -0.24, 0.86, 0.05, "skin")
-    m.box(0.24, 0.76, -0.05, 0.34, 0.86, 0.05, "skin")
-    # Head, eyes, hood
-    m.box(-0.12, 1.44, -0.12, 0.12, 1.70, 0.12, "skin")
-    m.box(-0.08, 1.57, 0.12, -0.03, 1.61, 0.125, "dark")
-    m.box(0.03, 1.57, 0.12, 0.08, 1.61, 0.125, "dark")
-    m.box(-0.15, 1.42, -0.16, 0.15, 1.73, -0.02, "hood")      # back of the hood
-    m.box(-0.15, 1.62, -0.02, 0.15, 1.73, 0.13, "hood")       # brim over the brow
-    m.pyramid(-0.15, 1.73, -0.16, 0.15, 1.73, 0.13, (0.0, 1.90, -0.12), "hood")
-    # Cape
-    m.box(-0.24, 0.50, -0.19, 0.24, 1.42, -0.14, "hood")
-    # Quiver with arrows on the back, bow in the left hand
-    m.box(0.06, 0.95, -0.30, 0.18, 1.50, -0.19, "leather")
-    m.box(0.08, 1.50, -0.28, 0.16, 1.60, -0.21, "fletching")
-    m.box(-0.40, 0.45, 0.02, -0.36, 1.75, 0.07, "wood")       # bow stave
-    m.box(-0.39, 0.52, -0.03, -0.375, 1.68, -0.015, "fletching")  # bow string
-    return m
-
-
-def build_paladin():
-    m = Mesh()
-    # Sabatons and greaves
-    m.box(-0.21, 0.0, -0.09, -0.03, 0.16, 0.15, "plate_dark")
-    m.box(0.03, 0.0, -0.09, 0.21, 0.16, 0.15, "plate_dark")
-    m.box(-0.20, 0.16, -0.08, -0.04, 0.84, 0.08, "plate")
-    m.box(0.04, 0.16, -0.08, 0.20, 0.84, 0.08, "plate")
-    # Breastplate, belt, and the tabard hanging over it with its red cross
-    m.box(-0.27, 0.74, -0.15, 0.27, 1.46, 0.15, "plate")
-    m.box(-0.28, 0.84, -0.16, 0.28, 0.92, 0.16, "leather")
-    m.box(-0.20, 0.52, 0.15, 0.20, 1.40, 0.17, "tabard")
-    m.box(-0.20, 0.52, -0.17, 0.20, 1.40, -0.15, "tabard")
-    m.box(-0.04, 0.78, 0.17, 0.04, 1.30, 0.18, "crusader")
-    m.box(-0.14, 1.10, 0.17, 0.14, 1.17, 0.18, "crusader")
-    # Pauldrons, arms, gauntlets
-    m.box(-0.44, 1.30, -0.15, -0.22, 1.50, 0.15, "plate_dark")
-    m.box(0.22, 1.30, -0.15, 0.44, 1.50, 0.15, "plate_dark")
-    m.box(-0.40, 0.86, -0.08, -0.27, 1.32, 0.08, "plate")
-    m.box(0.27, 0.86, -0.08, 0.40, 1.32, 0.08, "plate")
-    m.box(-0.40, 0.76, -0.07, -0.27, 0.87, 0.09, "plate_dark")
-    m.box(0.27, 0.76, -0.07, 0.40, 0.87, 0.09, "plate_dark")
-    # Great helm with a visor slit and a gold crest
-    m.box(-0.14, 1.46, -0.14, 0.14, 1.80, 0.14, "plate")
-    m.box(-0.11, 1.62, 0.14, 0.11, 1.65, 0.145, "visor")
-    m.box(-0.015, 1.50, 0.14, 0.015, 1.62, 0.145, "visor")
-    m.box(-0.03, 1.80, -0.12, 0.03, 1.88, 0.12, "gold")
-    # A cape down the back
-    m.box(-0.26, 0.50, -0.21, 0.26, 1.46, -0.17, "crusader")
-    # The great crusader shield on the left arm (-X), faced forward: gold rim, white field, red cross
-    m.box(-0.66, 0.42, 0.13, -0.10, 1.40, 0.18, "gold")
-    m.box(-0.63, 0.46, 0.18, -0.13, 1.36, 0.20, "tabard")
-    m.box(-0.415, 0.52, 0.20, -0.335, 1.30, 0.215, "crusader")
-    m.box(-0.58, 1.00, 0.20, -0.18, 1.08, 0.215, "crusader")
-    # The flail in the right hand (+X): a haft, a short chain, and a spiked iron ball hanging forward
-    m.box(0.31, 0.70, 0.04, 0.37, 1.10, 0.10, "wood")
-    m.box(0.30, 1.08, 0.03, 0.38, 1.13, 0.11, "iron")
-    for y, z in ((1.06, 0.15), (0.98, 0.21), (0.90, 0.26)):
-        m.box(0.32, y - 0.03, z - 0.025, 0.36, y + 0.03, z + 0.025, "iron")
-    cx, cy, cz, r, s = 0.34, 0.76, 0.30, 0.09, 0.025
-    m.box(cx - r, cy - r, cz - r, cx + r, cy + r, cz + r, "iron")
-    m.box(cx - 1.8 * r, cy - s, cz - s, cx + 1.8 * r, cy + s, cz + s, "steel")   # spikes through the ball on all three axes
-    m.box(cx - s, cy - 1.8 * r, cz - s, cx + s, cy + 1.8 * r, cz + s, "steel")
-    m.box(cx - s, cy - s, cz - 1.8 * r, cx + s, cy + s, cz + 1.8 * r, "steel")
-    return m
-
-
 def build_holy_circle():
     """The ground a Holy Nova leaves: a gold ring of radius 1, a thinner ring inside it, and a cross of light between them."""
     m = build_ring(0.9, 1.0, "holy")
@@ -342,128 +281,6 @@ def build_holy_circle():
     m.indices += [i + base for i in inner.indices]
     for x0, z0, x1, z1 in ((-0.05, -0.9, 0.05, 0.9), (-0.9, -0.05, 0.9, 0.05)):
         m.quad((x0, 0.005, z1), (x1, 0.005, z1), (x1, 0.005, z0), (x0, 0.005, z0), (0, 1, 0), "holy_light")
-    return m
-
-
-def build_mage():
-    m = Mesh()
-    # Boots under a long robe that widens to the hem
-    m.box(-0.16, 0.0, -0.07, -0.04, 0.10, 0.13, "leather")
-    m.box(0.04, 0.0, -0.07, 0.16, 0.10, 0.13, "leather")
-    m.box(-0.28, 0.08, -0.20, 0.28, 0.55, 0.20, "robe")
-    m.box(-0.23, 0.55, -0.15, 0.23, 1.42, 0.15, "robe")
-    m.box(-0.24, 0.86, -0.16, 0.24, 0.93, 0.16, "leather")          # belt
-    m.box(-0.05, 0.10, 0.20, 0.05, 1.40, 0.21, "robe_dark")          # the robe's front seam
-    # Sleeves and hands
-    m.box(-0.36, 0.88, -0.08, -0.23, 1.40, 0.08, "robe")
-    m.box(0.23, 0.88, -0.08, 0.36, 1.40, 0.08, "robe")
-    m.box(-0.35, 0.78, -0.05, -0.25, 0.88, 0.05, "skin")
-    m.box(0.25, 0.78, -0.05, 0.35, 0.88, 0.05, "skin")
-    # Head, eyes, beard, and a wide-brimmed pointed hat
-    m.box(-0.12, 1.44, -0.12, 0.12, 1.68, 0.12, "skin")
-    m.box(-0.08, 1.57, 0.12, -0.03, 1.61, 0.125, "dark")
-    m.box(0.03, 1.57, 0.12, 0.08, 1.61, 0.125, "dark")
-    m.box(-0.10, 1.26, 0.08, 0.10, 1.52, 0.16, "beard")
-    m.box(-0.27, 1.68, -0.27, 0.27, 1.72, 0.27, "robe_dark")
-    m.pyramid(-0.15, 1.72, -0.15, 0.15, 1.72, 0.15, (0.04, 2.20, -0.10), "robe_dark")
-    # The staff in the right hand (+X), crowned with an ice crystal
-    m.box(0.28, 0.02, 0.06, 0.33, 1.72, 0.11, "wood")
-    top, bottom = (0.305, 2.02, 0.085), (0.305, 1.70, 0.085)
-    ring = [(0.395, 1.84, 0.085), (0.305, 1.84, 0.175), (0.215, 1.84, 0.085), (0.305, 1.84, -0.005)]
-    for i in range(4):
-        a, b = ring[i], ring[(i + 1) % 4]
-        m.tri(a, top, b, "ice_light")
-        m.tri(b, bottom, a, "ice")
-    return m
-
-
-def build_shaman():
-    m = Mesh()
-    # Hide boots and leggings
-    m.box(-0.19, 0.0, -0.08, -0.03, 0.14, 0.13, "leather")
-    m.box(0.03, 0.0, -0.08, 0.19, 0.14, 0.13, "leather")
-    m.box(-0.18, 0.14, -0.07, -0.04, 0.82, 0.07, "hide")
-    m.box(0.04, 0.14, -0.07, 0.18, 0.82, 0.07, "hide")
-    # Hide tunic with a painted band, and a fur mantle over the shoulders
-    m.box(-0.23, 0.72, -0.13, 0.23, 1.40, 0.13, "hide")
-    m.box(-0.235, 0.98, 0.13, 0.235, 1.04, 0.135, "war_paint")
-    m.box(-0.34, 1.26, -0.20, 0.34, 1.46, 0.18, "fur")
-    m.box(-0.30, 0.60, -0.20, 0.30, 1.30, -0.13, "fur")              # the mantle hanging down the back
-    # Bare arms with painted bands, and hands
-    m.box(-0.35, 0.86, -0.07, -0.23, 1.30, 0.07, "skin")
-    m.box(0.23, 0.86, -0.07, 0.35, 1.30, 0.07, "skin")
-    m.box(-0.355, 1.08, -0.075, -0.225, 1.13, 0.075, "war_paint")
-    m.box(0.225, 1.08, -0.075, 0.355, 1.13, 0.075, "war_paint")
-    m.box(-0.34, 0.76, -0.05, -0.24, 0.86, 0.05, "skin")
-    m.box(0.24, 0.76, -0.05, 0.34, 0.86, 0.05, "skin")
-    # Head under a bone mask, with antlers
-    m.box(-0.12, 1.46, -0.12, 0.12, 1.70, 0.12, "skin")
-    m.box(-0.13, 1.50, 0.12, 0.13, 1.70, 0.16, "bone")
-    m.box(-0.08, 1.60, 0.16, -0.03, 1.64, 0.165, "dark")
-    m.box(0.03, 1.60, 0.16, 0.08, 1.64, 0.165, "dark")
-    for side in (-1, 1):
-        x, tip = side * 0.10, side * 0.26
-        m.box(x - 0.02, 1.70, -0.02, x + 0.02, 1.95, 0.02, "bone")                 # an antler's stem
-        m.box(min(x, tip), 1.88, -0.02, max(x, tip), 1.92, 0.02, "bone")           # and its branch, outward
-    # A totem staff in the right hand (+X), crowned with a crackling orb
-    m.box(0.28, 0.02, 0.06, 0.33, 1.78, 0.11, "wood")
-    m.box(0.26, 1.50, 0.04, 0.35, 1.58, 0.13, "fur")
-    top, bottom = (0.305, 2.06, 0.085), (0.305, 1.78, 0.085)
-    ring = [(0.40, 1.92, 0.085), (0.305, 1.92, 0.18), (0.21, 1.92, 0.085), (0.305, 1.92, -0.01)]
-    for i in range(4):
-        a, b = ring[i], ring[(i + 1) % 4]
-        m.tri(a, top, b, "spark_light")
-        m.tri(b, bottom, a, "spark")
-    return m
-
-
-def build_warrior():
-    m = Mesh()
-    # Fur boots and leather trousers
-    m.box(-0.21, 0.0, -0.09, -0.03, 0.22, 0.14, "fur")
-    m.box(0.03, 0.0, -0.09, 0.21, 0.22, 0.14, "fur")
-    m.box(-0.19, 0.22, -0.08, -0.04, 0.84, 0.08, "leather")
-    m.box(0.04, 0.22, -0.08, 0.19, 0.84, 0.08, "leather")
-    # A wide belt with an iron buckle, and a hide kilt over the hips
-    m.box(-0.27, 0.80, -0.15, 0.27, 0.90, 0.15, "chest_dark")
-    m.box(-0.05, 0.81, 0.15, 0.05, 0.89, 0.16, "iron")
-    m.box(-0.25, 0.62, -0.14, 0.25, 0.80, 0.14, "hide")
-    # A bare chest, broad, with red war paint across it
-    m.box(-0.28, 0.90, -0.14, 0.28, 1.46, 0.14, "skin")
-    m.box(-0.285, 1.18, 0.14, 0.285, 1.23, 0.145, "target_red")
-    m.box(-0.06, 0.96, 0.14, 0.06, 1.18, 0.145, "target_red")
-    # A fur mantle over the shoulders and down the back
-    m.box(-0.40, 1.32, -0.18, 0.40, 1.52, 0.16, "fur")
-    m.box(-0.30, 0.70, -0.20, 0.30, 1.40, -0.14, "fur")
-    # Bare, heavy arms with leather bracers, and fists
-    m.box(-0.44, 0.92, -0.08, -0.28, 1.38, 0.08, "skin")
-    m.box(0.28, 0.92, -0.08, 0.44, 1.38, 0.08, "skin")
-    m.box(-0.445, 0.84, -0.085, -0.275, 0.98, 0.085, "leather")
-    m.box(0.275, 0.84, -0.085, 0.445, 0.98, 0.085, "leather")
-    m.box(-0.43, 0.74, -0.06, -0.29, 0.85, 0.08, "skin")
-    m.box(0.29, 0.74, -0.06, 0.43, 0.85, 0.08, "skin")
-    # Head, a thick beard, and a horned iron helm
-    m.box(-0.13, 1.48, -0.13, 0.13, 1.74, 0.13, "skin")
-    m.box(-0.13, 1.40, 0.08, 0.13, 1.60, 0.17, "brute_hide")
-    m.box(-0.09, 1.62, 0.13, -0.03, 1.66, 0.135, "dark")
-    m.box(0.03, 1.62, 0.13, 0.09, 1.66, 0.135, "dark")
-    m.box(-0.15, 1.70, -0.15, 0.15, 1.86, 0.15, "iron")
-    m.box(-0.02, 1.58, 0.13, 0.02, 1.72, 0.16, "iron")   # the nasal guard
-    for side in (-1, 1):
-        x = side * 0.15
-        m.box(min(x, side * 0.26), 1.76, -0.03, max(x, side * 0.26), 1.82, 0.03, "horn")
-        m.box(min(side * 0.24, side * 0.29), 1.82, -0.03, max(side * 0.24, side * 0.29), 2.00, 0.03, "horn")
-    # An axe in each hand: a haft held down and forward, a broad steel head at the top with its edge outward, an iron spike behind it
-    for side in (-1, 1):
-        hx = side * 0.36
-        m.box(hx - 0.03, 0.55, 0.06, hx + 0.03, 1.32, 0.12, "wood")
-        m.box(hx - 0.035, 0.74, 0.055, hx + 0.035, 0.84, 0.125, "leather")      # the grip
-        blade0, blade1 = sorted((hx + side * 0.03, hx + side * 0.20))
-        m.box(blade0, 1.06, 0.07, blade1, 1.32, 0.11, "steel")
-        edge0, edge1 = sorted((hx + side * 0.20, hx + side * 0.23))
-        m.box(edge0, 1.02, 0.075, edge1, 1.36, 0.105, "fletching")               # the bright edge
-        spike0, spike1 = sorted((hx - side * 0.03, hx - side * 0.11))
-        m.box(spike0, 1.18, 0.075, spike1, 1.24, 0.105, "iron")
     return m
 
 
@@ -1519,8 +1336,8 @@ def write_glb(mesh, path):
 
 def write_skinned_glb(mesh, path, joints, clips):
     """Writes a skinned model: <mesh>'s faces each bound to one joint (mesh.joints), the skeleton <joints> ((name, parent index or None, bind position) each,
-    parents first), and <clips> ({name: (seconds, pose function)}: the function gives {joint name: (rotation, translation or None)} at a time), sampled 30 times
-    a second. The engine bakes every clip at load time and the game picks one and a time each frame."""
+    parents first), and <clips> ({name: (seconds, pose function)}: the function gives {joint name: (rotation, translation or None[, scale or None])} at a time),
+    sampled 30 times a second. Every frame of a clip must give the same joints, with the same channels. The engine bakes every clip at load time and the game picks one and a time each frame."""
     count = len(mesh.positions)
     image = png_bytes()
     views, blob, accessors = [], b"", []
@@ -1580,6 +1397,10 @@ def write_skinned_glb(mesh, path, joints, clips):
                 moves = b"".join(struct.pack("<3f", *f[name][1]) for f in frames)
                 samplers.append({"input": time_accessor, "output": accessor(moves, 5126, "VEC3", len(times)), "interpolation": "LINEAR"})
                 channels.append({"sampler": len(samplers) - 1, "target": {"node": 1 + names.index(name), "path": "translation"}})
+            if len(frames[0][name]) > 2 and frames[0][name][2] is not None:
+                sizes = b"".join(struct.pack("<3f", *f[name][2]) for f in frames)
+                samplers.append({"input": time_accessor, "output": accessor(sizes, 5126, "VEC3", len(times)), "interpolation": "LINEAR"})
+                channels.append({"sampler": len(samplers) - 1, "target": {"node": 1 + names.index(name), "path": "scale"}})
         animations.append({"name": clip, "samplers": samplers, "channels": channels})
 
     gltf = {
@@ -1607,10 +1428,8 @@ def write_skinned_glb(mesh, path, joints, clips):
 
 
 if __name__ == "__main__":
-    for name, build in (("ranger_placeholder.glb", build_ranger), ("paladin_placeholder.glb", build_paladin),
-                        ("holy_nova.glb", lambda: build_ring(0.88, 1.0, "holy")), ("holy_circle.glb", build_holy_circle),
-                        ("mage_placeholder.glb", build_mage), ("frost_bolt.glb", build_frost_bolt),
-                        ("shaman_placeholder.glb", build_shaman), ("warrior_placeholder.glb", build_warrior), ("cleave_wave.glb", build_cleave_wave), ("lightning_ball.glb", build_lightning_ball),
+    for name, build in (("holy_nova.glb", lambda: build_ring(0.88, 1.0, "holy")), ("holy_circle.glb", build_holy_circle),
+                        ("frost_bolt.glb", build_frost_bolt), ("cleave_wave.glb", build_cleave_wave), ("lightning_ball.glb", build_lightning_ball),
                         ("lightning_arc.glb", build_lightning_arc), ("lightning_zap.glb", lambda: build_ring(0.85, 1.0, "spark")),
                         ("frost_blast.glb", lambda: build_ring(0.86, 1.0, "ice_light")), ("frost_shard.glb", build_frost_shard),
                         ("aegis_burst.glb", lambda: build_ring(0.9, 1.0, "holy_light")), ("thunderstone_bolt.glb", build_lightning_arc),
@@ -1646,3 +1465,12 @@ if __name__ == "__main__":
     mesh = build_quartermaster()
     write_skinned_glb(mesh, MODELS / "camp_quartermaster.glb", QM_JOINTS, {"Idle": (QM_IDLE_SECONDS, quartermaster_idle)})
     print(f"Wrote {MODELS / 'camp_quartermaster.glb'} ({len(mesh.positions)} vertices, {len(QM_JOINTS)} joints, skinned)")
+
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import hero_models
+    for hero in hero_models.HEROES.values():
+        mesh = hero.mesh()
+        clips = hero.clips()
+        write_skinned_glb(mesh, MODELS / hero.file, hero.rig.gltf_joints(), clips)
+        print(f"Wrote {MODELS / hero.file} ({len(mesh.positions)} vertices, {len(hero.rig.names)} joints, clips {', '.join(clips)})")
