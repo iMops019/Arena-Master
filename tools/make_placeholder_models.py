@@ -11,6 +11,9 @@
   aegis_burst.glb         a flat pale-gold ring of radius 1, scaled as the Aegis of the Dawn's burst spreads (an item's, any class)
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
   ghoul_placeholder.glb   the first enemy: a hunched ghoul with long arms and red eyes
+  crossbow_ghoul_placeholder.glb  the ranged ghoul: hooded, a quiver on its back, arms held out in front to carry its crossbow
+  ghoul_crossbow.glb      the Crossbow Ghoul's crossbow, drawn over its body in the same pose: a stock, limbs with glowing runes, a loaded bolt
+  ghoul_bolt.glb          a Crossbow Ghoul's bolt: a dark shaft with a glowing head, centred on its middle, pointing +Z
   xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
   brute_placeholder.glb   the elite: a hulking horned ghoul brute, 2.4 m tall, with a bone club
   hollow_king_placeholder.glb  the boss: a towering crowned ghoul king, 4.2 m tall, with a tattered cape
@@ -99,6 +102,8 @@ PALETTE = {
     "beard": (226, 226, 230),
     "ice": (150, 214, 255),
     "ice_light": (226, 246, 255),
+    "hood_dark": (48, 40, 52),
+    "bolt_glow": (255, 110, 40),
 }
 COLOURS = list(PALETTE)
 
@@ -368,6 +373,62 @@ def build_ghoul():
     m.box(-0.10, 1.27, 0.52, -0.03, 1.32, 0.525, "ghoul_eye")
     m.box(0.03, 1.27, 0.52, 0.10, 1.32, 0.525, "ghoul_eye")
     m.box(-0.10, 1.10, 0.32, 0.10, 1.16, 0.50, "bone")
+    return m
+
+
+def build_crossbow_ghoul():
+    m = Mesh()
+    # Crooked legs and feet, as the ghoul's
+    m.box(-0.20, 0.0, -0.06, -0.06, 0.10, 0.16, "ghoul_skin")
+    m.box(0.06, 0.0, -0.06, 0.20, 0.10, 0.16, "ghoul_skin")
+    m.box(-0.18, 0.10, -0.06, -0.07, 0.62, 0.06, "ghoul_skin")
+    m.box(0.07, 0.10, -0.06, 0.18, 0.62, 0.06, "ghoul_skin")
+    # Rags, a less hunched torso, and a hood and cloak
+    m.box(-0.22, 0.52, -0.12, 0.22, 0.72, 0.12, "ghoul_rags")
+    m.box(-0.23, 0.70, -0.10, 0.23, 1.18, 0.16, "ghoul_skin")
+    m.box(-0.25, 0.60, -0.16, 0.25, 1.22, -0.10, "hood_dark")
+    # A quiver of bolts on its back
+    m.box(0.05, 0.80, -0.26, 0.17, 1.30, -0.16, "leather")
+    m.box(0.07, 1.30, -0.24, 0.15, 1.38, -0.18, "bolt_glow")
+    # Arms held out in front at chest height, hands where the crossbow sits
+    m.box(-0.34, 0.98, -0.02, -0.22, 1.10, 0.40, "ghoul_skin")
+    m.box(0.22, 0.98, -0.02, 0.34, 1.10, 0.40, "ghoul_skin")
+    m.box(-0.30, 0.99, 0.40, -0.12, 1.09, 0.50, "bone")
+    m.box(0.12, 0.99, 0.40, 0.30, 1.09, 0.50, "bone")
+    # Hooded head, red eyes
+    m.box(-0.13, 1.18, 0.02, 0.13, 1.44, 0.26, "ghoul_skin")
+    m.box(-0.10, 1.31, 0.26, -0.03, 1.36, 0.265, "ghoul_eye")
+    m.box(0.03, 1.31, 0.26, 0.10, 1.36, 0.265, "ghoul_eye")
+    m.box(-0.16, 1.16, -0.06, 0.16, 1.50, 0.02, "hood_dark")
+    m.box(-0.16, 1.42, -0.06, 0.16, 1.50, 0.24, "hood_dark")
+    return m
+
+
+def build_ghoul_crossbow():
+    """The crossbow, in the ghoul's own space: held level at chest height in front of it, pointing +Z."""
+    m = Mesh()
+    m.box(-0.04, 1.00, 0.22, 0.04, 1.08, 0.92, "wood")              # stock
+    m.box(-0.38, 1.03, 0.80, 0.38, 1.09, 0.86, "chest_dark")        # limbs
+    m.box(-0.44, 1.02, 0.78, -0.36, 1.10, 0.88, "bolt_glow")        # glowing runes at the limb tips
+    m.box(0.36, 1.02, 0.78, 0.44, 1.10, 0.88, "bolt_glow")
+    m.box(-0.36, 1.055, 0.60, 0.36, 1.065, 0.62, "fletching")      # the drawn string
+    m.box(-0.012, 1.08, 0.60, 0.012, 1.10, 0.96, "wood")           # the loaded bolt
+    m.box(-0.03, 1.07, 0.96, 0.03, 1.11, 1.02, "bolt_glow")         # its glowing head
+    return m
+
+
+def build_ghoul_bolt():
+    """A crossbow bolt pointing +Z, centred on its middle: a dark shaft, a glowing head, small vanes."""
+    m = Mesh()
+    m.box(-0.018, -0.018, -0.30, 0.018, 0.018, 0.24, "chest_dark")
+    tip, left, right = (0.0, 0.0, 0.40), (-0.05, 0.0, 0.24), (0.05, 0.0, 0.24)
+    for y in (0.02, -0.02):
+        top = (0.0, y, 0.26)
+        m.tri(left, top, tip, "bolt_glow")
+        m.tri(top, right, tip, "bolt_glow")
+        m.tri(left, right, top, "bolt_glow")
+    m.box(-0.003, -0.05, -0.30, 0.003, 0.05, -0.18, "ghoul_rags")
+    m.box(-0.05, -0.003, -0.30, 0.05, 0.003, -0.18, "ghoul_rags")
     return m
 
 
@@ -689,7 +750,9 @@ if __name__ == "__main__":
                         ("mage_placeholder.glb", build_mage), ("frost_bolt.glb", build_frost_bolt),
                         ("frost_blast.glb", lambda: build_ring(0.86, 1.0, "ice_light")), ("frost_shard.glb", build_frost_shard),
                         ("aegis_burst.glb", lambda: build_ring(0.9, 1.0, "holy_light")),
-                        ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul), ("xp_gem_placeholder.glb", build_xp_gem),
+                        ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul),
+                        ("crossbow_ghoul_placeholder.glb", build_crossbow_ghoul), ("ghoul_crossbow.glb", build_ghoul_crossbow),
+                        ("ghoul_bolt.glb", build_ghoul_bolt), ("xp_gem_placeholder.glb", build_xp_gem),
                         ("brute_placeholder.glb", build_brute), ("hollow_king_placeholder.glb", build_hollow_king),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
                         ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),

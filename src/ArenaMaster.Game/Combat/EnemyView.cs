@@ -6,7 +6,8 @@ namespace ArenaMaster.Game.Combat;
 /// <summary>
 /// Puts the <see cref="EnemyField"/> on screen: every enemy of a kind drawn as one engine crowd (one instanced draw however many there are), with a shambling bob
 /// while it walks, a flinch and a flash when it is hit, a crouch or a rearing-up as it winds up an attack, standing still and pale while frozen, and a sink into
-/// the ground as it dies. Attacks show their
+/// the ground as it dies. A kind that holds a weapon (the Crossbow Ghoul's crossbow) has it drawn as a crowd of its own in the same pose, lighting up from faint to
+/// bright as a shot winds up; the bolts in flight are a crowd too. Attacks show their
 /// telegraphs on the ground as placed props: a red lane for a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave. There
 /// are no animations yet; the stand-in models are rigid.
 /// </summary>
@@ -16,6 +17,7 @@ internal sealed class EnemyView
     public const string DiscModel = "telegraph_disc.glb";
     public const string LaneModel = "telegraph_lane.glb";
     public const string ShockwaveModel = "shockwave_ring.glb";
+    public const string BoltModel = "ghoul_bolt.glb";
 
     private enum Marker
     {
@@ -27,6 +29,7 @@ internal sealed class EnemyView
 
     private readonly Dictionary<(int Enemy, Marker Marker), int> _markers = new();   // telegraph -> placed prop id
     private readonly Dictionary<string, List<CrowdInstance>> _crowds = new();       // model -> this frame's copies
+    private readonly List<CrowdInstance> _bolts = new();
     private float _time;
 
     public void Sync(EngineWindow window, EnemyField field, IEnumerable<Enemy> gone, float deltaSeconds, Func<float, float, float?> groundAt)
@@ -52,7 +55,19 @@ internal sealed class EnemyView
                 _crowds[enemy.Kind.Model] = copies;
             }
 
-            copies.Add(Pose(enemy));
+            var pose = Pose(enemy);
+            copies.Add(pose);
+            if (enemy.Kind.HeldModel is { } held)
+            {
+                if (!_crowds.TryGetValue(held, out var weapons))
+                {
+                    weapons = new List<CrowdInstance>();
+                    _crowds[held] = weapons;
+                }
+
+                weapons.Add(pose with { Flash = MathF.Max(Glow(enemy), pose.Flash * 0.5f) });
+            }
+
             if (enemy.IsAlive)
             {
                 foreach (var (marker, placement) in Telegraphs(enemy, groundAt))
@@ -73,6 +88,34 @@ internal sealed class EnemyView
         {
             window.SetCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(copies));   // an empty list clears a kind that is gone
         }
+
+        _bolts.Clear();
+        foreach (var bolt in field.Bolts)
+        {
+            var (yaw, pitch) = Geometry.YawPitch(bolt.Velocity);
+            _bolts.Add(new CrowdInstance(bolt.Position, yaw, 1f, pitch, Flash: 0.4f));
+        }
+
+        window.SetCrowd(BoltModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_bolts));
+    }
+
+    /// <summary>
+    /// How brightly a held weapon glows (0 to 1): faintly as a shot starts to wind up, climbing ever faster to full brightness as it is loosed - the warning to move.
+    /// Dark otherwise.
+    /// </summary>
+    public static float Glow(Enemy enemy)
+    {
+        if (!enemy.IsAlive || enemy.Attack is not { Type: AttackType.Shoot })
+        {
+            return 0f;
+        }
+
+        return enemy.AttackPhase switch
+        {
+            AttackPhase.WindUp => 0.15f + 0.85f * MathF.Pow(enemy.WindUpProgress, 1.5f),
+            AttackPhase.Active => 1f,
+            _ => 0f,
+        };
     }
 
     /// <summary>Takes away an enemy's ground telegraphs (its body goes with the next <see cref="Sync"/>).</summary>
@@ -130,6 +173,12 @@ internal sealed class EnemyView
                     break;
                 case (AttackPhase.WindUp, AttackType.Shockwave or AttackType.Summon):
                     pitch -= 0.3f * windUp;                                                           // rearing up
+                    break;
+                case (AttackPhase.WindUp, AttackType.Shoot):
+                    pitch -= 0.12f * windUp;                                                          // straightening up to aim
+                    break;
+                case (AttackPhase.Active, AttackType.Shoot):
+                    pitch -= 0.25f;                                                                   // the kick of the shot
                     break;
                 case (AttackPhase.Active, AttackType.Lunge):
                     pitch += 0.4f;                                                                    // head down, charging

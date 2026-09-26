@@ -35,6 +35,7 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 **What's built** (numbers in `Combat/EnemyKind.cs` and `Combat/RunDirector.cs`):
 - **The director:** fodder grows from 16 to a swarm of 300 over the 30 minutes (about 75 at 10:00 and 170 at 20:00), and spawns faster to keep up (up to 6 a frame). Health scales +12% per minute, damage +5%/min, speed +1%/min.
 - **Ghoul (fodder):** 30 HP, 3.6 m/s, claws on contact for 8.
+- **Crossbow Ghoul (ranged fodder, the user's request; numbers are a first pass):** 24 HP, 3.2 m/s, 2 XP, claws for 6 if you walk up to it. Mixed into the fodder from 1:30: 6% of spawns, growing to 15% by 16:30. It walks in until you're within 11 m and stops there. With you 3 to 14 m away it aims for 1.1 s, turning to follow you, while its crossbow lights up from faint to bright (the telegraph). Then it looses a bolt at where you stand: 12 damage (scaled like any enemy's), a small shove, 20 m/s, so a step aside after the glow peaks dodges it. 2.8 s cooldown between shots. A shield blocks a bolt like any blow (no damage, no shove); a frozen shooter holds its shot.
 - **Ghoul Brute (elite):** first at 3:00, then every 2.5 min, 1 per wave (2 after 10:00, 3 after 20:00). 260 HP, 12 XP. Two telegraphed attacks:
   - *Lunge:* crouches for 0.75 s over a red lane, then charges 7.2 m down it. 22 damage plus knock-back.
   - *Leap slam:* a red circle (3.5 m) fills up over 1.45 s, then it lands in it. 26 damage, knock-back, 0.9 s stun.

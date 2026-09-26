@@ -118,6 +118,25 @@ internal readonly record struct PlayerTarget(Vector3D<float> Feet, bool Grounded
 /// <summary>A blow that reached the player this frame, landed or blocked: who struck, and how hard (before any cut to damage taken).</summary>
 internal readonly record struct Strike(Enemy Attacker, float Damage, bool Blocked);
 
+/// <summary>An enemy's bolt in flight (a Crossbow Ghoul's): it flies straight, and the first thing it meets - the player or the ground - stops it.</summary>
+internal sealed class EnemyBolt
+{
+    public required Enemy Shooter { get; init; }
+
+    public Vector3D<float> Position { get; set; }
+
+    public Vector3D<float> Velocity { get; init; }
+
+    /// <summary>Seconds of flight left.</summary>
+    public float FlightLeft { get; set; }
+
+    public float Damage { get; init; }
+
+    public float Radius { get; init; }
+
+    public float Knockback { get; init; }
+}
+
 /// <summary>
 /// What every hit the player lands does besides its damage, whichever class lands it (from the items carried): multipliers on chilled, frozen and elite enemies,
 /// a chill, and a chance to freeze a non-boss enemy.
@@ -160,6 +179,7 @@ internal sealed class EnemyField
     private readonly List<Enemy> _newlyKilled = new();
     private readonly List<(EnemyKind Kind, Vector3D<float> Position)> _summoned = new();
     private readonly List<Strike> _strikes = new();
+    private readonly List<EnemyBolt> _bolts = new();
     private readonly EnemyGrid _grid = new();
     private readonly Random _random;
     private bool _gridStale = true;
@@ -175,6 +195,14 @@ internal sealed class EnemyField
 
     /// <summary>How much tougher than base the next spawns are (the run director raises it over time).</summary>
     public EnemyScaling Scaling { get; set; } = EnemyScaling.None;
+
+    /// <summary>The kind some of the fodder spawns as instead of <see cref="Kind"/> (the Crossbow Ghoul), and the share that does (0 to 1).</summary>
+    public EnemyKind? RangedKind { get; set; }
+
+    public float RangedShare { get; set; }
+
+    /// <summary>The enemies' bolts in flight.</summary>
+    public IReadOnlyList<EnemyBolt> Bolts => _bolts;
 
     /// <summary>What every hit the player lands does besides its damage (see <see cref="HitEffects"/>). Set at the start of a run.</summary>
     public HitEffects HitEffects { get; set; } = HitEffects.None;
@@ -242,6 +270,8 @@ internal sealed class EnemyField
                 enemy.DeadFor += deltaSeconds;
             }
         }
+
+        MoveBolts(deltaSeconds, player, groundAt);
 
         foreach (var (kind, position) in _summoned)
         {
@@ -377,6 +407,7 @@ internal sealed class EnemyField
         _newlyKilled.Clear();
         _summoned.Clear();
         _strikes.Clear();
+        _bolts.Clear();
         _spawnTimer = 0f;
         _gridStale = true;
         return all;
@@ -407,7 +438,8 @@ internal sealed class EnemyField
             _spawnTimer += SpawnInterval;
             if (TryPickSpawnPoint(playerFeet, groundAt, out var point))
             {
-                Spawn(point);
+                bool ranged = RangedKind is not null && RangedShare > 0f && _random.NextDouble() < RangedShare;
+                Spawn(point, ranged ? RangedKind : null);
                 alive++;
             }
         }
@@ -474,9 +506,9 @@ internal sealed class EnemyField
             return;
         }
 
-        // Walk at the player, eased off by any other enemy close enough to crowd it, so a pack spreads around the player instead of stacking into one. The bigger of two
-        // enemies gives way less.
-        var step = toPlayer * enemy.WalkSpeed;
+        // Walk at the player (a ranged kind stops once it is close enough to shoot), eased off by any other enemy close enough to crowd it, so a pack spreads around
+        // the player instead of stacking into one. The bigger of two enemies gives way less.
+        var step = kind.StandOff > 0f && distance <= kind.StandOff ? Vector3D<float>.Zero : toPlayer * enemy.WalkSpeed;
         foreach (var other in _grid.Near(enemy.Position.X, enemy.Position.Z, kind.Radius + MaxEnemyRadius + 0.15f))
         {
             if (other == enemy || !other.IsAlive)
@@ -563,6 +595,10 @@ internal sealed class EnemyField
                     if (attack.Type == AttackType.Summon)
                     {
                         Summon(enemy, (int)attack.Reach, groundAt);
+                    }
+                    else if (attack.Type == AttackType.Shoot)
+                    {
+                        Shoot(enemy, attack, player);
                     }
                 }
 
@@ -688,6 +724,69 @@ internal sealed class EnemyField
         if (distance > 1e-3f)
         {
             enemy.Yaw = MathF.Atan2(toward.X, toward.Z);
+        }
+    }
+
+    /// <summary>Where a shooter's bolt leaves from: its weapon, this high above its feet and this far in front.</summary>
+    public const float ShotHeight = 1.05f;
+    public const float ShotForward = 0.85f;
+
+    /// <summary>How tall the player is, for a bolt hitting them: a capsule from the feet up this far.</summary>
+    public const float PlayerHeight = 1.8f;
+
+    /// <summary>Looses a bolt from <paramref name="shooter"/>'s weapon at the player's middle, where they stand now: moving after the glow peaks is how to dodge it.</summary>
+    private void Shoot(Enemy shooter, AttackSpec attack, PlayerTarget player)
+    {
+        var facing = new Vector3D<float>(MathF.Sin(shooter.Yaw), 0f, MathF.Cos(shooter.Yaw));
+        var from = shooter.Position + new Vector3D<float>(0f, ShotHeight, 0f) + facing * ShotForward;
+        var at = player.Feet + new Vector3D<float>(0f, PlayerHeight * 0.5f, 0f);
+        var toward = at - from;
+        var direction = toward.LengthSquared > 1e-6f ? Vector3D.Normalize(toward) : facing;
+        _bolts.Add(new EnemyBolt
+        {
+            Shooter = shooter,
+            Position = from,
+            Velocity = direction * attack.ProjectileSpeed,
+            FlightLeft = attack.Reach / attack.ProjectileSpeed,
+            Damage = attack.Damage * shooter.DamageScale,
+            Radius = attack.HitWidth,
+            Knockback = attack.Knockback,
+        });
+    }
+
+    /// <summary>
+    /// Moves the bolts in flight: one that reaches the player strikes them (a shield can block it, a blow in the grace after the last hit glances off) and is spent;
+    /// one that meets the ground or runs out of flight is gone.
+    /// </summary>
+    private void MoveBolts(float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
+    {
+        var bottom = player.Feet + new Vector3D<float>(0f, PlayerRadius, 0f);
+        var top = player.Feet + new Vector3D<float>(0f, PlayerHeight - PlayerRadius, 0f);
+        for (int i = _bolts.Count - 1; i >= 0; i--)
+        {
+            var bolt = _bolts[i];
+            var from = bolt.Position;
+            var to = from + bolt.Velocity * deltaSeconds;
+            bolt.FlightLeft -= deltaSeconds;
+
+            if (Geometry.SegmentDistance(from, to, bottom, top, out _) <= PlayerRadius + bolt.Radius)
+            {
+                if (Strike(bolt.Shooter, bolt.Damage, player, out bool blocked) && !blocked)
+                {
+                    player.Condition.Knock(bolt.Velocity, bolt.Knockback);
+                }
+
+                _bolts.RemoveAt(i);
+                continue;
+            }
+
+            if (bolt.FlightLeft <= 0f || (groundAt(to.X, to.Z) is { } ground && to.Y < ground))
+            {
+                _bolts.RemoveAt(i);
+                continue;
+            }
+
+            bolt.Position = to;
         }
     }
 

@@ -21,6 +21,9 @@ internal enum AttackType
 
     /// <summary>Raises its arms and calls a ring of fodder up around itself.</summary>
     Summon,
+
+    /// <summary>Stands and aims, its weapon glowing brighter as the shot nears, then looses a bolt at where the player is: step out of its path.</summary>
+    Shoot,
 }
 
 /// <summary>
@@ -29,9 +32,10 @@ internal enum AttackType
 /// </summary>
 /// <param name="MinRange">It only starts this attack with the player at least this far away...</param>
 /// <param name="MaxRange">...and no further than this.</param>
-/// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls.</param>
-/// <param name="HitWidth">Lunge: how close to the charging body counts as hit. Shockwave: half the ring's width. Unused otherwise.</param>
+/// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls. Shoot: how far the bolt flies.</param>
+/// <param name="HitWidth">Lunge: how close to the charging body counts as hit. Shockwave: half the ring's width. Shoot: the bolt's radius. Unused otherwise.</param>
 /// <param name="LeapHeight">LeapSlam: the top of the arc, above the straight line from take-off to landing.</param>
+/// <param name="ProjectileSpeed">Shoot: how fast the bolt flies - slow enough to sidestep once it is loosed.</param>
 internal sealed record AttackSpec(
     AttackType Type,
     float MinRange,
@@ -44,7 +48,8 @@ internal sealed record AttackSpec(
     float HitWidth = 0f,
     float Knockback = 0f,
     float Stun = 0f,
-    float LeapHeight = 0f);
+    float LeapHeight = 0f,
+    float ProjectileSpeed = 0f);
 
 /// <summary>
 /// What one kind of enemy is: its model and its numbers. Distances are metres, speeds metres per second, times seconds. The body is a standing cylinder of
@@ -67,6 +72,12 @@ internal sealed record EnemyKind(
 
     public float AttackCooldown { get; init; }
 
+    /// <summary>A ranged kind stops walking closer once the player is this near (0: it walks right up).</summary>
+    public float StandOff { get; init; }
+
+    /// <summary>A second model drawn with the body (a crossbow), which lights up from faint to bright as a <see cref="AttackType.Shoot"/> winds up. Null for none.</summary>
+    public string? HeldModel { get; init; }
+
     /// <summary>The first enemy: slow, fragile fodder that shambles straight at the player and claws on contact.</summary>
     public static readonly EnemyKind Ghoul = new(
         Name: "Ghoul",
@@ -79,6 +90,32 @@ internal sealed record EnemyKind(
         ContactDamage: 8f,
         ContactInterval: 0.8f,
         Experience: 1);
+
+    /// <summary>
+    /// Ranged fodder: a ghoul with a crossbow. It walks in until the player is in range, stops, and aims - the crossbow glowing brighter through the wind-up - then
+    /// looses a bolt at where the player is. A cooldown between shots. Fragile, and it claws like any ghoul if the player comes to it.
+    /// </summary>
+    public static readonly EnemyKind CrossbowGhoul = new(
+        Name: "Crossbow Ghoul",
+        Model: "crossbow_ghoul_placeholder.glb",
+        Tier: EnemyTier.Fodder,
+        MaxHealth: 24f,
+        Speed: 3.2f,
+        Radius: 0.4f,
+        Height: 1.45f,
+        ContactDamage: 6f,
+        ContactInterval: 0.8f,
+        Experience: 2)
+    {
+        AttackCooldown = 2.8f,
+        StandOff = 11f,
+        HeldModel = "ghoul_crossbow.glb",
+        Attacks = new[]
+        {
+            new AttackSpec(AttackType.Shoot, MinRange: 3f, MaxRange: 14f, WindUp: 1.1f, Active: 0.1f, Recover: 0.5f,
+                Damage: 12f, Reach: 30f, HitWidth: 0.25f, Knockback: 4f, ProjectileSpeed: 20f),
+        },
+    };
 
     /// <summary>The first elite: a hulking brute that lunges down a lane and leaps to slam a marked circle.</summary>
     public static readonly EnemyKind Brute = new(
