@@ -120,12 +120,25 @@ public class DelveRulesTests
         var relic = DelveRules.Reward(Node(3, DelveNodeKind.Relic));
         var boss = DelveRules.Reward(Node(10, DelveNodeKind.Boss));
 
-        Assert.Equal(armoury.Silver * 4, currency.Silver);
-        Assert.True(armoury.Gear);
+        Assert.Equal(armoury.Silver * 2, currency.Silver);
+        Assert.Equal(DelveRules.ArmouryGearChance, armoury.GearChance);
+        Assert.Equal(0f, currency.GearChance);
         Assert.True(knowledge.TreeExperience > 0);
         Assert.Equal(2, relic.Items);
-        Assert.True(boss.Gear && boss.Items == 1 && boss.Marks == 3);
+        Assert.True(boss.GearChance == DelveRules.BossGearChance && boss.Items == 1 && boss.Marks == 3);
         Assert.True(DelveRules.Reward(Node(9, DelveNodeKind.Currency)).Silver > currency.Silver);
+    }
+
+    [Fact]
+    public void Gear_IsAChance_NeverASureThing()
+    {
+        var random = new Random(11);
+        var armoury = DelveRules.Reward(new DelveNode(3, 0, DelveNodeKind.Armoury));
+        var relic = DelveRules.Reward(new DelveNode(3, 0, DelveNodeKind.Relic));
+        int drops = Enumerable.Range(0, 4000).Count(_ => DelveRules.RollsGear(armoury, random));
+        Assert.InRange(drops / 4000f, DelveRules.ArmouryGearChance - 0.03f, DelveRules.ArmouryGearChance + 0.03f);
+        Assert.False(Enumerable.Range(0, 200).Any(_ => DelveRules.RollsGear(relic, random)));
+        Assert.True(DelveRules.ArmouryGearChance < 1f && DelveRules.BossGearChance < 1f);
     }
 
     [Fact]

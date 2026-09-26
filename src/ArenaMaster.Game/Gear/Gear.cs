@@ -157,7 +157,7 @@ internal static class GearCatalog
     public static void TakeOff(Profile profile, GearSlot slot) => profile.Gear.Worn.Remove(slot.ToString());
 
     /// <summary>
-    /// A piece found (a Delve reward): one not yet owned, at random, preferring an empty slot's. It goes straight into what the player owns, and on if its slot is
+    /// A piece found (a Delve cache's gear roll that came up): one not yet owned, at random, preferring an empty slot's. It goes straight into what the player owns, and on if its slot is
     /// empty. Null if every piece is owned already.
     /// </summary>
     public static GearPiece? Grant(Profile profile, Random random)

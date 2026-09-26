@@ -1,4 +1,5 @@
 using System.Numerics;
+using ArenaMaster.Game.Delve;
 using ArenaMaster.Game.Gear;
 using ArenaMaster.Game.Progression;
 using ImGuiNET;
@@ -74,7 +75,7 @@ internal sealed class GearScreen : GameScreen
         var start = ImGui.GetCursorScreenPos();
         float closeWidth = 150f * scale;
         UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.3f),
-            "Gear is found in Armoury and Boss Delves. Worn gear counts on every run. Click a piece to wear it, or to take it off.", UiTheme.Muted, 0.78f,
+            $"Gear can drop from Armoury Delves ({DelveRules.ArmouryGearChance * 100f:0}% a cache) and Boss Delves ({DelveRules.BossGearChance * 100f:0}%). Worn gear counts on every run. Click a piece to wear it, or to take it off.", UiTheme.Muted, 0.78f,
             width - closeWidth - 20f * scale);
         ImGui.SetCursorScreenPos(start + new Vector2(width - closeWidth, 0f));
         bool close = UiTheme.Button("Close  [E]", new Vector2(closeWidth, buttonHeight));

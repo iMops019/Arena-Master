@@ -263,9 +263,9 @@ internal sealed class DelveChartScreen : GameScreen
             lines.Add(reward.Items == 1 ? "1 item" : $"{reward.Items} items");
         }
 
-        if (reward.Gear)
+        if (reward.GearChance > 0f)
         {
-            lines.Add("1 piece of gear");
+            lines.Add($"{reward.GearChance * 100f:0}% chance of a piece of gear");
         }
 
         if (reward.Marks > 0)

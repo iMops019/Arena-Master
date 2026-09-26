@@ -200,7 +200,7 @@ public sealed partial class ArenaMasterContent
     }
 
     /// <summary>
-    /// The end of a Delve run: if its node was cleared, the cache pays out (silver, tree experience, items, gear, Delve Marks, as the node says) and the node is
+    /// The end of a Delve run: if its node was cleared, the cache pays out (silver, tree experience, items, Delve Marks, and gear if its chance comes up, as the node says) and the node is
     /// marked cleared, opening the floor below. Returns what happened, for the summary; null for a classic run.
     /// </summary>
     private DelveOutcome? SettleDelve(RunEnding ending)
@@ -228,7 +228,8 @@ public sealed partial class ArenaMasterContent
         }
 
         GearPiece? gear = null;
-        if (reward.Gear)
+        bool gearRolled = DelveRules.RollsGear(reward, _random);   // a chance, not a promise
+        if (gearRolled)
         {
             gear = GearCatalog.Grant(_profile, _random);
             if (gear is null)
@@ -245,7 +246,8 @@ public sealed partial class ArenaMasterContent
         _profile.Silver += silver;
         _profile.Delve.Marks += reward.Marks;
         DelveRules.Clear(_profile.Delve, node);
-        return new DelveOutcome(node.Depth, node.Name, Cleared: true, silver, reward.TreeExperience, reward.Marks, gear, items);
+        return new DelveOutcome(node.Depth, node.Name, Cleared: true, silver, reward.TreeExperience, reward.Marks, gear, items,
+            GearMissed: reward.GearChance > 0f && !gearRolled);
     }
 
     /// <summary>Lights and weathers the world for a floor's band, keeping camp's own to put back afterwards.</summary>

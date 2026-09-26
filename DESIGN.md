@@ -205,10 +205,11 @@ Added content, not a replacement: the classic 30-minute run is still there, a bu
 - **The chart** (the departure gate, `Ui/DelveChartScreen`): floors going down from depth 1, drawn as rows of nodes joined to the floor below. Each floor has **3 nodes** of different kinds, the same every time (seeded by depth, `Delve/DelveMap`), and **every 5th floor** a **Boss node** too (optional). **Clearing any node opens the floor below**; the floor's other nodes stay open to come back to. A cleared node is done. Floors not open yet are shown dark, two ahead.
 - **Node kinds and what their cache pays** (`DelveRules.Reward`; base silver is 80 + 30 per depth):
   - *Currency:* four times the base silver.
-  - *Armoury:* a piece of gear not yet owned (400 silver if every piece is owned), plus the base silver.
+  - *Armoury:* twice the base silver, and a **35% chance** of a piece of gear not yet owned (400 silver instead if the roll comes up and every piece is owned).
   - *Knowledge:* 500 + 150 per depth passive tree experience, plus the base silver.
   - *Relic:* two items at a boss chest's odds (with Lucky Charm), plus the base silver.
-  - *Boss:* three times the base silver, a piece of gear, an item, and **Delve Marks** (1 + the boss tier: 2 at depth 5, 3 at depth 10...).
+  - *Boss:* three times the base silver, an item, **Delve Marks** (1 + the boss tier: 2 at depth 5, 3 at depth 10...), and a **50% chance** of a piece of gear.
+  - Gear is a chance, never a promise (the user's call, like Path of Exile's pinnacle bosses): a piece may take a few runs. The rest of the cache always pays.
 - **A Delve node's run** (`Delve/DelveDirector`), about 10 minutes on the usual map: one Ghoul Brute at 5:00; the Hollow King and two Brutes at 10:00; three more Brutes when the King is at half health. The swarm is the classic run's curves played faster, and how far along them it gets by 10:00 depends on the depth: the classic 10:00 on depth 1, 1.5 minutes more each floor, up to 28:00. After 10:00 the swarm holds at that strength until the King falls. The King leaves the **Delve cache** (black and iron-bound, an orange seal, a beam of light); walking up to it opens it and clears the node. The HUD shows the depth and node, and the clock counts to the King, then says to slay him, then to open the cache.
 - **Depth** makes everything tougher on top of the run's own ramp: +15% enemy health and +6% damage per floor.
 - **Dying** keeps what dying always kept (the run's silver, items found, tree experience), but the node isn't cleared and the cache pays nothing. Only a classic 30:00 counts as a win for the bounties.
@@ -223,7 +224,7 @@ Added content, not a replacement: the classic 30-minute run is still there, a bu
 ## Gear (built, first pass)
 
 - Three slots: **Body Armour, Weapon, Trinket** (`Gear/Gear.cs`). Every piece is a **unique**: a name, one simple, strong effect, a line of flavour, and the orange unique look. Any class can wear any piece. Worn gear counts on every run, classic or Delve, through the same bonuses items use (not an item: it doesn't take a loadout slot).
-- Found in **Armoury** and **Boss** Delves: a piece not owned yet, preferring an empty slot's, and put on if its slot is empty. Owned once; worn and taken off at the armour stand (`Ui/GearScreen`).
+- Can drop from **Armoury** (35% a cache) and **Boss** (50%) Delves: a piece not owned yet, preferring an empty slot's, and put on if its slot is empty. Owned once; worn and taken off at the armour stand (`Ui/GearScreen`).
 - The 12 pieces:
   - *Body Armour:* **Great Mage's Vestments** (a 100-point shield over health and any class shield; once broken it returns after 10 s), **Ironhide Hauberk** (15% less damage taken, +30 max health), **Thornmail of the Hollow** (blows that reach you are paid back in full), **Wraithskin Coat** (+15% move speed, Shift move 30% faster).
   - *Weapon:* **Kingsbane** (x1.4 damage to elites and bosses), **Emberbrand** (a ring of fire around you every 5 s for 60 damage), **Tempest Fang** (x1.2 attack speed), **Soulreaver** (+10% damage, heal 2 per kill).

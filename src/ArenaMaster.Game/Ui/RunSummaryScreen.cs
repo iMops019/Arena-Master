@@ -24,7 +24,8 @@ internal sealed record DelveOutcome(
     long TreeExperience = 0,
     long Marks = 0,
     Gear.GearPiece? Gear = null,
-    IReadOnlyList<RunItem>? Items = null);
+    IReadOnlyList<RunItem>? Items = null,
+    bool GearMissed = false);
 
 /// <summary>How a run went, for the summary at its end.</summary>
 internal sealed record RunSummary(
@@ -121,6 +122,10 @@ internal sealed class RunSummaryScreen : GameScreen
             if (cache.Gear is { } piece)
             {
                 Row("Gear found", piece.Name, UiTheme.Unique);
+            }
+            else if (cache.GearMissed)
+            {
+                Row("Gear", "none this time", UiTheme.Muted);
             }
         }
 
