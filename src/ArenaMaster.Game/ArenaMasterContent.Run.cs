@@ -96,6 +96,7 @@ public sealed partial class ArenaMasterContent
             window.TeleportPlayer(CampLayout.Ground(terrain, CampLayout.RunStart));
         }
 
+        DismissQuartermaster(window);
         _mode = GameMode.Run;
         Announce("Survive until 30:00");
     }

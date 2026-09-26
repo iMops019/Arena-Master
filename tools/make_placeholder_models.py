@@ -41,12 +41,22 @@
   item_<rarity>.glb       an item orb in its rarity's colour (common, rare, epic, legendary), centred on its middle
   camp_tent.glb, camp_firepit.glb, camp_stash.glb, camp_target.glb, camp_gate.glb, camp_board.glb, camp_stall.glb
   camp_rack.glb           the camp: a canvas tent, a ring of stones with logs (the engine's fire burns on it), the stash chest,
-                          the archery target (the passive tree station), the departure gate (the way into a run), the bounty
-                          board (a notice board with papers pinned to it), the quartermaster's stall (a counter under an awning)
-                          and the weapon rack (the class station: a bow, an ice staff, a totem, and a shield with a flail)
+                          the archery target (the passive tree station), the departure gate (a gatehouse set in the palisade: two
+                          towers and closed doors, the way into a run), the bounty board (a notice board with papers pinned to it),
+                          the quartermaster's stall (a counter under an awning) and the weapon rack (the class station: a bow, an
+                          ice staff, a totem, and a shield with a flail)
+  camp_wall.glb, camp_wall_post.glb   the palisade round the camp: a 3.5 m piece of sharpened logs, and the thick post at each corner
+  camp_barrel.glb, camp_crates.glb, camp_woodpile.glb, camp_bench.glb, camp_banner.glb, camp_brazier.glb, camp_haybale.glb,
+  camp_dummy.glb, camp_well.glb, camp_cart.glb, camp_cookpot.glb, camp_bedroll.glb, camp_lantern.glb, camp_sacks.glb
+                          the camp's dressing: a barrel, a stack of crates, a woodpile with a chopping stump, a log bench, a banner on
+                          a pole, an iron brazier (the engine's fire burns on it), a straw bale, a training dummy, a well, a supply cart,
+                          a cooking fire with a pot, a bedroll, a lantern post, and grain sacks
+  camp_quartermaster.glb  the quartermaster behind the stall, skinned (8 joints) with a looping 6 s "Idle" clip: he breathes, shifts his
+                          weight, looks along the camp one way and the other, strokes his moustache and nods, a hand on his hip
 
 The engine's model conventions: one mesh, one primitive, colours from one base-colour texture (vertex colours are
-ignored), facing +Z, feet at y = 0, metres. The texture is a strip of flat colour swatches and each face's UVs point
+ignored), facing +Z, feet at y = 0, metres. A skinned model adds JOINTS_0/WEIGHTS_0 (each vertex wholly on one joint), a skin and
+its animations. The texture is a strip of flat colour swatches and each face's UVs point
 at the middle of its swatch.
 
     python tools/make_placeholder_models.py
@@ -147,6 +157,8 @@ def swatch_uv(colour):
 class Mesh:
     def __init__(self):
         self.positions, self.normals, self.uvs, self.indices = [], [], [], []
+        self.joints = []   # per vertex: the one joint it moves with (only a skinned model uses them)
+        self.joint = 0     # the joint the faces added next are bound to
 
     def quad(self, a, b, c, d, normal, colour):
         """Adds the face a-b-c-d (counter-clockwise seen from outside)."""
@@ -156,6 +168,7 @@ class Mesh:
             self.positions.append(p)
             self.normals.append(normal)
             self.uvs.append(uv)
+            self.joints.append(self.joint)
         self.indices += [base, base + 1, base + 2, base, base + 2, base + 3]
 
     def tri(self, a, b, c, colour):
@@ -166,6 +179,7 @@ class Mesh:
             self.positions.append(p)
             self.normals.append(normal)
             self.uvs.append(uv)
+            self.joints.append(self.joint)
         self.indices += [base, base + 1, base + 2]
 
     def box(self, x0, y0, z0, x1, y1, z1, colour):
@@ -181,6 +195,43 @@ class Mesh:
         a, b, c, d = (x0, y0, z1), (x1, y0, z1), (x1, y0, z0), (x0, y0, z0)
         for p, q in ((a, b), (b, c), (c, d), (d, a)):
             self.tri(p, q, apex, colour)
+
+    def facing(self, points, outward, colour):
+        """A flat convex face through <points> (3 or 4, in order around it), wound so that it faces <outward>."""
+        n = _cross(_sub(points[1], points[0]), _sub(points[2], points[0]))
+        if n[0] * outward[0] + n[1] * outward[1] + n[2] * outward[2] < 0:
+            points = list(reversed(points))
+        if len(points) == 3:
+            self.tri(*points, colour)
+        else:
+            self.quad(*points, _normalize(outward), colour)
+
+    def prism(self, cx, cz, r, y0, y1, colour, sides=10, top=None, bottom=False):
+        """An upright round post: <sides> faces around (cx, cz), radius r, from y0 to y1, capped on top with <top> if given."""
+        import math
+        ring = [(cx + r * math.cos(2 * math.pi * i / sides), cz + r * math.sin(2 * math.pi * i / sides)) for i in range(sides)]
+        for i in range(sides):
+            (xa, za), (xb, zb) = ring[i], ring[(i + 1) % sides]
+            out = ((xa + xb) / 2 - cx, 0.0, (za + zb) / 2 - cz)
+            self.facing([(xa, y0, za), (xb, y0, zb), (xb, y1, zb), (xa, y1, za)], out, colour)
+        for y, on, up in ((y1, top, 1.0), (y0, bottom and (top or colour), -1.0)):
+            if on:
+                for i in range(sides):
+                    (xa, za), (xb, zb) = ring[i], ring[(i + 1) % sides]
+                    self.facing([(cx, y, cz), (xa, y, za), (xb, y, zb)], (0.0, up, 0.0), on)
+
+    def log(self, x0, x1, cy, cz, r, colour, ends=None, sides=8):
+        """A round log lying along X from x0 to x1, its axis at (cy, cz), capped at both ends with <ends>."""
+        import math
+        ring = [(cy + r * math.cos(2 * math.pi * i / sides), cz + r * math.sin(2 * math.pi * i / sides)) for i in range(sides)]
+        for i in range(sides):
+            (ya, za), (yb, zb) = ring[i], ring[(i + 1) % sides]
+            out = (0.0, (ya + yb) / 2 - cy, (za + zb) / 2 - cz)
+            self.facing([(x0, ya, za), (x0, yb, zb), (x1, yb, zb), (x1, ya, za)], out, colour)
+        for x, side in ((x0, -1.0), (x1, 1.0)):
+            for i in range(sides):
+                (ya, za), (yb, zb) = ring[i], ring[(i + 1) % sides]
+                self.facing([(x, cy, cz), (x, ya, za), (x, yb, zb)], (side, 0.0, 0.0), ends or colour)
 
 
 def _sub(a, b):
@@ -858,14 +909,78 @@ def build_target():
     return m
 
 
-def build_gate():
-    """The departure gate: two posts 4 m apart and 3.4 m tall, a crossbeam, and a green banner hanging in the middle."""
+# The palisade: CampWalls in Camp/Camp.cs lays these round the camp, so its segment and gate sizes must match these.
+WALL_SEGMENT = 3.5   # one wall piece, along X
+GATE_WIDTH = 7.0     # the gatehouse fills two pieces' worth of the wall
+
+
+def _unit_noise(i, salt=0.0):
+    """A steady pseudo-random number in 0..1 for i: the same every time the script runs."""
+    import math
+    v = math.sin(i * 12.9898 + salt * 78.233) * 43758.5453
+    return v - math.floor(v)
+
+
+def build_wall():
+    """One piece of the palisade: sharpened logs standing side by side, WALL_SEGMENT long along X, about 3.2 m tall, bound by two rails on the camp side (+Z)."""
     m = Mesh()
-    m.box(-2.1, 0.0, -0.15, -1.8, 3.4, 0.15, "wood")
-    m.box(1.8, 0.0, -0.15, 2.1, 3.4, 0.15, "wood")
-    m.box(-2.4, 3.1, -0.18, 2.4, 3.45, 0.18, "chest_dark")
-    m.box(-0.7, 1.9, -0.03, 0.7, 3.1, 0.03, "banner")
-    m.box(-0.2, 2.3, 0.03, 0.2, 2.7, 0.05, "gold")               # a crest on the banner
+    count = 11
+    width = WALL_SEGMENT / count
+    for i in range(count):
+        x0 = -WALL_SEGMENT / 2 + i * width
+        x1 = x0 + width
+        top = 2.95 + 0.4 * _unit_noise(i)
+        colour = "wood" if i % 3 else "chest_wood"
+        m.box(x0, 0.0, -0.16, x1, top, 0.16, colour)
+        m.pyramid(x0, top, -0.16, x1, top, 0.16, ((x0 + x1) / 2, top + 0.38, 0.0), colour)
+    for y in (0.7, 2.3):
+        m.box(-WALL_SEGMENT / 2, y, 0.16, WALL_SEGMENT / 2, y + 0.16, 0.27, "chest_dark")
+    return m
+
+
+def build_wall_post():
+    """The thick post where two sides of the palisade meet: a round log 0.7 m across and 3.9 m tall with a pointed top and an iron band."""
+    m = Mesh()
+    m.prism(0.0, 0.0, 0.36, 0.0, 3.7, "chest_wood", sides=8)
+    m.prism(0.0, 0.0, 0.38, 2.5, 2.65, "iron", sides=8)
+    m.pyramid(-0.3, 3.7, -0.3, 0.3, 3.7, 0.3, (0.0, 4.25, 0.0), "chest_wood")
+    return m
+
+
+def build_gate():
+    """The departure gate, set in the palisade: a gatehouse GATE_WIDTH wide with a tower on each side, closed double doors under a walkway, and a green banner
+    over the doors on the camp side (+Z)."""
+    m = Mesh()
+    half = GATE_WIDTH / 2
+    for side in (-1, 1):
+        x0, x1 = sorted((side * half, side * (half - 1.4)))
+        m.box(x0, 0.0, -0.7, x1, 4.3, 0.7, "chest_wood")                      # the tower
+        for y in (1.2, 2.8):
+            m.box(x0 - 0.02, y, -0.72, x1 + 0.02, y + 0.14, 0.72, "chest_dark")
+        m.box(x0 - 0.15, 4.3, -0.85, x1 + 0.15, 4.45, 0.85, "chest_dark")    # its platform
+        for cx in (x0 - 0.1, x1 + 0.1):
+            for cz in (-0.8, 0.8):
+                m.box(cx - 0.06, 4.45, cz - 0.06, cx + 0.06, 5.2, cz + 0.06, "wood")
+        m.pyramid(x0 - 0.3, 5.2, -1.0, x1 + 0.3, 5.2, 1.0, ((x0 + x1) / 2, 6.3, 0.0), "chest_dark")   # its roof
+        m.box(x0 + 0.35, 2.0, 0.7, x1 - 0.35, 2.5, 0.72, "dark")             # a slit window on the camp side
+    inner = half - 1.4
+    for side in (-1, 1):                                                      # the two door leaves, planked, with iron bands
+        x0, x1 = sorted((side * 0.02, side * inner))
+        m.box(x0, 0.0, -0.12, x1, 3.4, 0.12, "chest_wood")
+        for y in (0.5, 2.7):
+            m.box(x0, y, 0.12, x1, y + 0.14, 0.15, "iron")
+        rx = side * 0.35
+        m.box(rx - 0.05, 1.5, 0.15, rx + 0.05, 1.75, 0.2, "iron")            # the ring handles
+    m.box(-0.04, 0.0, -0.08, 0.04, 3.4, 0.08, "dark")                        # the crack where they meet
+    m.box(-inner, 3.4, -0.35, inner, 3.9, 0.35, "chest_dark")                # the beam over the doors
+    m.box(-inner, 4.3, -0.85, inner, 4.45, 0.85, "chest_dark")               # the walkway between the towers
+    for i in range(8):
+        x = -inner + 0.25 + i * 0.6
+        m.box(x, 4.45, 0.75, x + 0.08, 5.0, 0.85, "wood")                    # its railing
+    m.box(-inner, 4.95, 0.75, inner, 5.05, 0.85, "wood")
+    m.box(-0.7, 1.9, 0.2, 0.7, 3.4, 0.24, "banner")                          # the banner, and its crest
+    m.tri((-0.7, 1.9, 0.24), (0.0, 1.55, 0.24), (0.7, 1.9, 0.24), "banner")
+    m.box(-0.2, 2.45, 0.24, 0.2, 2.85, 0.26, "gold")
     return m
 
 
@@ -896,6 +1011,315 @@ def build_stall():
     m.box(0.3, 1.08, -0.1, 0.8, 1.25, 0.2, "gold")
     m.box(1.45, 0.0, 0.1, 1.85, 0.6, 0.45, "canvas")               # a sack
     return m
+
+
+def build_barrel():
+    """A barrel 0.6 m across and 0.9 m tall, with two iron hoops."""
+    m = Mesh()
+    m.prism(0.0, 0.0, 0.28, 0.0, 0.9, "chest_wood", top="chest_dark")
+    m.prism(0.0, 0.0, 0.31, 0.08, 0.3, "chest_wood")
+    m.prism(0.0, 0.0, 0.31, 0.6, 0.82, "chest_wood")
+    for y in (0.14, 0.72):
+        m.prism(0.0, 0.0, 0.32, y, y + 0.06, "iron")
+    return m
+
+
+def build_crates():
+    """A stack of supply crates: two side by side and one on top, about 1.7 m wide and 1.5 m tall."""
+    m = Mesh()
+    for (cx, y, cz, size) in ((-0.43, 0.0, 0.0, 0.8), (0.42, 0.0, 0.08, 0.78), (0.0, 0.8, 0.02, 0.68)):
+        h = size / 2
+        m.box(cx - h, y, cz - h, cx + h, y + size, cz + h, "chest_wood")
+        m.box(cx - h - 0.01, y + size * 0.42, cz - h - 0.01, cx + h + 0.01, y + size * 0.58, cz + h + 0.01, "chest_dark")
+        for ex in (cx - h, cx + h - 0.07):
+            m.box(ex - 0.005, y, cz - h - 0.01, ex + 0.075, y + size, cz + h + 0.01, "chest_dark")
+    return m
+
+
+def build_woodpile():
+    """Split logs stacked four, three and two high, 1.8 m long, with a chopping stump and an axe beside them (+X)."""
+    m = Mesh()
+    r = 0.16
+    for row, count in enumerate((4, 3, 2)):
+        for i in range(count):
+            z = (i - (count - 1) / 2) * 2 * r
+            m.log(-0.9, 0.9, r + row * 2 * r * 0.87, z, r, "chest_wood", ends="canvas")
+    m.prism(1.45, 0.0, 0.3, 0.0, 0.5, "chest_wood", top="canvas")
+    m.box(1.42, 0.5, -0.03, 1.48, 1.15, 0.03, "wood")                  # the axe, its head bitten into the stump
+    m.box(1.35, 0.48, -0.04, 1.55, 0.62, 0.04, "steel")
+    return m
+
+
+def build_bench():
+    """A log bench by the fire: a log 2 m long along X on two stumps."""
+    m = Mesh()
+    for x in (-0.7, 0.7):
+        m.prism(x, 0.0, 0.2, 0.0, 0.3, "chest_wood", sides=8, top="canvas")
+    m.log(-1.0, 1.0, 0.42, 0.0, 0.17, "wood", ends="canvas")
+    return m
+
+
+def build_banner():
+    """A banner on a pole, 4.4 m tall: a green cloth with a gold crest hanging from a crossbar, its face toward +Z."""
+    m = Mesh()
+    m.prism(0.0, 0.0, 0.06, 0.0, 4.2, "wood", sides=6)
+    m.pyramid(-0.07, 4.2, -0.07, 0.07, 4.2, 0.07, (0.0, 4.45, 0.0), "gold")
+    m.box(-0.6, 3.9, -0.04, 0.6, 3.98, 0.04, "wood")
+    m.box(-0.52, 2.1, 0.04, 0.52, 3.9, 0.07, "banner")
+    m.facing([(-0.52, 2.1, 0.07), (0.0, 1.7, 0.07), (0.52, 2.1, 0.07)], (0.0, 0.0, 1.0), "banner")
+    m.facing([(-0.52, 2.1, 0.04), (0.0, 1.7, 0.04), (0.52, 2.1, 0.04)], (0.0, 0.0, -1.0), "banner")
+    m.box(-0.18, 2.85, 0.07, 0.18, 3.25, 0.09, "gold")
+    m.box(-0.52, 3.72, 0.07, 0.52, 3.8, 0.09, "gold")
+    return m
+
+
+def build_brazier():
+    """An iron brazier on three legs, its bowl of glowing coals 1.15 m up (the engine's fire burns on it)."""
+    import math
+    m = Mesh()
+    for i in range(3):
+        a = 2 * math.pi * i / 3
+        x, z = math.cos(a) * 0.3, math.sin(a) * 0.3
+        m.box(x - 0.04, 0.0, z - 0.04, x + 0.04, 0.9, z + 0.04, "iron")
+    m.prism(0.0, 0.0, 0.2, 0.8, 0.9, "iron", sides=8)
+    m.prism(0.0, 0.0, 0.42, 0.9, 1.12, "iron", sides=10, bottom=True)
+    m.prism(0.0, 0.0, 0.37, 1.12, 1.14, "fire", sides=10, top="fire")
+    return m
+
+
+def build_haybale():
+    """A bale of straw, 1.1 m long, bound twice."""
+    m = Mesh()
+    m.box(-0.55, 0.0, -0.3, 0.55, 0.55, 0.3, "straw")
+    for x in (-0.3, 0.26):
+        m.box(x, 0.0, -0.31, x + 0.04, 0.56, 0.31, "leather")
+    return m
+
+
+def build_dummy():
+    """A training dummy: a straw body and sack head on a post, arms of wood, a red mark on its chest (+Z)."""
+    m = Mesh()
+    m.box(-0.45, 0.0, -0.06, 0.45, 0.1, 0.06, "wood")                 # its feet
+    m.box(-0.06, 0.0, -0.45, 0.06, 0.1, 0.45, "wood")
+    m.box(-0.06, 0.0, -0.06, 0.06, 1.9, 0.06, "wood")
+    m.box(-0.25, 0.8, -0.16, 0.25, 1.5, 0.16, "straw")
+    m.box(-0.26, 1.0, -0.17, 0.26, 1.06, 0.17, "leather")
+    m.box(-0.62, 1.32, -0.05, 0.62, 1.4, 0.05, "wood")
+    m.box(-0.15, 1.52, -0.14, 0.15, 1.82, 0.14, "canvas")
+    m.box(-0.1, 1.1, 0.16, 0.1, 1.3, 0.18, "target_red")
+    return m
+
+
+def build_well():
+    """A stone well 1.9 m across with dark water in it, a little roof on two posts and a bucket on a rope."""
+    import math
+    m = Mesh()
+    for i in range(14):
+        a = 2 * math.pi * i / 14
+        x, z = math.cos(a) * 0.82, math.sin(a) * 0.82
+        m.box(x - 0.2, 0.0, z - 0.2, x + 0.2, 0.75, z + 0.2, "stone")
+    m.prism(0.0, 0.0, 0.7, 0.0, 0.5, "stone", sides=12, top="robe_dark")
+    for x in (-0.98, 0.98):
+        m.box(x - 0.07, 0.0, -0.07, x + 0.07, 2.2, 0.07, "wood")
+    m.log(-1.05, 1.05, 1.75, 0.0, 0.06, "wood")
+    for side in (-1, 1):
+        a, b = (-1.25, 2.1, side * 0.9), (1.25, 2.1, side * 0.9)
+        c, d = (1.25, 2.65, 0.0), (-1.25, 2.65, 0.0)
+        m.facing([a, b, c, d], (0.0, 0.9, side * 0.55), "chest_dark")
+        m.facing([a, b, c, d], (0.0, -0.9, -side * 0.55), "chest_dark")   # and its underside
+    m.box(-0.015, 1.3, -0.015, 0.015, 1.72, 0.015, "canvas")          # the rope, and its bucket
+    m.prism(0.0, 0.0, 0.15, 1.05, 1.3, "chest_wood", sides=8, top="dark")
+    return m
+
+
+def build_cart():
+    """A two-wheeled supply cart, 2.2 m long, its shafts forward (+Z), loaded with sacks and a barrel."""
+    m = Mesh()
+    m.box(-0.75, 0.55, -1.1, 0.75, 0.65, 1.1, "chest_wood")
+    for x0, x1 in ((-0.8, -0.72), (0.72, 0.8)):
+        m.box(x0, 0.65, -1.1, x1, 0.95, 1.1, "wood")
+    m.box(-0.8, 0.65, -1.15, 0.8, 0.95, -1.08, "wood")
+    for x in (-0.95, 0.83):
+        m.log(x, x + 0.12, 0.45, 0.0, 0.45, "chest_dark", ends="wood", sides=12)
+    m.log(-0.95, 0.95, 0.45, 0.0, 0.05, "iron")
+    for x in (-0.55, 0.55):
+        m.box(x - 0.05, 0.5, 1.1, x + 0.05, 0.6, 2.3, "wood")
+    for (x0, z0, x1, z1) in ((-0.65, -0.95, -0.05, -0.35), (0.0, -0.9, 0.62, -0.3), (-0.6, -0.25, 0.0, 0.3)):
+        m.box(x0, 0.65, z0, x1, 1.05, z1, "canvas")
+        m.pyramid(x0, 1.05, z0, x1, 1.05, z1, ((x0 + x1) / 2, 1.2, (z0 + z1) / 2), "canvas")
+    m.prism(0.35, 0.45, 0.24, 0.65, 1.3, "chest_wood", top="chest_dark")
+    return m
+
+
+def build_cookpot():
+    """A cooking fire: a small ring of stones (the engine's fire burns in it) under a pot of stew hung from a crossbar on two forked posts."""
+    import math
+    m = Mesh()
+    for i in range(8):
+        a = 2 * math.pi * i / 8
+        x, z = math.cos(a) * 0.38, math.sin(a) * 0.38
+        m.box(x - 0.08, 0.0, z - 0.07, x + 0.08, 0.12, z + 0.07, "stone")
+    for x in (-0.6, 0.6):
+        m.box(x - 0.04, 0.0, -0.04, x + 0.04, 1.25, 0.04, "wood")
+        m.box(x - 0.1, 1.2, -0.03, x + 0.1, 1.3, 0.03, "wood")
+    m.log(-0.7, 0.7, 1.28, 0.0, 0.035, "wood", sides=6)
+    m.box(-0.012, 0.85, -0.012, 0.012, 1.28, 0.012, "iron")
+    m.prism(0.0, 0.0, 0.24, 0.5, 0.85, "iron", top="meat", sides=10)
+    m.prism(0.0, 0.0, 0.18, 0.42, 0.5, "iron", sides=10, bottom=True)
+    return m
+
+
+def build_bedroll():
+    """A bedroll laid on the ground, 1.8 m long along Z, rolled up at its head (-Z)."""
+    m = Mesh()
+    m.box(-0.35, 0.0, -0.8, 0.35, 0.06, 0.9, "canvas_dark")
+    m.box(-0.33, 0.06, -0.3, 0.33, 0.1, 0.88, "banner")
+    m.log(-0.36, 0.36, 0.14, -0.78, 0.14, "canvas", ends="canvas_dark")
+    return m
+
+
+def build_lantern():
+    """A lantern post 2.3 m tall, the lantern hanging from an arm toward +Z."""
+    m = Mesh()
+    m.box(-0.06, 0.0, -0.06, 0.06, 2.35, 0.06, "wood")
+    m.box(-0.03, 2.2, 0.0, 0.03, 2.28, 0.55, "wood")
+    m.box(-0.01, 1.95, 0.44, 0.01, 2.2, 0.46, "iron")
+    m.box(-0.12, 1.66, 0.33, 0.12, 1.95, 0.57, "iron")
+    m.box(-0.1, 1.69, 0.35, 0.1, 1.92, 0.55, "holy_light")
+    m.pyramid(-0.14, 1.95, 0.31, 0.14, 1.95, 0.59, (0.0, 2.05, 0.45), "iron")
+    return m
+
+
+def build_sacks():
+    """Three grain sacks leaning together."""
+    m = Mesh()
+    for (x0, z0, x1, z1, h) in ((-0.55, -0.25, -0.05, 0.2, 0.62), (0.0, -0.3, 0.5, 0.15, 0.55), (-0.3, 0.2, 0.2, 0.62, 0.5)):
+        m.box(x0, 0.0, z0, x1, h, z1, "canvas")
+        m.pyramid(x0, h, z0, x1, h, z1, ((x0 + x1) / 2, h + 0.14, (z0 + z1) / 2), "canvas")
+        m.box((x0 + x1) / 2 - 0.05, h + 0.08, (z0 + z1) / 2 - 0.05, (x0 + x1) / 2 + 0.05, h + 0.22, (z0 + z1) / 2 + 0.05, "leather")
+    return m
+
+
+# The quartermaster's skeleton: each joint's name, parent and where it sits in the bind pose (standing, arms hanging, facing +Z). A joint's bind frame is the
+# world's axes, so a rotation in the animation turns it about its own point. The -X arm is the one on the hip, the +X arm the one that strokes the moustache.
+QM_JOINTS = (
+    ("root", None, (0.0, 0.0, 0.0)),
+    ("hips", 0, (0.0, 0.95, 0.0)),
+    ("chest", 1, (0.0, 1.05, 0.0)),
+    ("head", 2, (0.0, 1.5, 0.0)),
+    ("upper_arm_l", 2, (-0.33, 1.42, 0.0)),
+    ("forearm_l", 4, (-0.34, 1.13, 0.0)),
+    ("upper_arm_r", 2, (0.33, 1.42, 0.0)),
+    ("forearm_r", 6, (0.34, 1.13, 0.0)),
+)
+QM_IDLE_SECONDS = 6.0   # must match QuartermasterNpc.IdleSeconds in Camp/Camp.cs
+
+
+def build_quartermaster():
+    """The quartermaster, who stands behind the stall: a stout old trader in a shirt, a leather waistcoat and an apron, a grey moustache and a brown felt hat.
+    Skinned: every face moves with one joint of QM_JOINTS, for the Idle animation (quartermaster_idle)."""
+    m = Mesh()
+    m.joint = 0                                                        # legs and boots stay put
+    for side in (-1, 1):
+        x0, x1 = sorted((side * 0.03, side * 0.21))
+        m.box(x0 - 0.01, 0.0, -0.11, x1 + 0.01, 0.13, 0.17, "dark")
+        m.box(x0, 0.13, -0.1, x1, 0.9, 0.1, "trousers")
+    m.joint = 1                                                        # hips: belt, the apron's skirt
+    m.box(-0.27, 0.85, -0.16, 0.27, 1.02, 0.2, "trousers")
+    m.box(-0.28, 0.94, -0.17, 0.28, 1.02, 0.21, "dark")
+    m.box(-0.05, 0.95, 0.21, 0.05, 1.01, 0.23, "gold")
+    m.box(-0.24, 0.5, 0.21, 0.24, 0.94, 0.23, "canvas_dark")
+    m.joint = 2                                                        # chest: shirt, belly, waistcoat, the apron's bib, neck
+    m.box(-0.28, 1.02, -0.16, 0.28, 1.46, 0.19, "canvas")
+    m.box(-0.25, 1.02, 0.19, 0.25, 1.3, 0.27, "canvas")
+    for side in (-1, 1):
+        x0, x1 = sorted((side * 0.1, side * 0.29))
+        m.box(x0, 1.02, 0.19, x1, 1.47, 0.28, "leather")
+    m.box(-0.29, 1.02, -0.17, 0.29, 1.47, -0.12, "leather")
+    m.box(-0.16, 1.02, 0.28, 0.16, 1.36, 0.3, "canvas_dark")
+    for side in (-1, 1):
+        m.box(side * 0.14 - 0.012, 1.36, 0.19, side * 0.14 + 0.012, 1.47, 0.3, "canvas_dark")
+    m.box(-0.08, 1.46, -0.07, 0.08, 1.52, 0.07, "skin")
+    m.joint = 3                                                        # head: face, moustache, hat
+    m.box(-0.13, 1.51, -0.13, 0.13, 1.79, 0.13, "skin")
+    m.box(-0.085, 1.66, 0.13, -0.035, 1.7, 0.135, "dark")
+    m.box(0.035, 1.66, 0.13, 0.085, 1.7, 0.135, "dark")
+    m.box(-0.1, 1.71, 0.13, -0.02, 1.73, 0.14, "beard")
+    m.box(0.02, 1.71, 0.13, 0.1, 1.73, 0.14, "beard")
+    m.box(-0.03, 1.6, 0.13, 0.03, 1.67, 0.18, "skin")
+    m.box(-0.12, 1.57, 0.13, 0.12, 1.61, 0.17, "beard")
+    for side in (-1, 1):
+        x0, x1 = sorted((side * 0.08, side * 0.13))
+        m.box(x0, 1.51, 0.13, x1, 1.58, 0.16, "beard")
+        x0, x1 = sorted((side * 0.13, side * 0.145))
+        m.box(x0, 1.56, -0.12, x1, 1.72, 0.06, "beard")
+    m.box(-0.13, 1.56, -0.145, 0.13, 1.74, -0.13, "beard")
+    m.box(-0.2, 1.77, -0.2, 0.2, 1.8, 0.2, "chest_dark")
+    m.box(-0.14, 1.8, -0.14, 0.14, 1.94, 0.14, "chest_dark")
+    m.box(-0.145, 1.8, -0.145, 0.145, 1.84, 0.145, "crusader")
+    for side, upper, fore in ((-1, 4, 5), (1, 6, 7)):
+        x0, x1 = sorted((side * 0.28, side * 0.4))
+        m.joint = upper                                                # sleeve
+        m.box(x0, 1.12, -0.07, x1, 1.47, 0.07, "canvas")
+        m.joint = fore                                                 # rolled cuff, bare forearm, hand
+        x0, x1 = sorted((side * 0.29, side * 0.39))
+        m.box(x0 - 0.005, 1.06, -0.065, x1 + 0.005, 1.14, 0.065, "canvas")
+        m.box(x0, 0.88, -0.055, x1, 1.06, 0.055, "skin")
+        m.box(x0 - 0.005, 0.77, -0.06, x1 + 0.005, 0.88, 0.06, "skin")
+    return m
+
+
+def _quat(axis, degrees):
+    import math
+    half = math.radians(degrees) / 2
+    x, y, z = _normalize(axis)
+    return (x * math.sin(half), y * math.sin(half), z * math.sin(half), math.cos(half))
+
+
+def _qmul(a, b):
+    ax, ay, az, aw = a
+    bx, by, bz, bw = b
+    return (aw * bx + ax * bw + ay * bz - az * by,
+            aw * by - ax * bz + ay * bw + az * bx,
+            aw * bz + ax * by - ay * bx + az * bw,
+            aw * bw - ax * bx - ay * by - az * bz)
+
+
+def _euler(x=0.0, y=0.0, z=0.0):
+    """A turn of x degrees about X, then z about Z, then y about Y (each about the joint's own point)."""
+    return _qmul(_qmul(_quat((0, 1, 0), y), _quat((0, 0, 1), z)), _quat((1, 0, 0), x))
+
+
+def _smooth(t, t0, t1):
+    """0 before t0, 1 after t1, eased in between."""
+    if t <= t0:
+        return 0.0
+    if t >= t1:
+        return 1.0
+    u = (t - t0) / (t1 - t0)
+    return u * u * (3 - 2 * u)
+
+
+def quartermaster_idle(t):
+    """The quartermaster's pose t seconds into his idle: he breathes, shifts his weight, looks one way along the camp and then the other, strokes his moustache
+    and nods, one hand on his hip the whole time. Every curve is back where it started at QM_IDLE_SECONDS, so the clip loops.
+    Returns {joint name: (rotation quaternion, translation or None)}."""
+    import math
+    breath = math.sin(2 * math.pi * t / (QM_IDLE_SECONDS / 2))
+    sway = math.sin(2 * math.pi * t / QM_IDLE_SECONDS)
+    look = _smooth(t, 0.5, 1.3) - 1.75 * _smooth(t, 2.3, 3.2) + 0.75 * _smooth(t, 4.9, 5.7)   # 0 -> 1 -> -0.75 -> 0
+    stroke = _smooth(t, 3.3, 3.9) - _smooth(t, 4.7, 5.3)
+    rub = math.sin(2 * math.pi * (t - 3.3) * 1.6) * stroke
+    nod = math.sin(math.pi * _smooth(t, 5.3, 5.9))
+    return {
+        "hips": (_euler(y=3.0 * sway), (0.0, 0.95 + 0.006 * breath, 0.0)),
+        "chest": (_euler(x=-1.8 * breath, y=-2.0 * sway), None),
+        "head": (_euler(x=2.0 * breath + 9.0 * nod - 6.0 * stroke, y=30.0 * look, z=-3.0 * look), None),
+        "upper_arm_l": (_euler(x=6.0, z=-38.0 + 1.5 * breath), None),
+        "forearm_l": (_euler(z=100.0), None),
+        "upper_arm_r": (_euler(x=-2.0 * sway - 63.0 * stroke, y=-20.0 * stroke, z=4.0 - 4.0 * stroke), None),   # the hand up to the moustache
+        "forearm_r": (_euler(x=-4.0 - 101.0 * stroke + 7.0 * rub, y=-40.0 * stroke), None),
+    }
 
 
 def png_bytes():
@@ -958,6 +1382,95 @@ def write_glb(mesh, path):
     path.write_bytes(struct.pack("<III", 0x46546C67, 2, 12 + len(body)) + body)
 
 
+def write_skinned_glb(mesh, path, joints, clips):
+    """Writes a skinned model: <mesh>'s faces each bound to one joint (mesh.joints), the skeleton <joints> ((name, parent index or None, bind position) each,
+    parents first), and <clips> ({name: (seconds, pose function)}: the function gives {joint name: (rotation, translation or None)} at a time), sampled 30 times
+    a second. The engine bakes every clip at load time and the game picks one and a time each frame."""
+    count = len(mesh.positions)
+    image = png_bytes()
+    views, blob, accessors = [], b"", []
+
+    def add(data, target=None):
+        nonlocal blob
+        view = {"buffer": 0, "byteOffset": len(blob), "byteLength": len(data)}
+        if target:
+            view["target"] = target
+        views.append(view)
+        blob += pad4(data)
+        return len(views) - 1
+
+    def accessor(data, component, kind, n, target=None, bounds=None):
+        entry = {"bufferView": add(data, target), "componentType": component, "count": n, "type": kind}
+        if bounds:
+            entry["min"], entry["max"] = bounds
+        accessors.append(entry)
+        return len(accessors) - 1
+
+    mins = [min(p[i] for p in mesh.positions) for i in range(3)]
+    maxs = [max(p[i] for p in mesh.positions) for i in range(3)]
+    position = accessor(b"".join(struct.pack("<3f", *p) for p in mesh.positions), 5126, "VEC3", count, 34962, (mins, maxs))
+    normal = accessor(b"".join(struct.pack("<3f", *n) for n in mesh.normals), 5126, "VEC3", count, 34962)
+    uv = accessor(b"".join(struct.pack("<2f", *t) for t in mesh.uvs), 5126, "VEC2", count, 34962)
+    joint = accessor(b"".join(struct.pack("<4H", j, 0, 0, 0) for j in mesh.joints), 5123, "VEC4", count, 34962)
+    weight = accessor(b"".join(struct.pack("<4f", 1.0, 0.0, 0.0, 0.0) for _ in mesh.joints), 5126, "VEC4", count, 34962)
+    index = accessor(b"".join(struct.pack("<I", i) for i in mesh.indices), 5125, "SCALAR", len(mesh.indices), 34963)
+    image_view = add(image)
+
+    # The inverse bind matrices: the bind pose has no turns, so each is just a step back from the joint's place (column-major).
+    ibm = b"".join(struct.pack("<16f", 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -x, -y, -z, 1) for (_, _, (x, y, z)) in joints)
+    inverse_binds = accessor(ibm, 5126, "MAT4", len(joints))
+
+    nodes = [{"name": path.stem, "mesh": 0, "skin": 0}]
+    for i, (name, parent, (x, y, z)) in enumerate(joints):
+        px, py, pz = joints[parent][2] if parent is not None else (0.0, 0.0, 0.0)
+        node = {"name": name, "translation": [x - px, y - py, z - pz]}
+        children = [1 + c for c, (_, up, _) in enumerate(joints) if up == i]
+        if children:
+            node["children"] = children
+        nodes.append(node)
+
+    animations = []
+    names = [name for (name, _, _) in joints]
+    for clip, (seconds, pose) in clips.items():
+        steps = int(round(seconds * 30))
+        times = [seconds * k / steps for k in range(steps + 1)]
+        frames = [pose(t) for t in times]
+        time_accessor = accessor(b"".join(struct.pack("<f", t) for t in times), 5126, "SCALAR", len(times), None, ([0.0], [seconds]))
+        samplers, channels = [], []
+        for name in frames[0]:
+            rotations = b"".join(struct.pack("<4f", *f[name][0]) for f in frames)
+            samplers.append({"input": time_accessor, "output": accessor(rotations, 5126, "VEC4", len(times)), "interpolation": "LINEAR"})
+            channels.append({"sampler": len(samplers) - 1, "target": {"node": 1 + names.index(name), "path": "rotation"}})
+            if frames[0][name][1] is not None:
+                moves = b"".join(struct.pack("<3f", *f[name][1]) for f in frames)
+                samplers.append({"input": time_accessor, "output": accessor(moves, 5126, "VEC3", len(times)), "interpolation": "LINEAR"})
+                channels.append({"sampler": len(samplers) - 1, "target": {"node": 1 + names.index(name), "path": "translation"}})
+        animations.append({"name": clip, "samplers": samplers, "channels": channels})
+
+    gltf = {
+        "asset": {"version": "2.0", "generator": "Arena Master make_placeholder_models.py"},
+        "scene": 0,
+        "scenes": [{"nodes": [0, 1]}],
+        "nodes": nodes,
+        "skins": [{"joints": list(range(1, 1 + len(joints))), "inverseBindMatrices": inverse_binds, "skeleton": 1}],
+        "meshes": [{"primitives": [{"attributes": {"POSITION": position, "NORMAL": normal, "TEXCOORD_0": uv, "JOINTS_0": joint, "WEIGHTS_0": weight},
+                                    "indices": index, "material": 0}]}],
+        "materials": [{"pbrMetallicRoughness": {"baseColorTexture": {"index": 0}, "metallicFactor": 0.0, "roughnessFactor": 1.0}}],
+        "textures": [{"source": 0, "sampler": 0}],
+        "samplers": [{"magFilter": 9728, "minFilter": 9728}],
+        "images": [{"bufferView": image_view, "mimeType": "image/png"}],
+        "accessors": accessors,
+        "animations": animations,
+        "bufferViews": views,
+        "buffers": [{"byteLength": len(blob)}],
+    }
+
+    json_chunk = pad4(json.dumps(gltf, separators=(",", ":")).encode(), b" ")
+    body = struct.pack("<II", len(json_chunk), 0x4E4F534A) + json_chunk + struct.pack("<II", len(blob), 0x004E4942) + blob
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(struct.pack("<III", 0x46546C67, 2, 12 + len(body)) + body)
+
+
 if __name__ == "__main__":
     for name, build in (("ranger_placeholder.glb", build_ranger), ("paladin_placeholder.glb", build_paladin),
                         ("holy_nova.glb", lambda: build_ring(0.88, 1.0, "holy")), ("holy_circle.glb", build_holy_circle),
@@ -983,7 +1496,17 @@ if __name__ == "__main__":
                         ("item_epic.glb", lambda: build_item_orb("epic")), ("item_legendary.glb", lambda: build_item_orb("legendary")),
                         ("camp_tent.glb", build_tent), ("camp_firepit.glb", build_firepit), ("camp_stash.glb", build_stash),
                         ("camp_target.glb", build_target), ("camp_gate.glb", build_gate),
-                        ("camp_board.glb", build_board), ("camp_stall.glb", build_stall), ("camp_rack.glb", build_rack)):
+                        ("camp_board.glb", build_board), ("camp_stall.glb", build_stall), ("camp_rack.glb", build_rack),
+                        ("camp_wall.glb", build_wall), ("camp_wall_post.glb", build_wall_post), ("camp_barrel.glb", build_barrel),
+                        ("camp_crates.glb", build_crates), ("camp_woodpile.glb", build_woodpile), ("camp_bench.glb", build_bench),
+                        ("camp_banner.glb", build_banner), ("camp_brazier.glb", build_brazier), ("camp_haybale.glb", build_haybale),
+                        ("camp_dummy.glb", build_dummy), ("camp_well.glb", build_well), ("camp_cart.glb", build_cart),
+                        ("camp_cookpot.glb", build_cookpot), ("camp_bedroll.glb", build_bedroll), ("camp_lantern.glb", build_lantern),
+                        ("camp_sacks.glb", build_sacks)):
         mesh = build()
         write_glb(mesh, MODELS / name)
         print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")
+
+    mesh = build_quartermaster()
+    write_skinned_glb(mesh, MODELS / "camp_quartermaster.glb", QM_JOINTS, {"Idle": (QM_IDLE_SECONDS, quartermaster_idle)})
+    print(f"Wrote {MODELS / 'camp_quartermaster.glb'} ({len(mesh.positions)} vertices, {len(QM_JOINTS)} joints, skinned)")

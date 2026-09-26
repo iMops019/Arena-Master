@@ -50,7 +50,7 @@ public sealed partial class ArenaMasterContent
         else
         {
             hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -120f),
-                "Chest and quartermaster on the left, tree target and bounty board on the right, class rack behind you, the gate ahead starts a run",
+                "Chest and quartermaster on the right, tree target and bounty board on the left, class rack behind you, the gate ahead starts a run",
                 new Vector4D<float>(1f, 1f, 1f, 0.6f), 0.8f);
         }
 

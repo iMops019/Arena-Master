@@ -189,7 +189,7 @@ The user's brief: a Shaman whose first tree is **Lightning Alignment** and whose
 
 ## Camp (built)
 
-- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle. A fire, a tent, and six stations; walk up and press E:
+- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle, walled in by a palisade (an octagon of sharpened logs, `CampWalls`) with the departure gate set in it as a gatehouse, and ringed outside by low wooded hills. Going to a run and coming back is a fade to black with the place's name on it (`Ui/ScreenFade`), so camp reads as its own small place. The camp is dressed (`CampLayout.Decor`: tents and bedrolls, benches round the fire, a cooking fire, braziers, banners, lanterns, a well, a supply cart, crates, barrels and sacks, a practice yard with dummies and straw bales, a woodpile), and the **quartermaster** stands behind his stall, idling (a skinned model with a looping clip: he breathes, looks about, strokes his moustache). He is only for looks. A fire, and six stations; walk up and press E:
   - **Weapon rack** (behind the spawn) -> choose the class: the Ranger, the Paladin, the Mage or the Shaman. Each keeps its own tree; the item chest, silver and upgrades are shared.
   - **Stash chest** -> Item Chest: every item, how many owned, and which are still undiscovered.
   - **Archery target** -> the chosen class's passive tree (the in-game version of the mockup).

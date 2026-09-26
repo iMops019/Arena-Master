@@ -11,6 +11,7 @@ using ArenaMaster.Game.Shaman;
 using ArenaMaster.Game.Ui;
 using ArenaMaster.Game.World;
 using CEngine.Core;
+using ImGuiNET;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 
@@ -111,7 +112,7 @@ public sealed partial class ArenaMasterContent : IGameContent
             terrain.ApplyBrush(hill.X, hill.Z, hill.Radius, hill.Height);
         }
 
-        CampLayout.PaintClearing(terrain);
+        CampLayout.ShapeGround(terrain);
         return terrain;
     }
 
@@ -174,7 +175,7 @@ public sealed partial class ArenaMasterContent : IGameContent
         switch (_mode)
         {
             case GameMode.Camp:
-                UpdateCamp(window);
+                UpdateCamp(window, deltaSeconds);
                 break;
             case GameMode.Run:
                 UpdateRun(window, deltaSeconds, GroundAt);
@@ -182,8 +183,25 @@ public sealed partial class ArenaMasterContent : IGameContent
         }
     }
 
-    /// <summary>The game's own screens, over the world: whichever is open takes the frame.</summary>
+    /// <summary>The game's own screens, over the world, and over everything the fade between camp and a run.</summary>
     public void DrawOverlay(EngineWindow window)
+    {
+        DrawScreens(window);
+        switch (_fade.Advance(ImGui.GetIO().DeltaTime))
+        {
+            case ScreenFade.Step.Dark:
+                window.GamePaused = true;   // the move is made: stay still until the picture is back
+                break;
+            case ScreenFade.Step.Done:
+                window.GamePaused = false;
+                break;
+        }
+
+        _fade.Draw();
+    }
+
+    /// <summary>The game's own screens: whichever is open takes the frame.</summary>
+    private void DrawScreens(EngineWindow window)
     {
         if (_newGameScreen.IsOpen)
         {
@@ -204,7 +222,7 @@ public sealed partial class ArenaMasterContent : IGameContent
         {
             if (_summaryScreen.Draw())
             {
-                ReturnToCamp(window);
+                Travel(window, "Camp", () => ReturnToCamp(window));
             }
 
             return;
@@ -218,12 +236,11 @@ public sealed partial class ArenaMasterContent : IGameContent
         DrawLevelUp(window);
     }
 
-    /// <summary>The first frame of play: third person, the camp fire lit, the pause menu's own button.</summary>
+    /// <summary>The first frame of play: third person, the camp built and its fires lit, the pause menu's own button, and the picture fading in on camp.</summary>
     private void Start(EngineWindow window, Terrain terrain)
     {
         window.ThirdPerson = true;
-        var fire = CampLayout.Ground(terrain, CampLayout.Centre);
-        window.AddFire(CampLayout.FireId, fire + new Vector3D<float>(0f, 0.1f, 0f), scale: 1f);
+        BuildCamp(window, terrain);
         window.AddPauseMenuButton("Return to Camp", () =>
         {
             if (_mode == GameMode.Run)
@@ -232,9 +249,10 @@ public sealed partial class ArenaMasterContent : IGameContent
             }
             else if (_mode == GameMode.Camp)
             {
-                window.TeleportPlayer(CampLayout.Ground(terrain, CampLayout.Spawn));
+                Travel(window, "Camp", () => window.TeleportPlayer(CampLayout.Ground(terrain, CampLayout.Spawn)));
             }
         });
+        _fade.Reveal("Camp");
         _started = true;
     }
 
@@ -251,6 +269,7 @@ public sealed partial class ArenaMasterContent : IGameContent
 
         _summaryScreen.Close();
         CloseCampScreens();
+        _fade.Cancel();
 
         try
         {

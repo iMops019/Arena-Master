@@ -2,12 +2,14 @@ using ArenaMaster.Game.Camp;
 using ArenaMaster.Game.Ui;
 using CEngine.Core;
 using Silk.NET.Input;
+using Silk.NET.Maths;
 
 namespace ArenaMaster.Game;
 
 // Camp: walking up to a station and pressing E opens its screen - the item chest, the passive tree, the class rack, the bounty board, the quartermaster, or the
 // loadout at the departure gate, which is where a run begins.
 // A screen pauses the world (the engine's GamePaused) and frees the cursor until it is closed.
+// Camp is walled in and dressed, with the quartermaster idling behind his stall; the trip to a run and back goes through a fade to black (Travel).
 public sealed partial class ArenaMasterContent
 {
     private readonly ItemChestScreen _chestScreen = new();
@@ -25,10 +27,18 @@ public sealed partial class ArenaMasterContent
     /// <summary>The station the player is standing at, if any, and what pressing E there does.</summary>
     private (CampStation Station, string Prompt)? _nearStation;
 
-    private void UpdateCamp(EngineWindow window)
+    /// <summary>The fade between camp and a run.</summary>
+    private readonly ScreenFade _fade = new();
+
+    /// <summary>How far the quartermaster is into his idle clip; and whether his model could be loaded (null until tried).</summary>
+    private float _quartermasterSeconds;
+    private bool? _quartermasterLoaded;
+
+    private void UpdateCamp(EngineWindow window, float deltaSeconds)
     {
         _health.Reset(_hero.MaxHealth);   // camp is safe
         _nearStation = CampLayout.StationNear(window.PlayerFeet);
+        PoseQuartermaster(window, deltaSeconds);
 
         // Testing shortcut, like the run's F5-F7: F8 at camp gives the active tree one level, to try deep nodes without the runs. Goes before a real release.
         if (Pressed(window, Key.F8) && _tree.Level < Progression.TreeProgress.MaxLevel)
@@ -152,7 +162,7 @@ public sealed partial class ArenaMasterContent
                 CloseScreen(window);
                 if (result == LoadoutScreen.Result.Begin)
                 {
-                    BeginRun(window);
+                    Travel(window, "Into the Wilds", () => BeginRun(window));
                 }
             }
 
@@ -177,6 +187,54 @@ public sealed partial class ArenaMasterContent
     {
         window.GamePaused = false;
         SwallowKey(Key.E);
+    }
+
+    /// <summary>
+    /// Goes somewhere through a fade: the world holds still, the picture fades to black, <paramref name="move"/> is made in the dark (with <paramref name="title"/>
+    /// on the screen), and the picture comes back on the new place, which starts moving again once it is clear (see <see cref="DrawOverlay"/>).
+    /// </summary>
+    private void Travel(EngineWindow window, string title, Action move)
+    {
+        _fade.Start(title, move);
+        window.GamePaused = true;
+    }
+
+    /// <summary>Puts up the palisade and camp's dressing, and lights the camp fire, the braziers and the cooking fire, once at the start of play.</summary>
+    private static void BuildCamp(EngineWindow window, Terrain terrain)
+    {
+        foreach (var placement in CampLayout.DecorProps(terrain))
+        {
+            window.PlaceProp(placement);
+        }
+
+        window.AddFire(CampLayout.FireId, CampLayout.Ground(terrain, CampLayout.Centre) + new Vector3D<float>(0f, 0.1f, 0f), scale: 1f);
+        foreach (var (id, offset, height, scale) in CampLayout.SmallFires())
+        {
+            window.AddFire(id, CampLayout.Ground(terrain, CampLayout.Centre + offset) + new Vector3D<float>(0f, height, 0f), scale);
+        }
+    }
+
+    /// <summary>The quartermaster idles behind his stall while the player is at camp.</summary>
+    private void PoseQuartermaster(EngineWindow window, float deltaSeconds)
+    {
+        _quartermasterLoaded ??= window.TryLoadSkinnedModel(QuartermasterNpc.Model, AssetsRoot);
+        if (_quartermasterLoaded != true || window.Terrain is not { } terrain)
+        {
+            return;
+        }
+
+        _quartermasterSeconds = QuartermasterNpc.ClipTime(_quartermasterSeconds + deltaSeconds);
+        var (offset, yaw) = QuartermasterNpc.Stand();
+        window.SetSkinnedPropPose(QuartermasterNpc.Model, QuartermasterNpc.IdleClip, _quartermasterSeconds, CampLayout.Ground(terrain, CampLayout.Centre + offset), yaw, 1f);
+    }
+
+    /// <summary>Takes the quartermaster out of the world while the player is away on a run (a skinned model is drawn wherever it is, near or far).</summary>
+    private void DismissQuartermaster(EngineWindow window)
+    {
+        if (_quartermasterLoaded == true)
+        {
+            window.RemoveSkinnedProp(QuartermasterNpc.Model);
+        }
     }
 
     /// <summary>From a run's summary back to camp: by the fire, whole again.</summary>
