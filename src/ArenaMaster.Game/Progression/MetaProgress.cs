@@ -146,10 +146,14 @@ internal static class Bounties
         new("deadeye_prize", "Deadeye's Prize", "Win a run as the Ranger.", 800, "splintered_crown", (run, _, _) => run.ClassId == Ranger && run.Won),
         new("rise_again", "Rise Again", "Survive 25 minutes in one run.", 500, "phoenix_feather", (run, _, _) => run.Seconds >= 1500f),
         new("hoarder", "Hoarder", "Own 30 different items.", 600, "crown_of_plenty", (_, profile, _) => profile.Stash.Count(kv => kv.Value > 0) >= 30),
+
+        // The Shaman's.
+        new("conductor", "Conductor", "Kill 600 enemies in one run as the Shaman.", 250, "stormcallers_horn", (run, _, _) => run.ClassId == Shaman && run.Kills >= 600),
+        new("stormborn", "Stormborn", "Win a run as the Shaman.", 800, "crown_of_storms", (run, _, _) => run.ClassId == Shaman && run.Won),
     };
 
     // The class ids the class bounties ask for (the classes' own ids, kept here as text so the board doesn't reach into any class's code).
-    private const string Ranger = "ranger", Paladin = "paladin", Mage = "mage";
+    private const string Ranger = "ranger", Paladin = "paladin", Mage = "mage", Shaman = "shaman";
 
     /// <summary>Whether <paramref name="item"/> can come out of chests and drops: yes unless a bounty not yet done unlocks it.</summary>
     public static bool IsUnlocked(RunItem item, Profile profile) =>

@@ -36,6 +36,7 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 - **The director:** fodder grows from 16 to a swarm of 300 over the 30 minutes (about 75 at 10:00 and 170 at 20:00), and spawns faster to keep up (up to 6 a frame). Health scales +12% per minute, damage +5%/min, speed +1%/min.
 - **Ghoul (fodder):** 30 HP, 3.6 m/s, claws on contact for 8.
 - **Crossbow Ghoul (ranged fodder, the user's request; numbers are a first pass):** 24 HP, 3.2 m/s, 2 XP, claws for 6 if you walk up to it. Mixed into the fodder from 1:30: 6% of spawns, growing to 15% by 16:30. It walks in until you're within 11 m and stops there. With you 3 to 14 m away it aims for 1.1 s, turning to follow you, while its crossbow lights up from faint to bright (the telegraph). Then it looses a bolt at where you stand: 12 damage (scaled like any enemy's), a small shove, 20 m/s, so a step aside after the glow peaks dodges it. 2.8 s cooldown between shots. A shield blocks a bolt like any blow (no damage, no shove); a frozen shooter holds its shot.
+- **Ghoul Mage (ranged fodder, the user's request; numbers are a first pass):** it gets in range and shoots a fireball. Made to play differently from the crossbow: rarer, tougher, further off, slower to shoot, and dodged by a real sidestep rather than a lean. 36 HP, 3 m/s, 3 XP, claws for 6 up close. Mixed into the fodder from 5:00: 3% of spawns, growing to 8% by 20:00. It stops 14 m off. With you 4 to 18 m away it winds up for 1.4 s, a flame between its hands glowing from faint to bright, then hurls a fireball at the ground where you stand: 13 m/s, and a burning ring marks where it will land while it flies. It bursts on you or on the ground there: 16 damage and a shove to anyone within 2 m. 3.5 s cooldown. A shield blocks the burst.
 - **Ghoul Brute (elite):** first at 3:00, then every 2.5 min, 1 per wave (2 after 10:00, 3 after 20:00). 260 HP, 12 XP. Two telegraphed attacks:
   - *Lunge:* crouches for 0.75 s over a red lane, then charges 7.2 m down it. 22 damage plus knock-back.
   - *Leap slam:* a red circle (3.5 m) fills up over 1.45 s, then it lands in it. 26 damage, knock-back, 0.9 s stun.
@@ -86,7 +87,7 @@ Everything below the brief is a first pass **(draft)**: the numbers, the level-u
 - **Thorns** (unlocked by Crown of Thorns): every 0.5 s, each enemy touching the Paladin takes 6 damage (more from the nodes).
 - **Base numbers**: 130 max health (the Ranger has 100), 6.4 m/s, 3 m pickup.
 - **Items** read the same way as for the Ranger: damage and attack speed mean the nova's (and the circles' and thorns' damage), crit means the nova's.
-- **Level-up pool** (`Paladin/PaladinUpgrades.cs`): Holy Wrath (+20% nova damage, x5), Quickened Prayer (+12% nova frequency, x5), Radiance (+10% nova and circle size, x4), Consecration (+25% circle damage and +0.5 s, x4), Shield Training (+4% block, x5), Heavy Plate (+20 max health and heal, x5), Prayer of Mending (+0.5 health per second, x5), Barbed Plating (+40% thorns, x4, only once thorns are unlocked), Pilgrim's Stride (+8% move speed, x5), Gleaner (+35% pickup range, x4).
+- **Level-up pool** (`Paladin/PaladinUpgrades.cs`): Holy Wrath (+20% nova damage, x5), Quickened Prayer (+12% nova frequency, x5), Radiance (+10% nova and circle size, x4), Consecration (+25% circle damage and +0.5 s, x4), Shield Training (+4% block, x5), Heavy Plate (+20 max health and heal, x5), Prayer of Mending (+0.5 health per second, x5), Barbed Plating (+40% thorns, x4, only once thorns are unlocked), Pilgrim's Stride (+8% move speed, x5), Gleaner (+35% pickup range, x4). Added later, when the user asked for level-up choices tied to the classes: Sanctified Ground (holy circles heal +25%, x4), Shield Slam (a block deals 15 damage to the attacker, x3), Zealot's Eye (+6% crit, +15% crit damage, x4), Steadfast (+5% block while standing still, x3), Bramble Mail (thorns strike 20% more often, x3, only with thorns).
 - **Defiance tree** (`Paladin/DefianceTree.cs`): 40 nodes in 7 tiers (the same levels as the Sharpshooter: 1, 3, 6, 10, 15, 21, 28) and four lanes: **Bulwark** (block chance, what a block does, regeneration), **Retribution** (thorns), **Radiance** (the nova) and **Consecration** (area: the nova's reach and the circles). Two starting nodes: Shield Wall (+2% block, +8 max health per rank) and Zealous Light (+10% nova damage, +5% frequency per rank). Thirteen majors, a capstone per lane:
   - *Crown of Thorns* (tier 2, Retribution): unlocks thorns.
   - *Echoing Nova* (tier 3, Radiance): every nova bursts again 0.35 s later at 60% damage.
@@ -113,7 +114,7 @@ Everything below the brief is a first pass **(draft)**.
 - **Cold:** every frost hit chills: 1.5 s, walking 20% slower (chill capped at 70%). A frozen enemy stands still, can't claw, and holds any attack it was winding up; it shows pale. Bosses can't be frozen.
 - **Base numbers:** 90 max health (the most fragile class), 7 m/s, 3 m pickup.
 - **Items:** damage means cold damage, attack speed means cast speed, crit means a bolt's crit.
-- **Level-up pool** (`Mage/MageUpgrades.cs`): Ice Shards (+20% cold damage, x5), Quickened Casting (+12% cast speed, x5), Splinter Bolt (+1 projectile, x3), Winter Wind (+20% projectile speed, +15% range, x3), Numbing Cold (+8% chill, +0.3 s, x4), Piercing Ice (+1 pierce, x2), Glacial Ward (+30% Frost Shield, x3, only with Frost Shield), Concussive Frost (+25% Frost Blast radius, x3, only with Frost Blast), Arcane Vigor (+15 max health and heal, x5), Fleet Step (+8% move speed, x5), Attunement (+35% pickup range, x4), Frozen Precision (+6% crit chance, +15% crit damage, x4).
+- **Level-up pool** (`Mage/MageUpgrades.cs`): Ice Shards (+20% cold damage, x5), Quickened Casting (+12% cast speed, x5), Splinter Bolt (+1 projectile, x3), Winter Wind (+20% projectile speed, +15% range, x3), Numbing Cold (+8% chill, +0.3 s, x4), Piercing Ice (+1 pierce, x2), Glacial Ward (+30% Frost Shield, x3, only with Frost Shield), Concussive Frost (+25% Frost Blast radius, x3, only with Frost Blast), Arcane Vigor (+15 max health and heal, x5), Fleet Step (+8% move speed, x5), Attunement (+35% pickup range, x4), Frozen Precision (+6% crit chance, +15% crit damage, x4). Added later: Glacial Spikes (+20% damage to chilled and frozen, x4), Ice Armor (6% less damage taken, x3), Shatterpoint (+15% damage to elites and bosses, x4), Deep Chill (+3% freeze chance and +0.3 s freezes, x3, only with Deep Freeze), Blast Power (Frost Blast +25% damage, x3, only with Frost Blast).
 - **Frost tree** (`Mage/FrostTree.cs`): 34 nodes in 7 tiers (levels 1, 3, 6, 10, 15, 21, 28) and three lanes: **Winter** (cold damage, chill, freezing), **Barrage** (the bolts) and **Ward** (the Frost Shield and staying alive). Two starting nodes: Cold Hands (+10% cold damage, +3% chill per rank) and Quickened Mind (+8% cast speed, +8% projectile speed per rank). Two +1 projectile nodes: Extra Shard (tier 2) and Volley of Ice (tier 4), 2 ranks each. Ten majors:
   - *Frost Shield* (tier 2, Ward; the user's): every 10 s a shield forms on its own and takes damage for 4 s: 25 plus 20% of max health. It's a barrier on the health bar (the icy band, and "+N shield" by the HP). The first comes 2 s into a run.
   - *Frost Blast* (tier 3, Barrage; the user's): a bolt that hits explodes: 50% of its damage to every other enemy within 2 m, chilling them.
@@ -124,6 +125,31 @@ Everything below the brief is a first pass **(draft)**.
   - *Ice Block* (tier 6, Ward): once per run, a killing blow leaves 1 health, heals 25% and puts up a shield of half max health.
   - Capstones (tier 7): *Blizzard* (every enemy within 5 m takes a bolt's damage per second and is chilled), *Comet* (every 4th barrage ends with a comet at the toughest enemy in range: 500%, and a 4 m blast of half that), *Glacial Fortress* (the Frost Shield holds until it breaks, and forms 50% faster).
 - **How it plays, from a simulation** (no rendering, the real director, a random level-up each level): a fresh Mage that keeps moving survives 10 minutes, about as well as a fresh Paladin that stands still. A fresh Mage that stands still dies in about 25 seconds. With about 30 tree points it survives 10 minutes either way. The Mage is the class that has to keep moving.
+
+## Fourth class: Shaman (built, first pass)
+
+The user's brief: a Shaman whose first tree is **Lightning Alignment** and whose attack is **Rolling Lightning**: it lobs a ball of lightning that bounces off the ground and forks off terrain (trees, rocks) and enemies before it dissipates. The user gave Claude the honour of designing the tree. Everything below the brief is a first pass **(draft)**.
+
+- **Rolling Lightning** (`Shaman/RollingLightning.cs`): every 1.3 s the Shaman lobs a ball (radius 0.35) in an arc that comes down on whatever the crosshair is on (3 to 24 m; with the crosshair on the sky, 14 m ahead). It falls under gravity and bounces along the ground: each bounce zaps everything within 1.6 m for half the ball's damage. It fades on landing with no bounces left (4 to start) or after 4 s.
+  - **Enemies:** the ball strikes what it rolls into (22 damage, 5% crit, the same enemy at most every 0.5 s), then glances off it, and the lightning forks from the struck enemy to the 2 nearest others within 6 m for 60% damage each.
+  - **Trees and rocks:** the ball glances off them and forks from the trunk the same way. This uses a new engine query, `EngineWindow.TouchesObstacle`, over the same trunk, rock and solid-prop colliders the player bumps into (only those near the camera exist, which is fine for a ball thrown nearby).
+- **Base numbers:** 100 max health, 7 m/s, the surge on Shift (a quick 0.16 s dash, 1.4 s cooldown).
+- **Items:** damage means lightning damage, attack speed cast speed, projectiles more balls per cast (fanned 14 degrees apart), area the zaps and fork range, duration the ball's life, range how far it can be thrown.
+- **Level-up pool** (`Shaman/ShamanUpgrades.cs`): Charged Core (+20% damage, x5), Swift Casting (+12% cast speed, x5), Twin Spheres (+1 ball, x3), Resonance (+1 bounce, x3), Branching Bolts (+1 fork, x3), Long Reach (+20% fork range, x3), Static Field (+25% zap damage, +15% zap size, x4), Earthen Hide (+20 max health and heal, x5), Stormstride (+8% move speed, x5), Magnetism (+35% pickup, x4), Overcharge (+6% crit, +15% crit damage, x4). Added later: Storm Bolt (+1 s ball life, x3), Conductive (+20% fork damage, x4), Heavy Sphere (+20% ball size, x3), Insulation (6% less damage taken, x3), Rod Mastery (rods last 1.5 s longer and zap 20% harder, x3, only with Lightning Rod).
+- **Lightning Alignment** (`Shaman/AlignmentTree.cs`, Claude's design): 36 nodes in 7 tiers (levels 1, 3, 6, 10, 15, 21, 28), three lanes: **Tempest** (the ball: damage, cast speed, bounces, size, life), **Conduction** (the forks: count, range, damage, forking from trees and the ground) and **Attunement** (the Shaman: health, regeneration, speed, the surge, lightning that answers being hit). Starting nodes: Charged Air (+10% damage, +5% cast speed per rank) and Live Wire (+10% fork damage, +8% fork range per rank). Twelve majors:
+  - *Paralysis* (tier 2, Conduction): forked enemies are paralysed 0.5 s (elites half, bosses never).
+  - *Thunderclap* (tier 3, Tempest): zaps reach 60% further and hit 50% harder.
+  - *Chain Reaction* (tier 3, Conduction): every fork leaps on once more.
+  - *Surge Strike* (tier 3, Attunement): every surge drops a ball rolling the way you went.
+  - *Supercell* (tier 4, Tempest): every 5th cast is a supercell: twice the size and damage, +3 bounces.
+  - *Lightning Rod* (tier 4, Conduction): a tree or rock the ball glances off stays charged 4 s, zapping everything within 4 m twice a second.
+  - *Ground Current* (tier 5, Conduction): every bounce forks too.
+  - *Eye of the Storm* (tier 5, Attunement): while you move, a ring shocks everything within 3 m twice a second.
+  - *Lightning Reflexes* (tier 6, Attunement): a blow that lands recharges the surge (at most every 5 s).
+  - Capstones (tier 7): *Wrath of the Thunder God* (a fading ball bursts for 300% within 5 m), *Living Current* (every lightning kill forks to two more; those forks' kills don't fork again), *Call Lightning* (every 8 s, strikes from the sky on the 5 nearest enemies within 15 m for 400%).
+  - Minors worth knowing: Static Skin (an attacker that strikes you takes lightning damage), Galvanic Recovery (heal per lightning kill), Arc Weaver (stronger rods).
+- **How it plays, from a simulation** (no trees in it, so no forking off terrain; it aims at the nearest enemy): a fresh Shaman that keeps moving lasts about 7 minutes; one that stands still dies at once, like the Mage. With about 30 tree points, moving, it survives 10 minutes. It first ran weaker (a fresh one died at 5 minutes), so the base damage went from 16 to 22 and casts from every 1.5 s to 1.3 s. Trees in the real map give it more than the simulation can show.
+- The model is a stand-in: a fur mantle over hide, a bone mask with antlers, blue war paint, a totem staff with a crackling orb. The balls are spiky blue orbs; each arc is a jagged run of short bright bars that jumps about every frame.
 - The model is a stand-in: a long blue robe, a pointed hat, a white beard, a staff with an ice crystal. The bolts are ice crystals; the shield and the blizzard are ice shards circling the Mage.
 
 ## Items
@@ -142,7 +168,7 @@ Everything below the brief is a first pass **(draft)**.
   - A boss drops a chest that is epic or better.
   - Fodder has a 1-in-200 chance to drop an item orb.
   - Walk into a chest or orb to take it. It goes into the chest at once (kept even if the run is lost) but **does nothing in the run it was found in**, not even as an extra copy of an item already brought. The run's bonuses are the loadout's, fixed when it sets out. To use a find, choose it for a later run.
-- **The 40 items.** The first 16:
+- **The 46 items.** The first 16:
   - *Common:* Whetstone (+8% damage), Feather Charm (+8% attack speed), Worn Boots (+6% move speed), Troll Blood (+0.4 HP/s), Leather Brigandine (6% less damage taken), Lodestone (+20% pickup range), Old Tome (+8% XP).
   - *Rare:* Hawk Feather (+6% crit), Troll Heart (+25 max HP), Vampire Fang (heal 1 per kill), Serrated Edge (+30% crit damage).
   - *Epic:* Rune of Might (x1.2 damage), Swiftwind Sigil (x1.15 attack speed), Ironbark Totem (x0.85 damage taken, +20 max HP).
@@ -150,13 +176,14 @@ Everything below the brief is a first pass **(draft)**.
 - **The 24 added with the Paladin and the Mage** (the user asked for Paladin- and Mage-friendly items and general ones, Claude proposed these, the user took them all). Class-leaning items still give every class something; they just pay the most for the class they lean to:
   - *Paladin-leaning:* Iron Buckler (common, +4% block chance: any class can block with it), Thorned Bracers (common, thorns: 4 damage every 0.5 s to what touches you, any class), Pilgrim's Censer (rare, +20% area: the Paladin's nova and circles, the Mage's blasts, blizzard and ward burst, the Ranger's Rain of Arrows patch), Blessed Reliquary (rare, +1 s to lingering effects: holy circles, chill, the Frost Shield, Momentum), Bulwark Sigil (epic, x1.25 block chance, x0.9 damage taken), Martyr's Crown (legendary, every blow that reaches you is paid back at 150% and heals 1% of max health), Aegis of the Dawn (legendary, +12% block, every block bursts for 25 damage within 3 m).
   - *Mage-leaning:* Rime Charm (common, every hit chills 10% for 1 s; the Mage's own chill +10%), Prism Shard (rare, +1 projectile: an arrow or a bolt; the Paladin gets +12% nova damage instead), Warding Crystal (rare, every 15 s a 20-point ward for 5 s; a Mage with the Frost Shield gets a 25% stronger shield instead), Lens of Clarity (rare, +20% projectile speed and range, +5% crit), Heart of Winter (epic, x1.25 damage to chilled or frozen enemies), Staff of the Long Night (legendary, hits have a 5% chance to freeze a non-boss for 1 s, frozen enemies take x1.4), Splintered Crown (legendary, +2 projectiles each 15% weaker; the Paladin +24% nova damage).
+  - *Shaman-leaning* (added with the Shaman): Grounding Charm (common, 25% less damage from bolts and fireballs), Storm Glass (common, +10% area and +0.5 s to lingering effects), Conductor's Coil (rare, +1 chain: one more Shaman fork, Ranger arrow chain or Mage bolt pierce; the Paladin +10% nova damage), Thunderstone (rare, every 6 s lightning strikes the nearest enemy within 15 m for 40 damage), Stormcaller's Horn (epic, x1.3 area), Crown of Storms (legendary, +2 chains, x1.2 attack speed).
   - *For everyone:* Merchant's Purse (common, +15% silver), Headsman's Axe (rare, x1.25 damage to elites and bosses), Wind-Walker Boots (rare, the Shift move recharges 25% faster, +5% move speed), Bloodstone (rare, heal 1 per 60 damage dealt), Hourglass of Chances (rare, +1 level-up reroll per run, +5% XP), Glass Pendant (epic, x1.35 damage but x1.2 damage taken), Berserker's Band (epic, up to +35% attack speed as health drops), Cursed Idol (epic, +40% XP and silver, but enemies +15% health), Phoenix Feather (legendary, once per copy per run a killing blow brings you back at 50%; a class's own last stand, Unbroken Vow or Ice Block, is used first), Crown of Plenty (legendary, x1.2 damage, XP and silver).
-- **Where each effect lives:** a class's stats read what changes its own attacks (area, duration, projectiles, block, dash recharge, attack speed with Berserk). The enemy field's hit effects apply what changes every hit, whoever lands it (chill, freeze, damage to chilled, frozen and elite enemies). `Items/ItemEffects` runs what acts on its own (thorns, the ward, Bloodstone, Martyr's Crown, the Aegis burst, the Phoenix). The content applies silver, XP and rerolls.
+- **Where each effect lives:** a class's stats read what changes its own attacks (area, duration, projectiles, block, dash recharge, attack speed with Berserk). The enemy field's hit effects apply what changes every hit, whoever lands it (chill, freeze, damage to chilled, frozen and elite enemies). `Items/ItemEffects` runs what acts on its own (thorns, the ward, Bloodstone, Martyr's Crown, the Aegis burst, the Thunderstone, the Phoenix). The enemy field softens enemy shots (the Grounding Charm). The content applies silver, XP and rerolls.
 
 ## Camp (built)
 
 - A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle. A fire, a tent, and six stations; walk up and press E:
-  - **Weapon rack** (behind the spawn) -> choose the class: the Ranger, the Paladin or the Mage. Each keeps its own tree; the item chest, silver and upgrades are shared.
+  - **Weapon rack** (behind the spawn) -> choose the class: the Ranger, the Paladin, the Mage or the Shaman. Each keeps its own tree; the item chest, silver and upgrades are shared.
   - **Stash chest** -> Item Chest: every item, how many owned, and which are still undiscovered.
   - **Archery target** -> the chosen class's passive tree (the in-game version of the mockup).
   - **Bounty board** -> the bounties, done and to do.
@@ -173,7 +200,7 @@ All in `Progression/MetaProgress.cs`; all numbers are a starting point to tune.
   - *Second Thoughts:* +1 reroll per run on the level-up screen, 5 ranks. A reroll swaps all three cards (R).
   - *Clear Mind:* +1 banish per run, 3 ranks. A banish strikes one card's upgrade from the pool for the rest of the run and replaces the card.
   - *Lucky Charm:* 5 ranks. Each makes rares 15%, epics 30% and legendaries 50% likelier (relative to commons) from chests and drops.
-- **The Bounty Board** (camp) has 21 one-time challenges, checked at the end of every run. Each pays silver once, and 16 unlock an item into the drop pool. **Every epic and legendary starts locked** (items already owned stay owned). The board lists the open ones first and scrolls:
+- **The Bounty Board** (camp) has 23 one-time challenges, checked at the end of every run. Each pays silver once, and 18 unlock an item into the drop pool. **Every epic and legendary starts locked** (items already owned stay owned). The board lists the open ones first and scrolls:
   - Brute Force (kill a Brute) -> Ironbark Totem
   - Holding On (survive 10 min) -> Swiftwind Sigil
   - Regicide (kill the Hollow King) -> Hunter's Moon
@@ -190,6 +217,8 @@ All in `Progression/MetaProgress.cs`; all numbers are a starting point to tune.
   - Deadeye's Prize (win as the Ranger) -> Splintered Crown
   - Rise Again (survive 25 min) -> Phoenix Feather
   - Hoarder (own 30 different items) -> Crown of Plenty
+  - Conductor (600 kills in a run as the Shaman) -> Stormcaller's Horn
+  - Stormborn (win as the Shaman) -> Crown of Storms
   - Silver only: First Hunt, Collector, Deep Roots, A Thousand Cuts (lifetime), Champion (win).
   - While a rarity's items are all locked, a roll of that rarity falls back to the next one down.
 - Later: unlocking a second class, more trees, cosmetic or camp upgrades.
@@ -208,7 +237,8 @@ Each step should be playable before the next one starts. **[engine]** means the 
 8. *(Built, first pass; the user is starting a fresh save to try it.)* **Meta progression:** silver, the Quartermaster, the Bounty Board, locked items, and a New Game button on the title screen. (The save file came in step 6.) [game] [engine: title-screen buttons]
 9. *(Built, first pass.)* **Class #2, the Paladin, and its Defiance tree**, with a class rack at camp to switch. [game]
 10. *(Built, first pass.)* **Class #3, the Mage, and its Frost tree.** [game]
-11. Play the three classes and tune them: the Ranger, the Paladin (how much standing still should pay), the Mage (how hard standing still should punish). Then more enemies, or second trees.
+11. *(Built, first pass.)* **Class #4, the Shaman, and its Lightning Alignment tree.** [engine: `TouchesObstacle`] [game]
+12. Play the four classes and tune them: the Ranger, the Paladin (how much standing still should pay), the Mage (how hard standing still should punish), the Shaman (how much the trees give). Then more enemies, or second trees.
 
 ## Open questions
 

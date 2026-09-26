@@ -154,11 +154,11 @@ public class CrossbowGhoulTests
     [Fact]
     public void TheDirector_MixesCrossbowsIntoTheSwarm_AfterTheFirstMinuteAndAHalf()
     {
-        Assert.Equal(0f, RunDirector.RangedShareAt(60f));
-        Assert.Equal(0.06f, RunDirector.RangedShareAt(90f), 4);
-        Assert.Equal(0.15f, RunDirector.RangedShareAt(29f * 60f), 4);
+        Assert.Equal(0f, RunDirector.CrossbowShareAt(60f));
+        Assert.Equal(0.06f, RunDirector.CrossbowShareAt(90f), 4);
+        Assert.Equal(0.15f, RunDirector.CrossbowShareAt(29f * 60f), 4);
 
-        var field = new EnemyField(new Random(4)) { TargetCount = 200, SpawnInterval = 0f, RangedKind = EnemyKind.CrossbowGhoul, RangedShare = 0.5f };
+        var field = new EnemyField(new Random(4)) { TargetCount = 200, SpawnInterval = 0f, Mix = new[] { (EnemyKind.CrossbowGhoul, 0.5f) } };
         Run(field, new PlayerHealth(1e9f), 1.5f);
 
         int crossbows = field.Enemies.Count(e => e.Kind == EnemyKind.CrossbowGhoul);

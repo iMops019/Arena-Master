@@ -4,7 +4,7 @@ namespace ArenaMaster.Game.Combat;
 internal readonly record struct DirectorOrders(int Elites, bool Boss, bool FinalBoss);
 
 /// <summary>
-/// The 30-minute run's schedule: how many fodder enemies there are, how many of them carry crossbows, and how tough they spawn, minute by minute; when elites come and how many; and when the bosses
+/// The 30-minute run's schedule: how many fodder enemies there are, how many of them carry crossbows or cast fireballs, and how tough they spawn, minute by minute; when elites come and how many; and when the bosses
 /// arrive (10:00, 20:00, and a final one at 27:00). Survive to 30:00 and the run is won. Pure - it only sets the enemy field's numbers and says what to spawn.
 /// </summary>
 internal sealed class RunDirector
@@ -36,10 +36,17 @@ internal sealed class RunDirector
     public static float SpawnInterval(float seconds) => MathF.Max(0.03f, 0.5f - 0.016f * seconds / 60f);
 
     /// <summary>The share of fodder that spawns as Crossbow Ghouls at <paramref name="seconds"/>: none before 1:30, then 6%, growing to 15% by 16:30.</summary>
-    public static float RangedShareAt(float seconds)
+    public static float CrossbowShareAt(float seconds)
     {
         float minutes = seconds / 60f;
         return minutes < 1.5f ? 0f : MathF.Min(0.15f, 0.06f + 0.006f * (minutes - 1.5f));
+    }
+
+    /// <summary>The share of fodder that spawns as Ghoul Mages at <paramref name="seconds"/>: none before 5:00, then 3%, growing to 8% by 20:00.</summary>
+    public static float MageShareAt(float seconds)
+    {
+        float minutes = seconds / 60f;
+        return minutes < 5f ? 0f : MathF.Min(0.08f, 0.03f + (0.05f / 15f) * (minutes - 5f));
     }
 
     /// <summary>How much tougher than base everything spawns at <paramref name="seconds"/>: health climbs steeply, damage and speed gently.</summary>
@@ -63,8 +70,7 @@ internal sealed class RunDirector
         field.TargetCount = FodderCount(seconds);
         field.SpawnInterval = SpawnInterval(seconds);
         field.Scaling = ScalingAt(seconds);
-        field.RangedKind = EnemyKind.CrossbowGhoul;
-        field.RangedShare = RangedShareAt(seconds);
+        field.Mix = new[] { (EnemyKind.CrossbowGhoul, CrossbowShareAt(seconds)), (EnemyKind.GhoulMage, MageShareAt(seconds)) };
 
         int elites = 0;
         if (seconds >= _nextElite)

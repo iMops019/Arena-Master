@@ -70,6 +70,7 @@ public sealed partial class ArenaMasterContent
         _health.LastStands += bonuses.LastStands;   // the Phoenix Feather's, on top of any the class has
         _enemies.HitEffects = ItemEffects.HitEffectsOf(bonuses);
         _enemies.HealthBonus = bonuses.EnemyHealth;
+        _enemies.RangedDamageTaken = bonuses.RangedDamageTaken;
         _itemEffects.Begin();
         _health.DamageTaken = _hero.DamageTaken;
         _condition.Clear();
@@ -205,6 +206,7 @@ public sealed partial class ArenaMasterContent
         _itemEffectsView.Clear(window);
         _enemies.HitEffects = HitEffects.None;
         _enemies.HealthBonus = 0f;
+        _enemies.RangedDamageTaken = 1f;
         _numbers.Clear();
         _levelUp.Close();
         _pendingLevels = 0;

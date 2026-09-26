@@ -22,7 +22,10 @@ internal enum AttackType
     /// <summary>Raises its arms and calls a ring of fodder up around itself.</summary>
     Summon,
 
-    /// <summary>Stands and aims, its weapon glowing brighter as the shot nears, then looses a bolt at where the player is: step out of its path.</summary>
+    /// <summary>
+    /// Stands and aims, its weapon glowing brighter as the shot nears, then looses a shot at where the player is: step out of its path. A shot with a splash
+    /// (a fireball) is aimed at the ground under the player instead, and bursts where it lands.
+    /// </summary>
     Shoot,
 }
 
@@ -35,7 +38,9 @@ internal enum AttackType
 /// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls. Shoot: how far the bolt flies.</param>
 /// <param name="HitWidth">Lunge: how close to the charging body counts as hit. Shockwave: half the ring's width. Shoot: the bolt's radius. Unused otherwise.</param>
 /// <param name="LeapHeight">LeapSlam: the top of the arc, above the straight line from take-off to landing.</param>
-/// <param name="ProjectileSpeed">Shoot: how fast the bolt flies - slow enough to sidestep once it is loosed.</param>
+/// <param name="ProjectileSpeed">Shoot: how fast the shot flies - slow enough to sidestep once it is loosed.</param>
+/// <param name="Splash">Shoot: 0 for a bolt that has to hit the player; more for a fireball that bursts where it lands, hurting anyone within this far.</param>
+/// <param name="ProjectileModel">Shoot: the model the shot is drawn with.</param>
 internal sealed record AttackSpec(
     AttackType Type,
     float MinRange,
@@ -49,7 +54,9 @@ internal sealed record AttackSpec(
     float Knockback = 0f,
     float Stun = 0f,
     float LeapHeight = 0f,
-    float ProjectileSpeed = 0f);
+    float ProjectileSpeed = 0f,
+    float Splash = 0f,
+    string? ProjectileModel = null);
 
 /// <summary>
 /// What one kind of enemy is: its model and its numbers. Distances are metres, speeds metres per second, times seconds. The body is a standing cylinder of
@@ -75,7 +82,7 @@ internal sealed record EnemyKind(
     /// <summary>A ranged kind stops walking closer once the player is this near (0: it walks right up).</summary>
     public float StandOff { get; init; }
 
-    /// <summary>A second model drawn with the body (a crossbow), which lights up from faint to bright as a <see cref="AttackType.Shoot"/> winds up. Null for none.</summary>
+    /// <summary>A second model drawn with the body (a crossbow, a flame), which lights up from faint to bright as a <see cref="AttackType.Shoot"/> winds up. Null for none.</summary>
     public string? HeldModel { get; init; }
 
     /// <summary>The first enemy: slow, fragile fodder that shambles straight at the player and claws on contact.</summary>
@@ -113,7 +120,34 @@ internal sealed record EnemyKind(
         Attacks = new[]
         {
             new AttackSpec(AttackType.Shoot, MinRange: 3f, MaxRange: 14f, WindUp: 1.1f, Active: 0.1f, Recover: 0.5f,
-                Damage: 12f, Reach: 30f, HitWidth: 0.25f, Knockback: 4f, ProjectileSpeed: 20f),
+                Damage: 12f, Reach: 30f, HitWidth: 0.25f, Knockback: 4f, ProjectileSpeed: 20f, ProjectileModel: "ghoul_bolt.glb"),
+        },
+    };
+
+    /// <summary>
+    /// Ranged fodder, rarer and tougher than the crossbow: a robed ghoul that keeps further off and conjures a fireball between its hands - the flame glowing
+    /// brighter through a longer wind-up - then hurls it at the ground under the player. It flies slowly, a burning ring marks where it will land, and it bursts
+    /// there, hurting anyone within 2 m: a real sidestep, not a lean, gets clear.
+    /// </summary>
+    public static readonly EnemyKind GhoulMage = new(
+        Name: "Ghoul Mage",
+        Model: "ghoul_mage_placeholder.glb",
+        Tier: EnemyTier.Fodder,
+        MaxHealth: 36f,
+        Speed: 3f,
+        Radius: 0.4f,
+        Height: 1.5f,
+        ContactDamage: 6f,
+        ContactInterval: 0.8f,
+        Experience: 3)
+    {
+        AttackCooldown = 3.5f,
+        StandOff = 14f,
+        HeldModel = "ghoul_flame.glb",
+        Attacks = new[]
+        {
+            new AttackSpec(AttackType.Shoot, MinRange: 4f, MaxRange: 18f, WindUp: 1.4f, Active: 0.1f, Recover: 0.6f,
+                Damage: 16f, Reach: 30f, HitWidth: 0.35f, Knockback: 6f, ProjectileSpeed: 13f, Splash: 2f, ProjectileModel: "ghoul_fireball.glb"),
         },
     };
 

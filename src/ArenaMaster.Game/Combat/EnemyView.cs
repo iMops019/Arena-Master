@@ -7,7 +7,8 @@ namespace ArenaMaster.Game.Combat;
 /// Puts the <see cref="EnemyField"/> on screen: every enemy of a kind drawn as one engine crowd (one instanced draw however many there are), with a shambling bob
 /// while it walks, a flinch and a flash when it is hit, a crouch or a rearing-up as it winds up an attack, standing still and pale while frozen, and a sink into
 /// the ground as it dies. A kind that holds a weapon (the Crossbow Ghoul's crossbow) has it drawn as a crowd of its own in the same pose, lighting up from faint to
-/// bright as a shot winds up; the bolts in flight are a crowd too. Attacks show their
+/// bright as a shot winds up. The shots in flight are crowds too; a fireball's landing spot is marked with a burning ring while it flies, and it bursts in a ring
+/// of fire. Attacks show their
 /// telegraphs on the ground as placed props: a red lane for a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave. There
 /// are no animations yet; the stand-in models are rigid.
 /// </summary>
@@ -17,7 +18,8 @@ internal sealed class EnemyView
     public const string DiscModel = "telegraph_disc.glb";
     public const string LaneModel = "telegraph_lane.glb";
     public const string ShockwaveModel = "shockwave_ring.glb";
-    public const string BoltModel = "ghoul_bolt.glb";
+    public const string LandingModel = "fireball_mark.glb";
+    public const string BlastModel = "fireball_burst.glb";
 
     private enum Marker
     {
@@ -29,7 +31,9 @@ internal sealed class EnemyView
 
     private readonly Dictionary<(int Enemy, Marker Marker), int> _markers = new();   // telegraph -> placed prop id
     private readonly Dictionary<string, List<CrowdInstance>> _crowds = new();       // model -> this frame's copies
-    private readonly List<CrowdInstance> _bolts = new();
+    private readonly Dictionary<string, List<CrowdInstance>> _shots = new();   // shot model -> this frame's copies
+    private readonly List<CrowdInstance> _landings = new();
+    private readonly List<CrowdInstance> _blasts = new();
     private float _time;
 
     public void Sync(EngineWindow window, EnemyField field, IEnumerable<Enemy> gone, float deltaSeconds, Func<float, float, float?> groundAt)
@@ -89,14 +93,42 @@ internal sealed class EnemyView
             window.SetCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(copies));   // an empty list clears a kind that is gone
         }
 
-        _bolts.Clear();
-        foreach (var bolt in field.Bolts)
+        foreach (var list in _shots.Values)
         {
-            var (yaw, pitch) = Geometry.YawPitch(bolt.Velocity);
-            _bolts.Add(new CrowdInstance(bolt.Position, yaw, 1f, pitch, Flash: 0.4f));
+            list.Clear();
         }
 
-        window.SetCrowd(BoltModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_bolts));
+        _landings.Clear();
+        foreach (var bolt in field.Bolts)
+        {
+            if (!_shots.TryGetValue(bolt.Model, out var shots))
+            {
+                shots = new List<CrowdInstance>();
+                _shots[bolt.Model] = shots;
+            }
+
+            var (yaw, pitch) = Geometry.YawPitch(bolt.Velocity);
+            shots.Add(new CrowdInstance(bolt.Position, yaw, 1f, pitch, Flash: 0.4f));
+            if (bolt.Splash > 0f)
+            {
+                _landings.Add(new CrowdInstance(Lift(bolt.Target, 0.07f), _time * 1.5f, bolt.Splash, Flash: 0.3f + 0.3f * MathF.Abs(MathF.Sin(_time * 12f))));
+            }
+        }
+
+        _blasts.Clear();
+        foreach (var blast in field.Blasts)
+        {
+            float t = Math.Clamp(blast.Age / EnemyField.BlastSeconds, 0f, 1f);
+            _blasts.Add(new CrowdInstance(Lift(blast.Centre, 0.15f + 0.4f * t), 0f, blast.Radius * (0.4f + 0.6f * (1f - (1f - t) * (1f - t))), Flash: 1f - t));
+        }
+
+        foreach (var (model, shots) in _shots)
+        {
+            window.SetCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(shots));
+        }
+
+        window.SetCrowd(LandingModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_landings));
+        window.SetCrowd(BlastModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_blasts));
     }
 
     /// <summary>

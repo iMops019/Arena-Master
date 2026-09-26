@@ -15,6 +15,11 @@ internal enum MageUpgrade
     FleetStep,
     Attunement,
     FrozenPrecision,
+    GlacialSpikes,
+    IceArmor,
+    Shatterpoint,
+    DeepChill,
+    BlastPower,
 }
 
 /// <summary>One upgrade's name, how many times it stacks, and what the next level of it does.</summary>
@@ -25,7 +30,7 @@ internal sealed record MageChoice(MageUpgrade? Upgrade, string Name, string Desc
 
 /// <summary>
 /// The Mage's level-up pool: the upgrades, their numbers (kept in <see cref="MageStats"/>), and rolling three to choose from. Mage-only, like everything under
-/// Mage/. Glacial Ward and Concussive Frost only turn up once the tree has the Frost Shield or Frost Blast they improve.
+/// Mage/. Glacial Ward, Concussive Frost, Blast Power and Deep Chill only turn up once the tree has the Frost Shield, Frost Blast or Deep Freeze they improve.
 /// </summary>
 internal static class MageUpgrades
 {
@@ -46,6 +51,11 @@ internal static class MageUpgrades
         new MageUpgradeInfo(MageUpgrade.FleetStep, "Fleet Step", 5, "+8% move speed"),
         new MageUpgradeInfo(MageUpgrade.Attunement, "Attunement", 4, "+35% pickup range"),
         new MageUpgradeInfo(MageUpgrade.FrozenPrecision, "Frozen Precision", 4, "+6% critical chance, +15% critical damage"),
+        new MageUpgradeInfo(MageUpgrade.GlacialSpikes, "Glacial Spikes", 4, "+20% damage to chilled and frozen enemies"),
+        new MageUpgradeInfo(MageUpgrade.IceArmor, "Ice Armor", 3, "Take 6% less damage"),
+        new MageUpgradeInfo(MageUpgrade.Shatterpoint, "Shatterpoint", 4, "+15% damage to elites and bosses"),
+        new MageUpgradeInfo(MageUpgrade.DeepChill, "Deep Chill", 3, "+3% freeze chance, and freezes last 0.3 s longer"),
+        new MageUpgradeInfo(MageUpgrade.BlastPower, "Blast Power", 3, "Frost Blast deals 25% more damage"),
     };
 
     public static MageUpgradeInfo Info(MageUpgrade upgrade) => All.First(u => u.Upgrade == upgrade);
@@ -54,7 +64,8 @@ internal static class MageUpgrades
     public static bool Offered(MageUpgrade upgrade, MageStats stats) => upgrade switch
     {
         MageUpgrade.GlacialWard => stats.Tree.FrostShield,
-        MageUpgrade.ConcussiveFrost => stats.Tree.FrostBlast,
+        MageUpgrade.ConcussiveFrost or MageUpgrade.BlastPower => stats.Tree.FrostBlast,
+        MageUpgrade.DeepChill => stats.Tree.DeepFreeze,
         _ => true,
     };
 

@@ -118,10 +118,21 @@ internal readonly record struct PlayerTarget(Vector3D<float> Feet, bool Grounded
 /// <summary>A blow that reached the player this frame, landed or blocked: who struck, and how hard (before any cut to damage taken).</summary>
 internal readonly record struct Strike(Enemy Attacker, float Damage, bool Blocked);
 
-/// <summary>An enemy's bolt in flight (a Crossbow Ghoul's): it flies straight, and the first thing it meets - the player or the ground - stops it.</summary>
+/// <summary>
+/// An enemy's shot in flight - a Crossbow Ghoul's bolt or a Ghoul Mage's fireball: it flies straight, and the first thing it meets, the player or the ground,
+/// stops it. A shot with a <see cref="Splash"/> bursts there, hurting the player if they are within it.
+/// </summary>
 internal sealed class EnemyBolt
 {
     public required Enemy Shooter { get; init; }
+
+    /// <summary>The model it is drawn with.</summary>
+    public required string Model { get; init; }
+
+    /// <summary>Where it was aimed: for a splash shot, the spot on the ground where it will land (the view marks it).</summary>
+    public Vector3D<float> Target { get; init; }
+
+    public float Splash { get; init; }
 
     public Vector3D<float> Position { get; set; }
 
@@ -135,6 +146,16 @@ internal sealed class EnemyBolt
     public float Radius { get; init; }
 
     public float Knockback { get; init; }
+}
+
+/// <summary>A splash shot bursting (a fireball), for the view: where, how wide, and how long ago.</summary>
+internal sealed class EnemyBlast
+{
+    public Vector3D<float> Centre { get; init; }
+
+    public float Radius { get; init; }
+
+    public float Age { get; set; }
 }
 
 /// <summary>
@@ -180,6 +201,7 @@ internal sealed class EnemyField
     private readonly List<(EnemyKind Kind, Vector3D<float> Position)> _summoned = new();
     private readonly List<Strike> _strikes = new();
     private readonly List<EnemyBolt> _bolts = new();
+    private readonly List<EnemyBlast> _blasts = new();
     private readonly EnemyGrid _grid = new();
     private readonly Random _random;
     private bool _gridStale = true;
@@ -196,16 +218,26 @@ internal sealed class EnemyField
     /// <summary>How much tougher than base the next spawns are (the run director raises it over time).</summary>
     public EnemyScaling Scaling { get; set; } = EnemyScaling.None;
 
-    /// <summary>The kind some of the fodder spawns as instead of <see cref="Kind"/> (the Crossbow Ghoul), and the share that does (0 to 1).</summary>
-    public EnemyKind? RangedKind { get; set; }
+    /// <summary>
+    /// The kinds some of the fodder spawns as instead of <see cref="Kind"/> (the Crossbow Ghoul, the Ghoul Mage), each with the share that does (0 to 1, and
+    /// together at most 1).
+    /// </summary>
+    public IReadOnlyList<(EnemyKind Kind, float Share)> Mix { get; set; } = Array.Empty<(EnemyKind, float)>();
 
-    public float RangedShare { get; set; }
-
-    /// <summary>The enemies' bolts in flight.</summary>
+    /// <summary>The enemies' shots in flight.</summary>
     public IReadOnlyList<EnemyBolt> Bolts => _bolts;
+
+    /// <summary>How long a burst lasts, for the view.</summary>
+    public const float BlastSeconds = 0.35f;
+
+    /// <summary>Splash shots bursting right now.</summary>
+    public IReadOnlyList<EnemyBlast> Blasts => _blasts;
 
     /// <summary>What every hit the player lands does besides its damage (see <see cref="HitEffects"/>). Set at the start of a run.</summary>
     public HitEffects HitEffects { get; set; } = HitEffects.None;
+
+    /// <summary>What the damage of the enemies' shots (bolts, fireballs) is multiplied by, from the items carried.</summary>
+    public float RangedDamageTaken { get; set; } = 1f;
 
     /// <summary>Enemies spawn with this much more health than <see cref="Scaling"/> alone gives them (a cursed item).</summary>
     public float HealthBonus { get; set; }
@@ -272,6 +304,12 @@ internal sealed class EnemyField
         }
 
         MoveBolts(deltaSeconds, player, groundAt);
+        foreach (var blast in _blasts)
+        {
+            blast.Age += deltaSeconds;
+        }
+
+        _blasts.RemoveAll(b => b.Age >= BlastSeconds);
 
         foreach (var (kind, position) in _summoned)
         {
@@ -408,6 +446,7 @@ internal sealed class EnemyField
         _summoned.Clear();
         _strikes.Clear();
         _bolts.Clear();
+        _blasts.Clear();
         _spawnTimer = 0f;
         _gridStale = true;
         return all;
@@ -438,8 +477,7 @@ internal sealed class EnemyField
             _spawnTimer += SpawnInterval;
             if (TryPickSpawnPoint(playerFeet, groundAt, out var point))
             {
-                bool ranged = RangedKind is not null && RangedShare > 0f && _random.NextDouble() < RangedShare;
-                Spawn(point, ranged ? RangedKind : null);
+                Spawn(point, PickFromMix());
                 alive++;
             }
         }
@@ -448,6 +486,26 @@ internal sealed class EnemyField
         {
             _spawnTimer = MathF.Max(_spawnTimer, 0f);   // no stored-up burst once the field is full
         }
+    }
+
+    /// <summary>A kind from <see cref="Mix"/> by its shares, or null (the plain <see cref="Kind"/>) for the rest.</summary>
+    private EnemyKind? PickFromMix()
+    {
+        if (Mix.Count == 0)
+        {
+            return null;
+        }
+
+        double roll = _random.NextDouble();
+        foreach (var (kind, share) in Mix)
+        {
+            if ((roll -= share) < 0.0)
+            {
+                return kind;
+            }
+        }
+
+        return null;
     }
 
     private bool TryPickSpawnPoint(Vector3D<float> playerFeet, Func<float, float, float?> groundAt, out Vector3D<float> point)
@@ -598,7 +656,7 @@ internal sealed class EnemyField
                     }
                     else if (attack.Type == AttackType.Shoot)
                     {
-                        Shoot(enemy, attack, player);
+                        Shoot(enemy, attack, player, groundAt);
                     }
                 }
 
@@ -734,29 +792,38 @@ internal sealed class EnemyField
     /// <summary>How tall the player is, for a bolt hitting them: a capsule from the feet up this far.</summary>
     public const float PlayerHeight = 1.8f;
 
-    /// <summary>Looses a bolt from <paramref name="shooter"/>'s weapon at the player's middle, where they stand now: moving after the glow peaks is how to dodge it.</summary>
-    private void Shoot(Enemy shooter, AttackSpec attack, PlayerTarget player)
+    /// <summary>
+    /// Looses a shot from <paramref name="shooter"/>'s weapon where the player stands now - a bolt at their middle, a splash shot at the ground under them. Moving
+    /// after the glow peaks is how to dodge it.
+    /// </summary>
+    private void Shoot(Enemy shooter, AttackSpec attack, PlayerTarget player, Func<float, float, float?> groundAt)
     {
         var facing = new Vector3D<float>(MathF.Sin(shooter.Yaw), 0f, MathF.Cos(shooter.Yaw));
         var from = shooter.Position + new Vector3D<float>(0f, ShotHeight, 0f) + facing * ShotForward;
-        var at = player.Feet + new Vector3D<float>(0f, PlayerHeight * 0.5f, 0f);
+        var at = attack.Splash > 0f
+            ? new Vector3D<float>(player.Feet.X, groundAt(player.Feet.X, player.Feet.Z) ?? player.Feet.Y, player.Feet.Z)
+            : player.Feet + new Vector3D<float>(0f, PlayerHeight * 0.5f, 0f);
         var toward = at - from;
         var direction = toward.LengthSquared > 1e-6f ? Vector3D.Normalize(toward) : facing;
         _bolts.Add(new EnemyBolt
         {
             Shooter = shooter,
+            Model = attack.ProjectileModel ?? "ghoul_bolt.glb",
+            Target = at,
+            Splash = attack.Splash,
             Position = from,
             Velocity = direction * attack.ProjectileSpeed,
             FlightLeft = attack.Reach / attack.ProjectileSpeed,
-            Damage = attack.Damage * shooter.DamageScale,
+            Damage = attack.Damage * shooter.DamageScale * RangedDamageTaken,
             Radius = attack.HitWidth,
             Knockback = attack.Knockback,
         });
     }
 
     /// <summary>
-    /// Moves the bolts in flight: one that reaches the player strikes them (a shield can block it, a blow in the grace after the last hit glances off) and is spent;
-    /// one that meets the ground or runs out of flight is gone.
+    /// Moves the shots in flight. A bolt that reaches the player strikes them (a shield can block it, a blow in the grace after the last hit glances off) and is
+    /// spent; one that meets the ground or runs out of flight is gone. A splash shot bursts on the player or on the ground, striking the player if they are within
+    /// its splash.
     /// </summary>
     private void MoveBolts(float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
     {
@@ -769,9 +836,13 @@ internal sealed class EnemyField
             var to = from + bolt.Velocity * deltaSeconds;
             bolt.FlightLeft -= deltaSeconds;
 
-            if (Geometry.SegmentDistance(from, to, bottom, top, out _) <= PlayerRadius + bolt.Radius)
+            if (Geometry.SegmentDistance(from, to, bottom, top, out float along) <= PlayerRadius + bolt.Radius)
             {
-                if (Strike(bolt.Shooter, bolt.Damage, player, out bool blocked) && !blocked)
+                if (bolt.Splash > 0f)
+                {
+                    Burst(bolt, from + (to - from) * along, player, bottom, top);
+                }
+                else if (Strike(bolt.Shooter, bolt.Damage, player, out bool blocked) && !blocked)
                 {
                     player.Condition.Knock(bolt.Velocity, bolt.Knockback);
                 }
@@ -780,13 +851,36 @@ internal sealed class EnemyField
                 continue;
             }
 
-            if (bolt.FlightLeft <= 0f || (groundAt(to.X, to.Z) is { } ground && to.Y < ground))
+            if (groundAt(to.X, to.Z) is { } ground && to.Y < ground)
+            {
+                if (bolt.Splash > 0f)
+                {
+                    Burst(bolt, new Vector3D<float>(to.X, ground, to.Z), player, bottom, top);
+                }
+
+                _bolts.RemoveAt(i);
+                continue;
+            }
+
+            if (bolt.FlightLeft <= 0f)
             {
                 _bolts.RemoveAt(i);
                 continue;
             }
 
             bolt.Position = to;
+        }
+    }
+
+    /// <summary>A splash shot bursting at <paramref name="centre"/>: it strikes the player if any of them is within its splash, shoving them away from it.</summary>
+    private void Burst(EnemyBolt bolt, Vector3D<float> centre, PlayerTarget player, Vector3D<float> bottom, Vector3D<float> top)
+    {
+        _blasts.Add(new EnemyBlast { Centre = centre, Radius = bolt.Splash });
+        if (Geometry.SegmentDistance(centre, centre, bottom, top, out _) <= bolt.Splash + PlayerRadius
+            && Strike(bolt.Shooter, bolt.Damage, player, out bool blocked) && !blocked)
+        {
+            var away = Geometry.FlatDirection(centre, player.Feet, out _);
+            player.Condition.Knock(away == Vector3D<float>.Zero ? bolt.Velocity : away, bolt.Knockback);
         }
     }
 

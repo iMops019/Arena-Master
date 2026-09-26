@@ -125,7 +125,8 @@ internal sealed class MageStats
     /// <summary>How far away the barrage finds enemies to aim at: grows with range.</summary>
     public float TargetRange => BaseTargetRange * (1f + 0.15f * LevelOf(MageUpgrade.WinterWind) + Tree.Range + Items.Range);
 
-    public int Pierce => LevelOf(MageUpgrade.PiercingIce) + Tree.Pierce;
+    /// <summary>How many enemies a bolt passes through: an item's chains count as pierce for the Mage.</summary>
+    public int Pierce => LevelOf(MageUpgrade.PiercingIce) + Tree.Pierce + Items.Chains;
 
     public float CritChance => BaseCritChance + 0.06f * LevelOf(MageUpgrade.FrozenPrecision) + Items.CritChance + Tree.CritChance;
 
@@ -138,20 +139,20 @@ internal sealed class MageStats
     public float ChillDuration => BaseChillDuration + 0.3f * LevelOf(MageUpgrade.NumbingCold) + Tree.ChillDuration + Items.Duration;
 
     /// <summary>What a hit on a chilled (or frozen) enemy is multiplied by.</summary>
-    public float ChilledMultiplier => 1f + Tree.ChilledDamage;
+    public float ChilledMultiplier => 1f + Tree.ChilledDamage + 0.20f * LevelOf(MageUpgrade.GlacialSpikes);
 
-    public float FreezeChance => Tree.DeepFreeze ? BaseFreezeChance + Tree.FreezeChance : 0f;
+    public float FreezeChance => Tree.DeepFreeze ? BaseFreezeChance + Tree.FreezeChance + 0.03f * LevelOf(MageUpgrade.DeepChill) : 0f;
 
-    public float FreezeDuration => BaseFreezeDuration + Tree.FreezeDuration;
+    public float FreezeDuration => BaseFreezeDuration + Tree.FreezeDuration + 0.3f * LevelOf(MageUpgrade.DeepChill);
 
-    public float EliteMultiplier => 1f + Tree.EliteDamage;
+    public float EliteMultiplier => 1f + Tree.EliteDamage + 0.15f * LevelOf(MageUpgrade.Shatterpoint);
 
-    public float BlastRadius => BaseBlastRadius * (1f + 0.25f * LevelOf(MageUpgrade.ConcussiveFrost) + Tree.BlastRadius + Items.Area);
+    public float BlastRadius => BaseBlastRadius * (1f + 0.25f * LevelOf(MageUpgrade.ConcussiveFrost) + Tree.BlastRadius + Items.Area) * Items.AreaMultiplier;
 
     /// <summary>What the fixed areas (the comet's blast, the blizzard, Shattering Ward's burst) are scaled by: an item's area.</summary>
-    public float AreaScale => 1f + Items.Area;
+    public float AreaScale => (1f + Items.Area) * Items.AreaMultiplier;
 
-    public float BlastShare => BaseBlastDamage * (1f + Tree.BlastDamage);
+    public float BlastShare => BaseBlastDamage * (1f + Tree.BlastDamage + 0.25f * LevelOf(MageUpgrade.BlastPower));
 
     public float ShieldAmount => (ShieldFlat + ShieldShare * MaxHealth) * (1f + 0.30f * LevelOf(MageUpgrade.GlacialWard) + Tree.ShieldStrength + Items.WardShield);
 
@@ -170,7 +171,7 @@ internal sealed class MageStats
 
     public float Regeneration => Items.Regeneration + Tree.Regeneration;
 
-    public float DamageTaken => Items.DamageTaken * Tree.DamageTaken;
+    public float DamageTaken => Items.DamageTaken * Tree.DamageTaken * MathF.Pow(0.94f, LevelOf(MageUpgrade.IceArmor));
 
     public float MoveSpeed => BaseMoveSpeed * (1f + 0.08f * LevelOf(MageUpgrade.FleetStep) + Items.MoveSpeed);
 

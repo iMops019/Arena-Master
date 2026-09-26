@@ -102,7 +102,7 @@ internal sealed class RangerStats
     public int Pierce => LevelOf(RangerUpgrade.PiercingArrows) + Tree.Pierce;
 
     /// <summary>How many times an arrow can jump on to another enemy after it would stop.</summary>
-    public int Chains => Tree.ChainProjectiles ? 1 + Tree.ExtraChains : 0;
+    public int Chains => (Tree.ChainProjectiles ? 1 + Tree.ExtraChains : 0) + Items.Chains;
 
     public float ChainRange => BaseChainRange * (1f + Tree.ChainRange);
 
@@ -133,7 +133,7 @@ internal sealed class RangerStats
     public int RainArrows => Tree.RainOfArrows ? BaseRainArrows + Tree.RainArrows : 0;
 
     /// <summary>How wide the patch Rain of Arrows covers: wider with an item's area.</summary>
-    public float RainPatch => RainRadius * (1f + Items.Area);
+    public float RainPatch => RainRadius * (1f + Items.Area) * Items.AreaMultiplier;
 
     /// <summary>The block chance items give (the Ranger has no shield).</summary>
     public float BlockChance => MathF.Min(0.6f, Items.BlockChance * Items.BlockMultiplier);

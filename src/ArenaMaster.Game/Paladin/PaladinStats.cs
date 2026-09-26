@@ -109,16 +109,17 @@ internal sealed class PaladinStats
     }
 
     public float NovaDamage =>
-        BaseNovaDamage * (1f + 0.20f * LevelOf(PaladinUpgrade.HolyWrath) + Items.Damage + Tree.NovaDamage + ItemBonuses.ProjectileFallback * Items.Projectiles)
+        BaseNovaDamage * (1f + 0.20f * LevelOf(PaladinUpgrade.HolyWrath) + Items.Damage + Tree.NovaDamage + ItemBonuses.ProjectileFallback * Items.Projectiles
+                              + ItemBonuses.ChainFallback * Items.Chains)
         * Items.DamageMultiplier;
 
     public float NovaInterval =>
         BaseNovaInterval
         / (MathF.Max(0.2f, 1f + 0.12f * LevelOf(PaladinUpgrade.QuickenedPrayer) + Items.AttackSpeedNow + Tree.NovaFrequency) * Items.AttackSpeedMultiplier);
 
-    public float NovaRadius => BaseNovaRadius * (1f + 0.10f * LevelOf(PaladinUpgrade.Radiance) + Tree.NovaRadius + Items.Area);
+    public float NovaRadius => BaseNovaRadius * (1f + 0.10f * LevelOf(PaladinUpgrade.Radiance) + Tree.NovaRadius + Items.Area) * Items.AreaMultiplier;
 
-    public float CircleRadius => BaseCircleRadius * (1f + 0.10f * LevelOf(PaladinUpgrade.Radiance) + Tree.CircleRadius + Items.Area);
+    public float CircleRadius => BaseCircleRadius * (1f + 0.10f * LevelOf(PaladinUpgrade.Radiance) + Tree.CircleRadius + Items.Area) * Items.AreaMultiplier;
 
     public float CircleDuration => BaseCircleDuration + 0.5f * LevelOf(PaladinUpgrade.Consecration) + Tree.CircleDuration + Items.Duration;
 
@@ -127,12 +128,15 @@ internal sealed class PaladinStats
         BaseCircleDps * (1f + 0.25f * LevelOf(PaladinUpgrade.Consecration) + Items.Damage + Tree.CircleDamage) * Items.DamageMultiplier;
 
     /// <summary>Health per second from standing in a circle (from each circle, with Consecrated Ground).</summary>
-    public float CircleHealing => BaseCircleHealing * (1f + Tree.CircleHealing);
+    public float CircleHealing => BaseCircleHealing * (1f + 0.25f * LevelOf(PaladinUpgrade.SanctifiedGround) + Tree.CircleHealing);
 
-    public float CritChance => BaseCritChance + Items.CritChance + Tree.CritChance;
+    /// <summary>What a block does to the attacker: the tree's Shield Bash and the run's Shield Slam.</summary>
+    public float BashDamage => Tree.BashDamage + 15f * LevelOf(PaladinUpgrade.ShieldSlam);
+
+    public float CritChance => BaseCritChance + 0.06f * LevelOf(PaladinUpgrade.ZealotsEye) + Items.CritChance + Tree.CritChance;
 
     /// <summary>How many times normal damage a critical nova hit does.</summary>
-    public float CritMultiplier => BaseCritMultiplier + Items.CritDamage + Tree.CritDamage;
+    public float CritMultiplier => BaseCritMultiplier + 0.15f * LevelOf(PaladinUpgrade.ZealotsEye) + Items.CritDamage + Tree.CritDamage;
 
     /// <summary>What every Paladin hit on an elite or a boss is multiplied by.</summary>
     public float EliteMultiplier => 1f + Tree.EliteDamage;
@@ -140,7 +144,7 @@ internal sealed class PaladinStats
     /// <summary>The chance to block a blow, capped at <see cref="MaxBlockChance"/>. Braced Stance adds more standing still, Sanctuary more in a holy circle.</summary>
     public float BlockChance(bool standingStill, bool inCircle) => MathF.Min(MaxBlockChance,
         (BaseBlockChance + 0.04f * LevelOf(PaladinUpgrade.ShieldTraining) + Tree.BlockChance + Items.BlockChance
-         + (standingStill ? Tree.StillBlock : 0f)
+         + (standingStill ? Tree.StillBlock + 0.05f * LevelOf(PaladinUpgrade.Steadfast) : 0f)
          + (inCircle && Tree.Sanctuary ? SanctuaryBlock : 0f))
         * Items.BlockMultiplier);
 
@@ -155,7 +159,7 @@ internal sealed class PaladinStats
           * (1f + 0.40f * LevelOf(PaladinUpgrade.BarbedPlating) + Items.Damage + Tree.ThornsBonus + (Tree.CrownOfBriars ? BriarsBonus : 0f))
           * Items.DamageMultiplier;
 
-    public float ThornsInterval => BaseThornsInterval / (1f + Tree.ThornsSpeed);
+    public float ThornsInterval => BaseThornsInterval / (1f + Tree.ThornsSpeed + 0.20f * LevelOf(PaladinUpgrade.BrambleMail));
 
     public float MaxHealth => BaseMaxHealth + 20f * LevelOf(PaladinUpgrade.HeavyPlate) + Items.MaxHealth + Tree.MaxHealth;
 

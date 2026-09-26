@@ -9,8 +9,9 @@ internal readonly record struct ItemHit(Enemy Enemy, Vector3D<float> Position, f
 
 /// <summary>
 /// The items that act on their own during a run, whichever class carries them: thorns on whatever touches the player, the Warding Crystal's ward, Bloodstone's
-/// life from damage dealt, Berserker's Band keeping up with the health missing, Martyr's Crown paying blows back, Aegis of the Dawn's burst on a block, and the
-/// Phoenix Feather bringing the player back. Pure - no engine calls - so it can be tested; <see cref="ItemEffectsView"/> draws the Aegis bursts.
+/// life from damage dealt, Berserker's Band keeping up with the health missing, Martyr's Crown paying blows back, Aegis of the Dawn's burst on a block, the
+/// Thunderstone's lightning, and the Phoenix Feather bringing the player back. Pure - no engine calls - so it can be tested; <see cref="ItemEffectsView"/> draws
+/// the Aegis bursts and the Thunderstone's bolts.
 /// </summary>
 internal sealed class ItemEffects
 {
@@ -36,7 +37,14 @@ internal sealed class ItemEffects
     /// <summary>The Phoenix Feather brings the player back with this share of max health.</summary>
     public const float PhoenixHeal = 0.5f;
 
+    /// <summary>The Thunderstone strikes this often, the nearest enemy within this reach; its bolt shows this long.</summary>
+    public const float SkyStrikeInterval = 6f;
+    public const float SkyStrikeRange = 15f;
+    public const float BoltSeconds = 0.2f;
+
     private readonly List<(Vector3D<float> Centre, float Age)> _bursts = new();
+    private readonly List<(Vector3D<float> At, float Age)> _bolts = new();
+    private float _skyIn = SkyStrikeInterval;
     private float _thornsIn;
     private float _wardIn = FirstWard;
     private float _wardLeft;
@@ -45,6 +53,9 @@ internal sealed class ItemEffects
 
     /// <summary>The Aegis bursts spreading right now, and how far along each is.</summary>
     public IReadOnlyList<(Vector3D<float> Centre, float Age)> Bursts => _bursts;
+
+    /// <summary>The Thunderstone's bolts striking right now: where they land, and how long ago.</summary>
+    public IReadOnlyList<(Vector3D<float> At, float Age)> Bolts => _bolts;
 
     /// <summary>Whether the item ward is holding.</summary>
     public bool WardUp => _wardLeft > 0f;
@@ -63,6 +74,8 @@ internal sealed class ItemEffects
     public void Begin()
     {
         _bursts.Clear();
+        _bolts.Clear();
+        _skyIn = SkyStrikeInterval;
         _thornsIn = 0f;
         _wardIn = FirstWard;
         _wardLeft = 0f;
@@ -100,6 +113,7 @@ internal sealed class ItemEffects
         }
 
         UpdateWard(deltaSeconds, items, health, classKeepsBarrier);
+        UpdateSkyStrike(deltaSeconds, feet, items, enemies, hits);
 
         for (int i = _bursts.Count - 1; i >= 0; i--)
         {
@@ -146,6 +160,46 @@ internal sealed class ItemEffects
         }
     }
 
+    /// <summary>The Thunderstone: every so often, lightning on the nearest enemy.</summary>
+    private void UpdateSkyStrike(float deltaSeconds, Vector3D<float> feet, ItemBonuses items, EnemyField enemies, List<ItemHit> hits)
+    {
+        for (int i = _bolts.Count - 1; i >= 0; i--)
+        {
+            var bolt = _bolts[i];
+            bolt.Age += deltaSeconds;
+            if (bolt.Age >= BoltSeconds)
+            {
+                _bolts.RemoveAt(i);
+            }
+            else
+            {
+                _bolts[i] = bolt;
+            }
+        }
+
+        if (items.SkyStrike <= 0f)
+        {
+            return;
+        }
+
+        _skyIn -= deltaSeconds;
+        if (_skyIn > 0f)
+        {
+            return;
+        }
+
+        var nearest = enemies.Within(feet, SkyStrikeRange).OrderBy(e => Vector3D.DistanceSquared(e.Position, feet)).FirstOrDefault();
+        if (nearest is null)
+        {
+            _skyIn = 0f;   // ready, and waiting for something to strike
+            return;
+        }
+
+        _skyIn = SkyStrikeInterval;
+        _bolts.Add((nearest.Position, 0f));
+        Hurt(nearest, items.SkyStrike * items.DamageMultiplier, enemies, hits);
+    }
+
     /// <summary>The Warding Crystal: a barrier of <see cref="ItemBonuses.Ward"/> every so often, taken away again (what is left of it) when its time is up.</summary>
     private void UpdateWard(float deltaSeconds, ItemBonuses items, PlayerHealth health, bool classKeepsBarrier)
     {
@@ -188,12 +242,22 @@ internal sealed class ItemEffects
     }
 }
 
-/// <summary>Draws the Aegis of the Dawn's bursts: a pale gold ring spreading over the ground, one engine crowd.</summary>
+/// <summary>
+/// Draws what the items do on their own: the Aegis of the Dawn's bursts (a pale gold ring spreading over the ground) and the Thunderstone's bolts (a jagged stroke
+/// of short bright bars from the sky to the enemy), each one engine crowd.
+/// </summary>
 internal sealed class ItemEffectsView
 {
     public const string BurstModel = "aegis_burst.glb";
+    public const string BoltModel = "thunderstone_bolt.glb";
+
+    /// <summary>A bolt falls from this high, in pieces this long.</summary>
+    private const float BoltHeight = 14f;
+    private const float PieceLength = 1f;
 
     private readonly List<CrowdInstance> _bursts = new();
+    private readonly List<CrowdInstance> _bolts = new();
+    private readonly Random _jitter = new(5);
 
     public void Sync(EngineWindow window, ItemEffects effects)
     {
@@ -205,7 +269,33 @@ internal sealed class ItemEffectsView
         }
 
         window.SetCrowd(BurstModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_bursts));
+
+        _bolts.Clear();
+        foreach (var (at, _) in effects.Bolts)
+        {
+            var previous = at + new Vector3D<float>(0f, BoltHeight, 0f);
+            int pieces = (int)(BoltHeight / PieceLength);
+            for (int i = 1; i <= pieces; i++)
+            {
+                var next = at + new Vector3D<float>(0f, BoltHeight * (1f - i / (float)pieces), 0f);
+                if (i < pieces)
+                {
+                    next += new Vector3D<float>((float)_jitter.NextDouble() - 0.5f, 0f, (float)_jitter.NextDouble() - 0.5f) * 0.8f;
+                }
+
+                var piece = next - previous;
+                var (yaw, pitch) = Geometry.YawPitch(piece);
+                _bolts.Add(new CrowdInstance((previous + next) * 0.5f, yaw, piece.Length, pitch, Flash: 1f));
+                previous = next;
+            }
+        }
+
+        window.SetCrowd(BoltModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_bolts));
     }
 
-    public void Clear(EngineWindow window) => window.SetCrowd(BurstModel, ReadOnlySpan<CrowdInstance>.Empty);
+    public void Clear(EngineWindow window)
+    {
+        window.SetCrowd(BurstModel, ReadOnlySpan<CrowdInstance>.Empty);
+        window.SetCrowd(BoltModel, ReadOnlySpan<CrowdInstance>.Empty);
+    }
 }

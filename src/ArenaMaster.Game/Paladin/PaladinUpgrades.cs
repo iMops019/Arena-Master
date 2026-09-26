@@ -13,6 +13,11 @@ internal enum PaladinUpgrade
     BarbedPlating,
     PilgrimsStride,
     Gleaner,
+    SanctifiedGround,
+    ShieldSlam,
+    ZealotsEye,
+    Steadfast,
+    BrambleMail,
 }
 
 /// <summary>One upgrade's name, how many times it stacks, and what the next level of it does.</summary>
@@ -23,7 +28,7 @@ internal sealed record PaladinChoice(PaladinUpgrade? Upgrade, string Name, strin
 
 /// <summary>
 /// The Paladin's level-up pool: the upgrades, their numbers (kept in <see cref="PaladinStats"/>), and rolling three to choose from. Paladin-only, like everything
-/// under Paladin/. Barbed Plating only turns up once the tree has unlocked thorns, since it does nothing without them.
+/// under Paladin/. Barbed Plating and Bramble Mail only turn up once the tree has unlocked thorns, since they do nothing without them.
 /// </summary>
 internal static class PaladinUpgrades
 {
@@ -42,12 +47,18 @@ internal static class PaladinUpgrades
         new PaladinUpgradeInfo(PaladinUpgrade.BarbedPlating, "Barbed Plating", 4, "+40% thorns damage"),
         new PaladinUpgradeInfo(PaladinUpgrade.PilgrimsStride, "Pilgrim's Stride", 5, "+8% move speed"),
         new PaladinUpgradeInfo(PaladinUpgrade.Gleaner, "Gleaner", 4, "+35% pickup range"),
+        new PaladinUpgradeInfo(PaladinUpgrade.SanctifiedGround, "Sanctified Ground", 4, "Holy circles heal 25% more"),
+        new PaladinUpgradeInfo(PaladinUpgrade.ShieldSlam, "Shield Slam", 3, "Blocking a blow deals 15 damage to the attacker"),
+        new PaladinUpgradeInfo(PaladinUpgrade.ZealotsEye, "Zealot's Eye", 4, "+6% critical chance, +15% critical damage"),
+        new PaladinUpgradeInfo(PaladinUpgrade.Steadfast, "Steadfast", 3, "+5% block chance while standing still"),
+        new PaladinUpgradeInfo(PaladinUpgrade.BrambleMail, "Bramble Mail", 3, "Thorns strike 20% more often"),
     };
 
     public static PaladinUpgradeInfo Info(PaladinUpgrade upgrade) => All.First(u => u.Upgrade == upgrade);
 
     /// <summary>Whether <paramref name="upgrade"/> can come up at all for this build (thorns upgrades need thorns).</summary>
-    public static bool Offered(PaladinUpgrade upgrade, PaladinStats stats) => upgrade != PaladinUpgrade.BarbedPlating || stats.Tree.CrownOfThorns;
+    public static bool Offered(PaladinUpgrade upgrade, PaladinStats stats) =>
+        upgrade is not (PaladinUpgrade.BarbedPlating or PaladinUpgrade.BrambleMail) || stats.Tree.CrownOfThorns;
 
     /// <summary>
     /// Up to <paramref name="count"/> different upgrades that can be offered, aren't maxed and aren't in <paramref name="excluded"/> (banished this run), picked at

@@ -5,15 +5,25 @@
   holy_nova.glb           a flat gold ring of radius 1, scaled as a Holy Nova spreads out over the ground
   holy_circle.glb         a flat holy circle of radius 1: a gold ring with an inner ring and a cross, the ground a nova leaves
   mage_placeholder.glb    the Mage (a long blue robe, a pointed hat, a white beard, a staff crowned with an ice crystal)
+  shaman_placeholder.glb  the Shaman (a fur mantle over a hide tunic, a bone mask with antlers, blue war paint, a totem staff crowned with a crackling orb)
+  lightning_ball.glb      a ball of lightning: a spiky pale-blue orb with a white core, radius 0.35, centred on its middle
+  lightning_arc.glb       one piece of a lightning bolt: a thin bright bar 1 m long along Z, centred on its middle (scaled to each piece's length)
+  lightning_zap.glb       a flat pale-blue ring of radius 1, scaled as a zap spreads over the ground
   frost_bolt.glb          a Frost Barrage bolt: a pale ice crystal, centred on its middle, pointing +Z
   frost_blast.glb         a flat pale-blue ring of radius 1, scaled as a burst of frost spreads
   frost_shard.glb         a small ice shard, centred on its middle (the Frost Shield's and the Blizzard's swirl)
   aegis_burst.glb         a flat pale-gold ring of radius 1, scaled as the Aegis of the Dawn's burst spreads (an item's, any class)
+  thunderstone_bolt.glb   one piece of the Thunderstone's bolt from the sky: a thin bright bar 1 m long along Z (an item's, any class)
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
   ghoul_placeholder.glb   the first enemy: a hunched ghoul with long arms and red eyes
   crossbow_ghoul_placeholder.glb  the ranged ghoul: hooded, a quiver on its back, arms held out in front to carry its crossbow
   ghoul_crossbow.glb      the Crossbow Ghoul's crossbow, drawn over its body in the same pose: a stock, limbs with glowing runes, a loaded bolt
   ghoul_bolt.glb          a Crossbow Ghoul's bolt: a dark shaft with a glowing head, centred on its middle, pointing +Z
+  ghoul_mage_placeholder.glb  the Ghoul Mage: a gaunt ghoul in a long tattered robe and a tall hood, hands held out cupped in front of it
+  ghoul_flame.glb         the Ghoul Mage's flame, drawn over its body in the same pose: a burning orb between its hands
+  ghoul_fireball.glb      a Ghoul Mage's fireball: a fiery orb with a bright core, centred on its middle
+  fireball_mark.glb       a flat burning ring of radius 1 with flames on it, marking where a fireball will land
+  fireball_burst.glb      a flat ring of fire of radius 1, scaled as a fireball bursts
   xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
   brute_placeholder.glb   the elite: a hulking horned ghoul brute, 2.4 m tall, with a bone club
   hollow_king_placeholder.glb  the boss: a towering crowned ghoul king, 4.2 m tall, with a tattered cape
@@ -28,7 +38,7 @@
   camp_rack.glb           the camp: a canvas tent, a ring of stones with logs (the engine's fire burns on it), the stash chest,
                           the archery target (the passive tree station), the departure gate (the way into a run), the bounty
                           board (a notice board with papers pinned to it), the quartermaster's stall (a counter under an awning)
-                          and the weapon rack (the class station: a bow, an ice staff, and a shield with a flail)
+                          and the weapon rack (the class station: a bow, an ice staff, a totem, and a shield with a flail)
 
 The engine's model conventions: one mesh, one primitive, colours from one base-colour texture (vertex colours are
 ignored), facing +Z, feet at y = 0, metres. The texture is a strip of flat colour swatches and each face's UVs point
@@ -104,6 +114,14 @@ PALETTE = {
     "ice_light": (226, 246, 255),
     "hood_dark": (48, 40, 52),
     "bolt_glow": (255, 110, 40),
+    "ghoul_robe": (74, 30, 44),
+    "fire": (255, 96, 24),
+    "fire_light": (255, 214, 110),
+    "fur": (112, 86, 60),
+    "hide": (150, 116, 80),
+    "war_paint": (40, 90, 190),
+    "spark": (120, 196, 255),
+    "spark_light": (236, 246, 255),
 }
 COLOURS = list(PALETTE)
 
@@ -288,6 +306,60 @@ def build_mage():
     return m
 
 
+def build_shaman():
+    m = Mesh()
+    # Hide boots and leggings
+    m.box(-0.19, 0.0, -0.08, -0.03, 0.14, 0.13, "leather")
+    m.box(0.03, 0.0, -0.08, 0.19, 0.14, 0.13, "leather")
+    m.box(-0.18, 0.14, -0.07, -0.04, 0.82, 0.07, "hide")
+    m.box(0.04, 0.14, -0.07, 0.18, 0.82, 0.07, "hide")
+    # Hide tunic with a painted band, and a fur mantle over the shoulders
+    m.box(-0.23, 0.72, -0.13, 0.23, 1.40, 0.13, "hide")
+    m.box(-0.235, 0.98, 0.13, 0.235, 1.04, 0.135, "war_paint")
+    m.box(-0.34, 1.26, -0.20, 0.34, 1.46, 0.18, "fur")
+    m.box(-0.30, 0.60, -0.20, 0.30, 1.30, -0.13, "fur")              # the mantle hanging down the back
+    # Bare arms with painted bands, and hands
+    m.box(-0.35, 0.86, -0.07, -0.23, 1.30, 0.07, "skin")
+    m.box(0.23, 0.86, -0.07, 0.35, 1.30, 0.07, "skin")
+    m.box(-0.355, 1.08, -0.075, -0.225, 1.13, 0.075, "war_paint")
+    m.box(0.225, 1.08, -0.075, 0.355, 1.13, 0.075, "war_paint")
+    m.box(-0.34, 0.76, -0.05, -0.24, 0.86, 0.05, "skin")
+    m.box(0.24, 0.76, -0.05, 0.34, 0.86, 0.05, "skin")
+    # Head under a bone mask, with antlers
+    m.box(-0.12, 1.46, -0.12, 0.12, 1.70, 0.12, "skin")
+    m.box(-0.13, 1.50, 0.12, 0.13, 1.70, 0.16, "bone")
+    m.box(-0.08, 1.60, 0.16, -0.03, 1.64, 0.165, "dark")
+    m.box(0.03, 1.60, 0.16, 0.08, 1.64, 0.165, "dark")
+    for side in (-1, 1):
+        x, tip = side * 0.10, side * 0.26
+        m.box(x - 0.02, 1.70, -0.02, x + 0.02, 1.95, 0.02, "bone")                 # an antler's stem
+        m.box(min(x, tip), 1.88, -0.02, max(x, tip), 1.92, 0.02, "bone")           # and its branch, outward
+    # A totem staff in the right hand (+X), crowned with a crackling orb
+    m.box(0.28, 0.02, 0.06, 0.33, 1.78, 0.11, "wood")
+    m.box(0.26, 1.50, 0.04, 0.35, 1.58, 0.13, "fur")
+    top, bottom = (0.305, 2.06, 0.085), (0.305, 1.78, 0.085)
+    ring = [(0.40, 1.92, 0.085), (0.305, 1.92, 0.18), (0.21, 1.92, 0.085), (0.305, 1.92, -0.01)]
+    for i in range(4):
+        a, b = ring[i], ring[(i + 1) % 4]
+        m.tri(a, top, b, "spark_light")
+        m.tri(b, bottom, a, "spark")
+    return m
+
+
+def build_lightning_ball():
+    """A ball of lightning, radius 0.35: a spiky pale-blue orb with the white core poking through."""
+    m = Mesh()
+    _orb(m, 0.0, 0.0, 0.0, 0.35, "spark", "spark_light")
+    return m
+
+
+def build_lightning_arc():
+    """One piece of a lightning bolt: a thin bright bar 1 m long along Z, centred on its middle."""
+    m = Mesh()
+    m.box(-0.035, -0.035, -0.5, 0.035, 0.035, 0.5, "spark_light")
+    return m
+
+
 def build_frost_bolt():
     """A long, thin double pyramid of ice pointing +Z, centred on its middle."""
     m = Mesh()
@@ -334,6 +406,10 @@ def build_rack():
     # The Mage's ice staff, in the middle
     m.box(-0.08, 0.40, 0.0, -0.03, 1.70, 0.05, "wood")
     m.pyramid(-0.12, 1.70, -0.03, 0.01, 1.70, 0.08, (-0.055, 1.95, 0.025), "ice")
+    # The Shaman's totem, leaning by the left post, a crackling orb on top
+    m.box(-0.84, 0.0, 0.02, -0.79, 1.55, 0.07, "wood")
+    m.box(-0.86, 1.30, 0.0, -0.77, 1.38, 0.09, "fur")
+    m.pyramid(-0.88, 1.55, -0.01, -0.75, 1.55, 0.10, (-0.815, 1.75, 0.045), "spark")
     return m
 
 
@@ -429,6 +505,64 @@ def build_ghoul_bolt():
         m.tri(left, right, top, "bolt_glow")
     m.box(-0.003, -0.05, -0.30, 0.003, 0.05, -0.18, "ghoul_rags")
     m.box(-0.05, -0.003, -0.30, 0.05, 0.003, -0.18, "ghoul_rags")
+    return m
+
+
+def build_ghoul_mage():
+    m = Mesh()
+    # A long robe to the ground, widening at the hem
+    m.box(-0.26, 0.0, -0.18, 0.26, 0.40, 0.20, "ghoul_robe")
+    m.box(-0.22, 0.40, -0.14, 0.22, 1.20, 0.16, "ghoul_robe")
+    m.box(-0.23, 0.78, -0.15, 0.23, 0.84, 0.17, "bone")              # a cord of bones for a belt
+    # Thin arms held out in front at chest height, hands cupped where the flame burns
+    m.box(-0.32, 1.00, -0.02, -0.20, 1.10, 0.36, "ghoul_robe")
+    m.box(0.20, 1.00, -0.02, 0.32, 1.10, 0.36, "ghoul_robe")
+    m.box(-0.28, 0.98, 0.36, -0.14, 1.08, 0.50, "ghoul_skin")
+    m.box(0.14, 0.98, 0.36, 0.28, 1.08, 0.50, "ghoul_skin")
+    # Gaunt head, red eyes, and a tall pointed hood
+    m.box(-0.12, 1.20, 0.00, 0.12, 1.46, 0.24, "ghoul_skin")
+    m.box(-0.09, 1.33, 0.24, -0.03, 1.38, 0.245, "ghoul_eye")
+    m.box(0.03, 1.33, 0.24, 0.09, 1.38, 0.245, "ghoul_eye")
+    m.box(-0.16, 1.18, -0.08, 0.16, 1.52, 0.00, "ghoul_robe")
+    m.box(-0.16, 1.44, -0.08, 0.16, 1.52, 0.22, "ghoul_robe")
+    m.pyramid(-0.16, 1.52, -0.08, 0.16, 1.52, 0.22, (0.0, 1.85, -0.04), "ghoul_robe")
+    return m
+
+
+def _orb(m, cx, cy, cz, r, outer, inner):
+    """A spiky orb: a double pyramid of <outer>, and a brighter one of <inner> turned 45 degrees whose points stick out through its faces."""
+    import math
+    for size, colour, turn in ((r, outer, 0.0), (r * 0.85, inner, math.pi / 4)):
+        top, bottom = (cx, cy + size, cz), (cx, cy - size, cz)
+        ring = [(cx + math.cos(turn + k * math.pi / 2) * size, cy, cz + math.sin(turn + k * math.pi / 2) * size) for k in range(4)]
+        for i in range(4):
+            a, b = ring[i], ring[(i + 1) % 4]
+            m.tri(a, top, b, colour)
+            m.tri(b, bottom, a, colour)
+
+
+def build_ghoul_flame():
+    """The flame in the Ghoul Mage's own space: a burning orb held between its hands, in front of it at chest height."""
+    m = Mesh()
+    _orb(m, 0.0, 1.10, 0.56, 0.14, "fire", "fire_light")
+    return m
+
+
+def build_ghoul_fireball():
+    """A fireball, centred on its middle."""
+    m = Mesh()
+    _orb(m, 0.0, 0.0, 0.0, 0.26, "fire", "fire_light")
+    return m
+
+
+def build_fireball_mark():
+    """Where a fireball will land: a burning ring of radius 1 with little flames standing on it."""
+    m = build_ring(0.86, 1.0, "fire")
+    import math
+    for i in range(8):
+        a = 2 * math.pi * i / 8
+        x, z = math.cos(a) * 0.93, math.sin(a) * 0.93
+        m.pyramid(x - 0.05, 0.0, z - 0.05, x + 0.05, 0.0, z + 0.05, (x, 0.16, z), "fire_light")
     return m
 
 
@@ -748,11 +882,16 @@ if __name__ == "__main__":
     for name, build in (("ranger_placeholder.glb", build_ranger), ("paladin_placeholder.glb", build_paladin),
                         ("holy_nova.glb", lambda: build_ring(0.88, 1.0, "holy")), ("holy_circle.glb", build_holy_circle),
                         ("mage_placeholder.glb", build_mage), ("frost_bolt.glb", build_frost_bolt),
+                        ("shaman_placeholder.glb", build_shaman), ("lightning_ball.glb", build_lightning_ball),
+                        ("lightning_arc.glb", build_lightning_arc), ("lightning_zap.glb", lambda: build_ring(0.85, 1.0, "spark")),
                         ("frost_blast.glb", lambda: build_ring(0.86, 1.0, "ice_light")), ("frost_shard.glb", build_frost_shard),
-                        ("aegis_burst.glb", lambda: build_ring(0.9, 1.0, "holy_light")),
+                        ("aegis_burst.glb", lambda: build_ring(0.9, 1.0, "holy_light")), ("thunderstone_bolt.glb", build_lightning_arc),
                         ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul),
                         ("crossbow_ghoul_placeholder.glb", build_crossbow_ghoul), ("ghoul_crossbow.glb", build_ghoul_crossbow),
-                        ("ghoul_bolt.glb", build_ghoul_bolt), ("xp_gem_placeholder.glb", build_xp_gem),
+                        ("ghoul_bolt.glb", build_ghoul_bolt),
+                        ("ghoul_mage_placeholder.glb", build_ghoul_mage), ("ghoul_flame.glb", build_ghoul_flame),
+                        ("ghoul_fireball.glb", build_ghoul_fireball), ("fireball_mark.glb", build_fireball_mark),
+                        ("fireball_burst.glb", lambda: build_ring(0.75, 1.0, "fire")), ("xp_gem_placeholder.glb", build_xp_gem),
                         ("brute_placeholder.glb", build_brute), ("hollow_king_placeholder.glb", build_hollow_king),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
                         ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),

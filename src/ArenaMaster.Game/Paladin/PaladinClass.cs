@@ -155,7 +155,7 @@ internal sealed class PaladinClass : IHeroClass
                     _faithIn = PaladinStats.FaithInterval;   // the shield turned this one; it readies again in a while
                 }
 
-                _light.Hurt(strike.Attacker, Stats.Tree.BashDamage, crit: false, HolySource.ShieldBash, Stats, enemies, _hits);
+                _light.Hurt(strike.Attacker, Stats.BashDamage, crit: false, HolySource.ShieldBash, Stats, enemies, _hits);
                 health.Heal(Stats.Tree.BlockHeal);
                 if (Stats.Tree.HolyBastion)
                 {

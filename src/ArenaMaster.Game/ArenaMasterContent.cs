@@ -7,6 +7,7 @@ using ArenaMaster.Game.Mage;
 using ArenaMaster.Game.Paladin;
 using ArenaMaster.Game.Progression;
 using ArenaMaster.Game.Ranger;
+using ArenaMaster.Game.Shaman;
 using ArenaMaster.Game.Ui;
 using CEngine.Core;
 using Silk.NET.Input;
@@ -30,7 +31,7 @@ internal enum GameMode
 /// <summary>
 /// Arena Master's side of the engine seam. The player starts at camp (see <c>ArenaMasterContent.Camp.cs</c>): the item chest, the passive tree, the class rack and
 /// the departure gate. Setting out starts a 30-minute run (<c>ArenaMasterContent.Run.cs</c>) in the middle of the map as the chosen class - the Ranger, the
-/// Paladin or the Mage, each an <see cref="IHeroClass"/>; the run ends in victory, death, or a return to camp, shows its summary, and puts the player back at camp. What lasts
+/// Paladin, the Mage or the Shaman, each an <see cref="IHeroClass"/>; the run ends in victory, death, or a return to camp, shows its summary, and puts the player back at camp. What lasts
 /// between runs - the item stash, the loadout, the class and its tree - is the <see cref="Profile"/>, saved as it changes. This file holds the world and the
 /// switching between those parts; the HUD is in <c>ArenaMasterContent.Hud.cs</c>.
 /// </summary>
@@ -70,7 +71,7 @@ public sealed partial class ArenaMasterContent : IGameContent
         _profilePath = profilePath;
         _profile = ProfileStore.Load(profilePath);
         Loadout.Sanitize(_profile);
-        _classes = new IHeroClass[] { new RangerClass(_random), new PaladinClass(_random), new MageClass(_random) };
+        _classes = new IHeroClass[] { new RangerClass(_random), new PaladinClass(_random), new MageClass(_random), new ShamanClass(_random) };
         UseClass(ClassFor(_profile.ActiveClass));
         _health.Reset(_hero.MaxHealth);
         _enemies = new EnemyField(_random);

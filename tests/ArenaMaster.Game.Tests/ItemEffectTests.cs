@@ -24,10 +24,10 @@ public class ItemCatalogTests
     }
 
     [Fact]
-    public void ThereAreFortyItems_EachUnique()
+    public void ThereAreFortySixItems_EachUnique()
     {
-        Assert.Equal(40, ItemCatalog.All.Count);
-        Assert.Equal(40, ItemCatalog.All.Select(i => i.Id).Distinct().Count());
+        Assert.Equal(46, ItemCatalog.All.Count);
+        Assert.Equal(46, ItemCatalog.All.Select(i => i.Id).Distinct().Count());
     }
 
     [Fact]

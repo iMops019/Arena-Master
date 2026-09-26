@@ -70,6 +70,23 @@ internal sealed class ItemBonuses
     /// <summary>What each extra projectile is worth to a class that has none (the Paladin): this much more damage.</summary>
     public const float ProjectileFallback = 0.12f;
 
+    /// <summary>
+    /// Extra chains: one more jump for whatever a class's attack jumps with - a Shaman fork's enemies, a Ranger's arrow chaining on, a Mage's bolt piercing through.
+    /// A class with nothing that jumps (the Paladin) turns each into <see cref="ChainFallback"/> more damage.
+    /// </summary>
+    public int Chains;
+
+    public const float ChainFallback = 0.10f;
+
+    /// <summary>What every area (the nova, the circles, blasts, zaps, forks' reach, the rain) is multiplied by, on top of <see cref="Area"/>.</summary>
+    public float AreaMultiplier = 1f;
+
+    /// <summary>What the damage of enemy shots (bolts, fireballs) is multiplied by.</summary>
+    public float RangedDamageTaken = 1f;
+
+    /// <summary>Thunderstone: the damage of the lightning that strikes the nearest enemy every so often (see <see cref="ItemEffects"/>). 0 for none.</summary>
+    public float SkyStrike;
+
     public float ProjectileSpeed;
     public float Range;
 
@@ -212,6 +229,16 @@ internal static class ItemCatalog
             b.ExperienceGain += 0.05f;
         }),
 
+        // Shaman-leaning: chains, area, lightning.
+        new("grounding_charm", "Grounding Charm", ItemRarity.Common, "Take 25% less damage from bolts and fireballs", b => b.RangedDamageTaken *= 0.75f),
+        new("storm_glass", "Storm Glass", ItemRarity.Common, "+10% area, and lingering effects last 0.5 s longer", b =>
+        {
+            b.Area += 0.10f;
+            b.Duration += 0.5f;
+        }),
+        new("conductors_coil", "Conductor's Coil", ItemRarity.Rare, "+1 chain: one more fork, arrow chain or bolt pierce (the Paladin: +10% nova damage)", b => b.Chains += 1),
+        new("thunderstone", "Thunderstone", ItemRarity.Rare, "Every 6 s lightning strikes the nearest enemy for 40 damage", b => b.SkyStrike += 40f),
+
         // Epic: multipliers.
         new("rune_of_might", "Rune of Might", ItemRarity.Epic, "x1.2 damage", b => b.DamageMultiplier *= 1.2f),
         new("swiftwind_sigil", "Swiftwind Sigil", ItemRarity.Epic, "x1.15 attack speed", b => b.AttackSpeedMultiplier *= 1.15f),
@@ -232,6 +259,7 @@ internal static class ItemCatalog
             b.DamageTaken *= 1.2f;
         }),
         new("berserkers_band", "Berserker's Band", ItemRarity.Epic, "Up to +35% attack speed as your health drops", b => b.Berserk += 0.35f),
+        new("stormcallers_horn", "Stormcaller's Horn", ItemRarity.Epic, "x1.3 area", b => b.AreaMultiplier *= 1.3f),
         new("cursed_idol", "Cursed Idol", ItemRarity.Epic, "+40% experience and silver, but enemies have +15% health", b =>
         {
             b.ExperienceGain += 0.40f;
@@ -271,6 +299,11 @@ internal static class ItemCatalog
             b.ProjectileDamage *= 0.85f;
         }),
         new("phoenix_feather", "Phoenix Feather", ItemRarity.Legendary, "Once per run, a killing blow brings you back at 50% health", b => b.LastStands += 1),
+        new("crown_of_storms", "Crown of Storms", ItemRarity.Legendary, "+2 chains, x1.2 attack speed", b =>
+        {
+            b.Chains += 2;
+            b.AttackSpeedMultiplier *= 1.2f;
+        }),
         new("crown_of_plenty", "Crown of Plenty", ItemRarity.Legendary, "x1.2 damage, experience and silver", b =>
         {
             b.DamageMultiplier *= 1.2f;
