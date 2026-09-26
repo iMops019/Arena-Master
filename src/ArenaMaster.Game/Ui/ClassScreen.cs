@@ -21,7 +21,7 @@ internal sealed class ClassScreen : GameScreen
 
         MarkDrawn();
         float scale = UiTheme.Scale;
-        UiTheme.BeginScreen("##classes", 0.7f, 0.66f);
+        UiTheme.BeginScreen("##classes", MathF.Min(0.92f, 0.3f + 0.2f * classes.Count), 0.7f);
         UiTheme.Header("Camp · Weapon rack", "Choose your class", $"Playing the {current.Name}");
 
         var origin = ImGui.GetCursorScreenPos();
@@ -75,7 +75,7 @@ internal sealed class ClassScreen : GameScreen
         UiTheme.Text(new Vector2(min.X + pad, y), hero.Name, UiTheme.Ink, 1.6f);
         y += font * 2.1f;
         UiTheme.Text(new Vector2(min.X + pad, y), hero.Summary, UiTheme.Ink, 0.85f, width);
-        y += font * 3.6f;
+        y += ImGui.CalcTextSize(hero.Summary, width / 0.85f).Y * 0.85f + font * 0.8f;
 
         int free = tree.FreePoints;
         UiTheme.Text(new Vector2(min.X + pad, y), "PASSIVE TREE", UiTheme.Muted, 0.6f);

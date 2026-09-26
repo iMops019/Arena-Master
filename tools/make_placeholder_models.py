@@ -4,6 +4,10 @@
                           left arm and a flail in the right hand)
   holy_nova.glb           a flat gold ring of radius 1, scaled as a Holy Nova spreads out over the ground
   holy_circle.glb         a flat holy circle of radius 1: a gold ring with an inner ring and a cross, the ground a nova leaves
+  mage_placeholder.glb    the Mage (a long blue robe, a pointed hat, a white beard, a staff crowned with an ice crystal)
+  frost_bolt.glb          a Frost Barrage bolt: a pale ice crystal, centred on its middle, pointing +Z
+  frost_blast.glb         a flat pale-blue ring of radius 1, scaled as a burst of frost spreads
+  frost_shard.glb         a small ice shard, centred on its middle (the Frost Shield's and the Blizzard's swirl)
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
   ghoul_placeholder.glb   the first enemy: a hunched ghoul with long arms and red eyes
   xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
@@ -20,7 +24,7 @@
   camp_rack.glb           the camp: a canvas tent, a ring of stones with logs (the engine's fire burns on it), the stash chest,
                           the archery target (the passive tree station), the departure gate (the way into a run), the bounty
                           board (a notice board with papers pinned to it), the quartermaster's stall (a counter under an awning)
-                          and the weapon rack (the class station: a bow and a shield with a flail)
+                          and the weapon rack (the class station: a bow, an ice staff, and a shield with a flail)
 
 The engine's model conventions: one mesh, one primitive, colours from one base-colour texture (vertex colours are
 ignored), facing +Z, feet at y = 0, metres. The texture is a strip of flat colour swatches and each face's UVs point
@@ -89,6 +93,11 @@ PALETTE = {
     "visor": (18, 16, 16),
     "holy": (255, 232, 140),
     "holy_light": (255, 248, 210),
+    "robe": (46, 74, 150),
+    "robe_dark": (28, 44, 96),
+    "beard": (226, 226, 230),
+    "ice": (150, 214, 255),
+    "ice_light": (226, 246, 255),
 }
 COLOURS = list(PALETTE)
 
@@ -241,6 +250,62 @@ def build_holy_circle():
     return m
 
 
+def build_mage():
+    m = Mesh()
+    # Boots under a long robe that widens to the hem
+    m.box(-0.16, 0.0, -0.07, -0.04, 0.10, 0.13, "leather")
+    m.box(0.04, 0.0, -0.07, 0.16, 0.10, 0.13, "leather")
+    m.box(-0.28, 0.08, -0.20, 0.28, 0.55, 0.20, "robe")
+    m.box(-0.23, 0.55, -0.15, 0.23, 1.42, 0.15, "robe")
+    m.box(-0.24, 0.86, -0.16, 0.24, 0.93, 0.16, "leather")          # belt
+    m.box(-0.05, 0.10, 0.20, 0.05, 1.40, 0.21, "robe_dark")          # the robe's front seam
+    # Sleeves and hands
+    m.box(-0.36, 0.88, -0.08, -0.23, 1.40, 0.08, "robe")
+    m.box(0.23, 0.88, -0.08, 0.36, 1.40, 0.08, "robe")
+    m.box(-0.35, 0.78, -0.05, -0.25, 0.88, 0.05, "skin")
+    m.box(0.25, 0.78, -0.05, 0.35, 0.88, 0.05, "skin")
+    # Head, eyes, beard, and a wide-brimmed pointed hat
+    m.box(-0.12, 1.44, -0.12, 0.12, 1.68, 0.12, "skin")
+    m.box(-0.08, 1.57, 0.12, -0.03, 1.61, 0.125, "dark")
+    m.box(0.03, 1.57, 0.12, 0.08, 1.61, 0.125, "dark")
+    m.box(-0.10, 1.26, 0.08, 0.10, 1.52, 0.16, "beard")
+    m.box(-0.27, 1.68, -0.27, 0.27, 1.72, 0.27, "robe_dark")
+    m.pyramid(-0.15, 1.72, -0.15, 0.15, 1.72, 0.15, (0.04, 2.20, -0.10), "robe_dark")
+    # The staff in the right hand (+X), crowned with an ice crystal
+    m.box(0.28, 0.02, 0.06, 0.33, 1.72, 0.11, "wood")
+    top, bottom = (0.305, 2.02, 0.085), (0.305, 1.70, 0.085)
+    ring = [(0.395, 1.84, 0.085), (0.305, 1.84, 0.175), (0.215, 1.84, 0.085), (0.305, 1.84, -0.005)]
+    for i in range(4):
+        a, b = ring[i], ring[(i + 1) % 4]
+        m.tri(a, top, b, "ice_light")
+        m.tri(b, bottom, a, "ice")
+    return m
+
+
+def build_frost_bolt():
+    """A long, thin double pyramid of ice pointing +Z, centred on its middle."""
+    m = Mesh()
+    front, back = (0.0, 0.0, 0.32), (0.0, 0.0, -0.22)
+    ring = [(0.07, 0.0, 0.0), (0.0, 0.07, 0.0), (-0.07, 0.0, 0.0), (0.0, -0.07, 0.0)]
+    for i in range(4):
+        a, b = ring[i], ring[(i + 1) % 4]
+        m.tri(a, b, front, "ice_light")
+        m.tri(b, a, back, "ice")
+    return m
+
+
+def build_frost_shard():
+    """A small ice shard, taller than wide, centred on its middle."""
+    m = Mesh()
+    top, bottom = (0.0, 0.14, 0.0), (0.0, -0.10, 0.0)
+    ring = [(0.05, 0.0, 0.0), (0.0, 0.0, 0.05), (-0.05, 0.0, 0.0), (0.0, 0.0, -0.05)]
+    for i in range(4):
+        a, b = ring[i], ring[(i + 1) % 4]
+        m.tri(a, top, b, "ice_light")
+        m.tri(b, bottom, a, "ice")
+    return m
+
+
 def build_rack():
     """The weapon rack, the class station: a wooden frame 2 m wide holding a bow on one side and a crusader shield with a flail on the other. Its front faces +Z."""
     m = Mesh()
@@ -260,6 +325,9 @@ def build_rack():
     m.box(0.25, 1.12, 0.07, 0.67, 1.20, 0.085, "crusader")
     m.box(0.80, 0.9, 0.0, 0.85, 1.55, 0.05, "wood")
     m.box(0.74, 0.62, -0.03, 0.90, 0.78, 0.13, "iron")
+    # The Mage's ice staff, in the middle
+    m.box(-0.08, 0.40, 0.0, -0.03, 1.70, 0.05, "wood")
+    m.pyramid(-0.12, 1.70, -0.03, 0.01, 1.70, 0.08, (-0.055, 1.95, 0.025), "ice")
     return m
 
 
@@ -617,6 +685,8 @@ def write_glb(mesh, path):
 if __name__ == "__main__":
     for name, build in (("ranger_placeholder.glb", build_ranger), ("paladin_placeholder.glb", build_paladin),
                         ("holy_nova.glb", lambda: build_ring(0.88, 1.0, "holy")), ("holy_circle.glb", build_holy_circle),
+                        ("mage_placeholder.glb", build_mage), ("frost_bolt.glb", build_frost_bolt),
+                        ("frost_blast.glb", lambda: build_ring(0.86, 1.0, "ice_light")), ("frost_shard.glb", build_frost_shard),
                         ("arrow_placeholder.glb", build_arrow), ("ghoul_placeholder.glb", build_ghoul), ("xp_gem_placeholder.glb", build_xp_gem),
                         ("brute_placeholder.glb", build_brute), ("hollow_king_placeholder.glb", build_hollow_king),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),

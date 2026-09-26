@@ -48,6 +48,33 @@ internal sealed class Enemy
     /// <summary>Seconds since it died (only meaningful once it has).</summary>
     public float DeadFor { get; set; }
 
+    /// <summary>Seconds of chill left, and how much it slows the walk while it lasts (0 to 1).</summary>
+    public float ChilledFor { get; set; }
+
+    public float ChillSlow { get; set; }
+
+    /// <summary>Seconds left frozen solid: no walking, no clawing, an attack under way held.</summary>
+    public float FrozenFor { get; set; }
+
+    public bool IsChilled => ChilledFor > 0f;
+
+    public bool IsFrozen => FrozenFor > 0f;
+
+    /// <summary>How fast it walks right now: its speed, less any chill.</summary>
+    public float WalkSpeed => IsChilled ? Speed * (1f - ChillSlow) : Speed;
+
+    /// <summary>
+    /// Chills it for <paramref name="seconds"/>, slowing its walk by <paramref name="slow"/> (0 to 1). A chill already on it keeps the stronger slow and the longer time.
+    /// </summary>
+    public void Chill(float seconds, float slow)
+    {
+        ChillSlow = IsChilled ? MathF.Max(ChillSlow, slow) : slow;
+        ChilledFor = MathF.Max(ChilledFor, seconds);
+    }
+
+    /// <summary>Freezes it solid for <paramref name="seconds"/> (or keeps a longer freeze already on it).</summary>
+    public void Freeze(float seconds) => FrozenFor = MathF.Max(FrozenFor, seconds);
+
     public float ContactCooldown { get; set; }
 
     /// <summary>A per-enemy offset so a crowd doesn't bob in step.</summary>
@@ -353,6 +380,13 @@ internal sealed class EnemyField
     private void Move(Enemy enemy, float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
     {
         var kind = enemy.Kind;
+        enemy.ChilledFor = MathF.Max(0f, enemy.ChilledFor - deltaSeconds);
+        if (enemy.FrozenFor > 0f)
+        {
+            enemy.FrozenFor = MathF.Max(0f, enemy.FrozenFor - deltaSeconds);
+            return;   // frozen solid: no step, no claw, and an attack under way waits
+        }
+
         enemy.ContactCooldown = MathF.Max(0f, enemy.ContactCooldown - deltaSeconds);
         enemy.AttackCooldown = MathF.Max(0f, enemy.AttackCooldown - deltaSeconds);
 
@@ -382,7 +416,7 @@ internal sealed class EnemyField
 
         // Walk at the player, eased off by any other enemy close enough to crowd it, so a pack spreads around the player instead of stacking into one. The bigger of two
         // enemies gives way less.
-        var step = toPlayer * enemy.Speed;
+        var step = toPlayer * enemy.WalkSpeed;
         foreach (var other in _grid.Near(enemy.Position.X, enemy.Position.Z, kind.Radius + MaxEnemyRadius + 0.15f))
         {
             if (other == enemy || !other.IsAlive)
@@ -396,7 +430,7 @@ internal sealed class EnemyField
             {
                 float giveWay = 2f * other.Kind.Radius / (kind.Radius + other.Kind.Radius);
                 var push = apart > 1e-4f ? away : new Vector3D<float>(MathF.Sin(enemy.Phase), 0f, MathF.Cos(enemy.Phase));
-                step += push * enemy.Speed * (1f - apart / spacing) * 1.5f * giveWay;
+                step += push * enemy.WalkSpeed * (1f - apart / spacing) * 1.5f * giveWay;
             }
         }
 

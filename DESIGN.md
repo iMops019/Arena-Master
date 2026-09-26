@@ -10,7 +10,7 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 
 - **Nothing carries over from `ConnEngine-Game`** (the older game on this engine): no code, assets, designs or content. Arena Master starts clean.
 - **One class at a time.** Build the first class (Ranger) and its passive tree, and iterate until it feels right, before starting a second class. (On 2026-09-25 the user chose to start the second class, the Paladin, before the Ranger tuning pass.)
-- **Classes don't share anything.** Each class has its own attacks, level-up pool and passive tree. No shared abilities between classes. In code, each class lives in its own folder (`Ranger/`, `Paladin/`) and the game runs it through one seam, `Classes/IHeroClass`; the Paladin shares no code with the Ranger (its own stats, controller, pool and tree). Shared are only the world's things: enemies, items, the camp, the meta progression, and the general combat rules in `Combat/` (a blow can be blocked; any class can have a block chance, the Ranger's is 0).
+- **Classes don't share anything.** Each class has its own attacks, level-up pool and passive tree. No shared abilities between classes. In code, each class lives in its own folder (`Ranger/`, `Paladin/`) and the game runs it through one seam, `Classes/IHeroClass`; no class shares code with another (each has its own stats, controller, pool and tree). Shared are only the world's things: enemies, items, the camp, the meta progression, and the general combat rules in `Combat/`: a blow can be blocked (any class can have a block chance; only the Paladin's isn't 0), an enemy can be chilled (slowed) or frozen, and the player's health can carry a barrier that takes damage first.
 
 ## The core loop
 
@@ -26,7 +26,7 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 ## Camera and controls (built)
 
 - Third-person follow camera behind the player. The mouse orbits the camera and sets the aim direction.
-- WASD to move (the Ranger 7 m/s, the Paladin 6.4), Space to jump, Shift to dash (the Ranger: a 0.18 s burst with a 1.2 s cooldown; the Paladin's shield rush: 0.2 s, a little slower, 1.6 s cooldown).
+- WASD to move (the Ranger and the Mage 7 m/s, the Paladin 6.4), Space to jump, Shift to dash (the Ranger: a 0.18 s burst with a 1.2 s cooldown; the Paladin's shield rush: 0.2 s, a little slower, 1.6 s cooldown; the Mage's blink: 0.12 s, very fast, about 4.5 m, 2.2 s cooldown).
 - Esc pauses (Return to Camp is in the pause menu). The level-up screen is its own pause. E uses a camp station and closes camp screens.
 - The title screen has Play (continue the save) and **New Game** (start over, behind a confirmation; the old save is copied to `profile.backup-<date-time>.json`, never deleted).
 
@@ -101,6 +101,30 @@ Everything below the brief is a first pass **(draft)**: the numbers, the level-u
 - **How it plays, from a simulation** (no rendering, the real director, a level-up taken at random each level): a fresh Paladin with no tree points who stands its ground survives the first 10 minutes; one that keeps walking leaves its circles behind and died at about 4.5 minutes. With a modest tree (about 30 points) both survive 10 minutes easily. Defiance rewards standing your ground. Whether that's fun, or standing still is too strong, is the first thing to feel out.
 - The model is a stand-in like the Ranger's (plate, a white tabard with a red cross, a great helm, the tower shield on the left arm, the flail in the right hand). Nothing is animated: the flail doesn't swing yet.
 
+## Third class: Mage (built, first pass)
+
+The user's brief: a Mage whose first tree is **Frost**. Its attack is **Frost Barrage**: 7 projectiles fire out from the Mage and target enemies, with a slight delay between each one. The tree has cold damage nodes, projectile nodes and +1 projectile nodes; **Frost Shield**, a major that makes a shield that takes damage for the player for a short time and comes up on its own during the game; and **Frost Blast**, a major that makes a barrage bolt explode in a small area when it hits. The rest of the nodes and majors were left to Claude. A free class, like the others: not unlocked with silver.
+
+Everything below the brief is a first pass **(draft)**.
+
+- **Frost Barrage** (`Mage/FrostBarrage.cs`): every 1.8 s, while an enemy is within 22 m, 7 bolts leave the staff 0.07 s apart. Each fans out, a little upward, then curves onto its target (flying straight in for the last 3 m, so it never circles). 15 damage each (5% crit, x2), 24 m/s, 30 m of flight. A stun holds the barrage, bolts not yet away included.
+  - **Targeting:** each bolt goes for the best target in range (in front of the camera first, then nearest) that the bolts already flying at it won't kill. So a volley kills what it hits and then spreads out, instead of grazing seven enemies and killing none. The first simulation showed the one-bolt-each version dying in seconds.
+- **Cold:** every frost hit chills: 1.5 s, walking 20% slower (chill capped at 70%). A frozen enemy stands still, can't claw, and holds any attack it was winding up; it shows pale. Bosses can't be frozen.
+- **Base numbers:** 90 max health (the most fragile class), 7 m/s, 3 m pickup.
+- **Items:** damage means cold damage, attack speed means cast speed, crit means a bolt's crit.
+- **Level-up pool** (`Mage/MageUpgrades.cs`): Ice Shards (+20% cold damage, x5), Quickened Casting (+12% cast speed, x5), Splinter Bolt (+1 projectile, x3), Winter Wind (+20% projectile speed, +15% range, x3), Numbing Cold (+8% chill, +0.3 s, x4), Piercing Ice (+1 pierce, x2), Glacial Ward (+30% Frost Shield, x3, only with Frost Shield), Concussive Frost (+25% Frost Blast radius, x3, only with Frost Blast), Arcane Vigor (+15 max health and heal, x5), Fleet Step (+8% move speed, x5), Attunement (+35% pickup range, x4), Frozen Precision (+6% crit chance, +15% crit damage, x4).
+- **Frost tree** (`Mage/FrostTree.cs`): 34 nodes in 7 tiers (levels 1, 3, 6, 10, 15, 21, 28) and three lanes: **Winter** (cold damage, chill, freezing), **Barrage** (the bolts) and **Ward** (the Frost Shield and staying alive). Two starting nodes: Cold Hands (+10% cold damage, +3% chill per rank) and Quickened Mind (+8% cast speed, +8% projectile speed per rank). Two +1 projectile nodes: Extra Shard (tier 2) and Volley of Ice (tier 4), 2 ranks each. Ten majors:
+  - *Frost Shield* (tier 2, Ward; the user's): every 10 s a shield forms on its own and takes damage for 4 s: 25 plus 20% of max health. It's a barrier on the health bar (the icy band, and "+N shield" by the HP). The first comes 2 s into a run.
+  - *Frost Blast* (tier 3, Barrage; the user's): a bolt that hits explodes: 50% of its damage to every other enemy within 2 m, chilling them.
+  - *Deep Freeze* (tier 4, Winter): a frost hit on a chilled enemy has a 10% chance to freeze it for 1.2 s (half for elites).
+  - *Shattering Ward* (tier 4, Ward): a Frost Shield that breaks bursts for 300% of a bolt's damage within 4 m.
+  - *Shatter* (tier 5, Winter): frozen enemies take 60% more.
+  - *Splitting Ice* (tier 5, Barrage): a bolt that kills splits into two half-damage bolts that seek the nearest other enemies.
+  - *Ice Block* (tier 6, Ward): once per run, a killing blow leaves 1 health, heals 25% and puts up a shield of half max health.
+  - Capstones (tier 7): *Blizzard* (every enemy within 5 m takes a bolt's damage per second and is chilled), *Comet* (every 4th barrage ends with a comet at the toughest enemy in range: 500%, and a 4 m blast of half that), *Glacial Fortress* (the Frost Shield holds until it breaks, and forms 50% faster).
+- **How it plays, from a simulation** (no rendering, the real director, a random level-up each level): a fresh Mage that keeps moving survives 10 minutes, about as well as a fresh Paladin that stands still. A fresh Mage that stands still dies in about 25 seconds. With about 30 tree points it survives 10 minutes either way. The Mage is the class that has to keep moving.
+- The model is a stand-in: a long blue robe, a pointed hat, a white beard, a staff with an ice crystal. The bolts are ice crystals; the shield and the blizzard are ice shards circling the Mage.
+
 ## Items
 
 - Dropped by monsters (elites and bosses more likely) and found in chests.
@@ -126,7 +150,7 @@ Everything below the brief is a first pass **(draft)**: the numbers, the level-u
 ## Camp (built)
 
 - A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle. A fire, a tent, and six stations; walk up and press E:
-  - **Weapon rack** (behind the spawn) -> choose the class: the Ranger or the Paladin. Each keeps its own tree; the item chest, silver and upgrades are shared.
+  - **Weapon rack** (behind the spawn) -> choose the class: the Ranger, the Paladin or the Mage. Each keeps its own tree; the item chest, silver and upgrades are shared.
   - **Stash chest** -> Item Chest: every item, how many owned, and which are still undiscovered.
   - **Archery target** -> the chosen class's passive tree (the in-game version of the mockup).
   - **Bounty board** -> the bounties, done and to do.
@@ -166,7 +190,8 @@ Each step should be playable before the next one starts. **[engine]** means the 
 7. *(Done.)* **Swarms:** a batched crowd renderer for hundreds of enemies. [engine: `SetCrowd`, instanced props] [game: enemies, arrows and gems drawn as crowds; an enemy grid for spacing and hits; the director ramps to 300 fodder; gems merge past 400; damage numbers capped at 60]. The enemies are rigid stand-ins. Animated crowds (baked animation) wait for rigged enemy models.
 8. *(Built, first pass; the user is starting a fresh save to try it.)* **Meta progression:** silver, the Quartermaster, the Bounty Board, locked items, and a New Game button on the title screen. (The save file came in step 6.) [game] [engine: title-screen buttons]
 9. *(Built, first pass.)* **Class #2, the Paladin, and its Defiance tree**, with a class rack at camp to switch. [game]
-10. Play both classes and tune: the Ranger, then the Paladin (above all, how much standing still should pay). Then a second tree for either, or class #3.
+10. *(Built, first pass.)* **Class #3, the Mage, and its Frost tree.** [game]
+11. Play the three classes and tune them: the Ranger, the Paladin (how much standing still should pay), the Mage (how hard standing still should punish). Then more enemies, or second trees.
 
 ## Open questions
 

@@ -85,7 +85,16 @@ public sealed partial class ArenaMasterContent
         float health = _health.Current / _health.Max;
         var healthColor = Vector4D.Lerp(new Vector4D<float>(0.78f, 0.2f, 0.22f, 0.95f), new Vector4D<float>(1f, 0.55f, 0.55f, 1f), _health.HurtFlash);
         hud.Bar(HudAnchor.BottomLeft, new Vector2D<float>(24f, -28f), new Vector2D<float>(260f, 18f), health, healthColor, Shade);
-        hud.Text(HudAnchor.BottomLeft, new Vector2D<float>(28f, -50f), $"HP  {MathF.Ceiling(_health.Current)} / {_health.Max}", White, 0.75f);
+        string barrier = "";
+        if (_health.Barrier > 0f)
+        {
+            // A barrier over the health (the Mage's Frost Shield): an icy band along the bottom of the bar, as a share of max health.
+            hud.Bar(HudAnchor.BottomLeft, new Vector2D<float>(24f, -28f), new Vector2D<float>(260f, 6f), Math.Clamp(_health.Barrier / _health.Max, 0f, 1f),
+                new Vector4D<float>(0.6f, 0.9f, 1f, 0.95f), new Vector4D<float>(0f, 0f, 0f, 0f));
+            barrier = $"   +{MathF.Ceiling(_health.Barrier)} shield";
+        }
+
+        hud.Text(HudAnchor.BottomLeft, new Vector2D<float>(28f, -50f), $"HP  {MathF.Ceiling(_health.Current)} / {_health.Max}{barrier}", White, 0.75f);
         if (_health.HurtFlash > 0f)
         {
             hud.Rect(HudAnchor.TopLeft, Vector2D<float>.Zero, new Vector2D<float>(hud.ScreenSize.X, hud.ScreenSize.Y), new Vector4D<float>(0.7f, 0f, 0f, 0.18f * _health.HurtFlash));

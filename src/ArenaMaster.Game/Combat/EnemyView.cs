@@ -5,7 +5,8 @@ namespace ArenaMaster.Game.Combat;
 
 /// <summary>
 /// Puts the <see cref="EnemyField"/> on screen: every enemy of a kind drawn as one engine crowd (one instanced draw however many there are), with a shambling bob
-/// while it walks, a flinch and a flash when it is hit, a crouch or a rearing-up as it winds up an attack, and a sink into the ground as it dies. Attacks show their
+/// while it walks, a flinch and a flash when it is hit, a crouch or a rearing-up as it winds up an attack, standing still and pale while frozen, and a sink into
+/// the ground as it dies. Attacks show their
 /// telegraphs on the ground as placed props: a red lane for a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave. There
 /// are no animations yet; the stand-in models are rigid.
 /// </summary>
@@ -108,6 +109,11 @@ internal sealed class EnemyView
             float t = Math.Clamp(enemy.DeadFor / EnemyField.DeathDuration, 0f, 1f);
             position.Y -= t * enemy.Kind.Height * 0.8f;   // sinks into the ground
             return new CrowdInstance(position, enemy.Yaw, scale * (1f - 0.4f * t), pitch + 0.9f * t);
+        }
+
+        if (enemy.IsFrozen)
+        {
+            return new CrowdInstance(position, enemy.Yaw, scale, pitch, Flash: MathF.Max(0.55f, enemy.HitFlash));   // still, and pale with frost
         }
 
         if (enemy.Attack is { } attack)
