@@ -218,8 +218,8 @@ internal sealed class FrostBarrage
         }
         else
         {
-            // The best target not already doomed by the bolts on their way to it - so a volley kills what it hits and then spreads, rather than grazing seven
-            // enemies and killing none. Once every enemy in range is spoken for, the bolts go round them again.
+            // The best target not already doomed by the bolts on their way to it - so a volley kills what it hits and then spreads, rather than grazing every
+            // enemy and killing none. Once every enemy in range is spoken for, the bolts go round them again.
             var ranked = inRange.OrderBy(e => Rank(e, staff, aimFlat)).ToList();
             target = ranked.FirstOrDefault(e => e.Health > Incoming(e)) ?? (ranked.Count > 0 ? ranked[index % ranked.Count] : null);
         }

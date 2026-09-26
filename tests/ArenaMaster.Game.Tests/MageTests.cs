@@ -103,7 +103,7 @@ public class MageStatsTests
     {
         var stats = new MageStats();
 
-        Assert.Equal(7, stats.Projectiles);
+        Assert.Equal(3, stats.Projectiles);
         Assert.Equal(MageStats.BaseBoltDamage, stats.BoltDamage);
         Assert.Equal(MageStats.BaseBarrageInterval, stats.BarrageInterval);
         Assert.Equal(MageStats.BaseMaxHealth, stats.MaxHealth);
@@ -120,7 +120,7 @@ public class MageStatsTests
         stats.Increase(MageUpgrade.SplinterBolt);
 
         Assert.Equal(MageStats.BaseBoltDamage * 2.4f * 1.5f, stats.BoltDamage, 3);
-        Assert.Equal(8, stats.Projectiles);
+        Assert.Equal(MageStats.BaseProjectiles + 1, stats.Projectiles);
     }
 
     [Fact]
@@ -193,7 +193,7 @@ public class FrostBarrageTests
     }
 
     [Fact]
-    public void TheSevenBolts_LeaveOneAfterAnother()
+    public void TheThreeBolts_LeaveOneAfterAnother()
     {
         var field = MageTesting.QuietField();
         MageTesting.Sturdy(field, 20f);
@@ -203,13 +203,13 @@ public class FrostBarrageTests
         MageTesting.Cast(barrage, stats, field, FrostBarrage.FirstBarrage + 0.01f);
         Assert.Equal(1, barrage.Barrages);
         Assert.Single(barrage.Bolts);   // the first is away, the rest still to come
-        Assert.Equal(6, barrage.Queued);
+        Assert.Equal(2, barrage.Queued);
 
-        MageTesting.Cast(barrage, stats, field, 3f * MageStats.BoltStagger);
-        Assert.InRange(barrage.Bolts.Count, 3, 4);
+        MageTesting.Cast(barrage, stats, field, 1.2f * MageStats.BoltStagger);
+        Assert.Equal(2, barrage.Bolts.Count);
 
-        MageTesting.Cast(barrage, stats, field, 4f * MageStats.BoltStagger);
-        Assert.Equal(7, barrage.Bolts.Count);
+        MageTesting.Cast(barrage, stats, field, 1.2f * MageStats.BoltStagger);
+        Assert.Equal(3, barrage.Bolts.Count);
         Assert.Equal(0, barrage.Queued);
     }
 
@@ -219,9 +219,7 @@ public class FrostBarrageTests
         var field = MageTesting.QuietField();
         var enemies = new[]
         {
-            field.Spawn(new Vector3D<float>(8f, 0f, 0f)), field.Spawn(new Vector3D<float>(6f, 0f, 6f)), field.Spawn(new Vector3D<float>(6f, 0f, -6f)),
-            field.Spawn(new Vector3D<float>(-7f, 0f, 0f)), field.Spawn(new Vector3D<float>(0f, 0f, 9f)), field.Spawn(new Vector3D<float>(0f, 0f, -9f)),
-            field.Spawn(new Vector3D<float>(-5f, 0f, 5f)),
+            field.Spawn(new Vector3D<float>(8f, 0f, 0f)), field.Spawn(new Vector3D<float>(6f, 0f, 6f)), field.Spawn(new Vector3D<float>(-7f, 0f, -2f)),
         };
         foreach (var enemy in enemies)
         {
@@ -231,8 +229,8 @@ public class FrostBarrageTests
         var barrage = new FrostBarrage(new Random(1));
         var hits = MageTesting.Cast(barrage, MageTesting.With(), field, FrostBarrage.FirstBarrage + 1.5f).Where(h => h.Source == FrostSource.Bolt).ToList();
 
-        Assert.Equal(7, hits.Count);
-        Assert.Equal(7, hits.Select(h => h.Enemy).Distinct().Count());   // one each, all round the Mage
+        Assert.Equal(3, hits.Count);
+        Assert.Equal(3, hits.Select(h => h.Enemy).Distinct().Count());   // one each, all round the Mage
         Assert.All(enemies, e => Assert.False(e.IsAlive));
     }
 
@@ -241,22 +239,15 @@ public class FrostBarrageTests
     {
         var field = MageTesting.QuietField();
         var first = field.Spawn(new Vector3D<float>(7f, 0f, 0f));
-        var second = field.Spawn(new Vector3D<float>(7f, 0f, 3f));
-        foreach (var weak in new[] { first, second })
-        {
-            weak.Health = 2f * MageStats.BaseBoltDamage;   // two bolts each
-        }
-
+        first.Health = 2f * MageStats.BaseBoltDamage;   // two bolts
         var tough = MageTesting.Sturdy(field, 0f, -12f);
         var barrage = new FrostBarrage(new Random(1));
 
         var hits = MageTesting.Cast(barrage, MageTesting.With(), field, FrostBarrage.FirstBarrage + 1.5f).Where(h => h.Source == FrostSource.Bolt).ToList();
 
         Assert.Equal(2, hits.Count(h => h.Enemy == first));
-        Assert.Equal(2, hits.Count(h => h.Enemy == second));
-        Assert.Equal(3, hits.Count(h => h.Enemy == tough));   // the rest go to the one left
+        Assert.Equal(1, hits.Count(h => h.Enemy == tough));   // the one left over goes to the next
         Assert.False(first.IsAlive);
-        Assert.False(second.IsAlive);
     }
 
     [Fact]
@@ -270,7 +261,7 @@ public class FrostBarrageTests
 
         MageTesting.Cast(barrage, stats, field, 1f, canCast: false);
 
-        Assert.Equal(6, barrage.Queued);
+        Assert.Equal(MageStats.BaseProjectiles - 1, barrage.Queued);
     }
 
     [Fact]

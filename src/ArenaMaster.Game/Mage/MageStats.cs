@@ -17,7 +17,7 @@ internal sealed class MageStats
     /// The Frost Barrage: how many bolts, the moment between one leaving the staff and the next, seconds from one barrage to the next, each bolt's damage and speed,
     /// how far a bolt flies before it melts, and how far away the barrage looks for enemies to aim at.
     /// </summary>
-    public const int BaseProjectiles = 7;
+    public const int BaseProjectiles = 3;
     public const float BoltStagger = 0.07f;
     public const float BaseBarrageInterval = 1.8f;
     public const float BaseBoltDamage = 15f;

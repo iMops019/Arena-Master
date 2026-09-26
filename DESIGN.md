@@ -107,7 +107,7 @@ The user's brief: a Mage whose first tree is **Frost**. Its attack is **Frost Ba
 
 Everything below the brief is a first pass **(draft)**.
 
-- **Frost Barrage** (`Mage/FrostBarrage.cs`): every 1.8 s, while an enemy is within 22 m, 7 bolts leave the staff 0.07 s apart. Each fans out, a little upward, then curves onto its target (flying straight in for the last 3 m, so it never circles). 15 damage each (5% crit, x2), 24 m/s, 30 m of flight. A stun holds the barrage, bolts not yet away included.
+- **Frost Barrage** (`Mage/FrostBarrage.cs`): every 1.8 s, while an enemy is within 22 m, 3 bolts leave the staff 0.07 s apart (7 in the brief; the user cut it to 3 after the first build). Each fans out, a little upward, then curves onto its target (flying straight in for the last 3 m, so it never circles). 15 damage each (5% crit, x2), 24 m/s, 30 m of flight. A stun holds the barrage, bolts not yet away included.
   - **Targeting:** each bolt goes for the best target in range (in front of the camera first, then nearest) that the bolts already flying at it won't kill. So a volley kills what it hits and then spreads out, instead of grazing seven enemies and killing none. The first simulation showed the one-bolt-each version dying in seconds.
 - **Cold:** every frost hit chills: 1.5 s, walking 20% slower (chill capped at 70%). A frozen enemy stands still, can't claw, and holds any attack it was winding up; it shows pale. Bosses can't be frozen.
 - **Base numbers:** 90 max health (the most fragile class), 7 m/s, 3 m pickup.

@@ -51,7 +51,7 @@ internal sealed class MageClass : IHeroClass
     public string Name => "Mage";
 
     public string Summary =>
-        "A staff of ice. Frost Barrage sends seven bolts off the staff one after another, each seeking out an enemy, and the cold slows what it hits. Fragile, but quick to blink away.";
+        "A staff of ice. Frost Barrage sends three bolts off the staff one after another, each seeking out an enemy, and the cold slows what it hits. Fragile, but quick to blink away.";
 
     public TreeDefinition Tree => FrostTree.Tree;
 
