@@ -31,6 +31,7 @@ public sealed partial class ArenaMasterContent
     private readonly RunDirector _director = new();
     private readonly EnemyField _enemies;
     private readonly EnemyView _enemyView = new();
+    private readonly MonsterRush _rush = new(new Random());
     private readonly XpGemField _gems = new();
     private readonly XpGemView _gemView = new();
     private readonly DamageNumbers _numbers = new();
@@ -100,6 +101,7 @@ public sealed partial class ArenaMasterContent
         _pendingLevels = 0;
         _enemies.ResetKills();
         _director.Reset();
+        _rush.Reset();
         _itemToasts.Clear();
         _itemToastLeft = 0f;
         _runSeconds = 0f;
@@ -145,6 +147,14 @@ public sealed partial class ArenaMasterContent
         {
             FollowOrders(_director.Update(_runSeconds, _enemies), window.PlayerFeet, groundAt);
         }
+
+        // The Monster Rush, on top of whichever director set the numbers: not in a Boss node's arena, and not while a boss is on the field.
+        if (_rush.Update(deltaSeconds, allowed: _plan.Kind != Delve.RunKind.Arena && _enemies.Boss is null))
+        {
+            Announce("MONSTER RUSH!  Hold out for 30 seconds");
+        }
+
+        _rush.Apply(_enemies);
 
         // The class attacks; the enemies move and strike (against the block chance and damage cut as they stand this frame); the class answers their blows.
         bool standingStill = window.PlayerMoveDirection == Vector3D<float>.Zero && _hero.DashVelocity == Vector3D<float>.Zero && _condition.Knockback == Vector3D<float>.Zero;
@@ -459,6 +469,12 @@ public sealed partial class ArenaMasterContent
         if (Pressed(window, Key.F7))
         {
             SpawnBoss(window.PlayerFeet, groundAt, final: false);
+        }
+
+        if (Pressed(window, Key.F9) && !_rush.Active)
+        {
+            _rush.Start();
+            Announce("MONSTER RUSH!  Hold out for 30 seconds");
         }
     }
 

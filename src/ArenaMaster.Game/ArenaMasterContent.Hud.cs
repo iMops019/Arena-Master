@@ -96,6 +96,14 @@ public sealed partial class ArenaMasterContent
         }
         hud.Text(HudAnchor.TopRight, new Vector2D<float>(-26f, 32f), $"Kills  {_enemies.Kills}", White, 0.9f);
 
+        // A Monster Rush's countdown, under the clock (under the boss's bar, if one turned up during it).
+        if (_rush.Active)
+        {
+            float pulse = 0.75f + 0.25f * MathF.Abs(MathF.Sin(_rush.Left * 4f));
+            hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, _enemies.Boss is null ? 64f : 112f), $"MONSTER RUSH  {MathF.Ceiling(_rush.Left)}s",
+                new Vector4D<float>(Red.X, Red.Y, Red.Z, pulse), 0.95f);
+        }
+
         // The boss's health, under the clock, while one is on the field.
         if (_enemies.Boss is { } boss)
         {
