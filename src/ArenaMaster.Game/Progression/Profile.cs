@@ -48,6 +48,9 @@ internal sealed class Profile
     /// <summary>Lifetime totals the bounties read, kept across runs.</summary>
     public LifetimeRecord Lifetime { get; set; } = new();
 
+    /// <summary>Everything else the stats page shows: totals, bests, kills by kind, and each class's record.</summary>
+    public StatsRecord Stats { get; set; } = new();
+
     /// <summary>Where the player has got to in the Delve: the deepest floor open, the nodes cleared, and Delve Marks.</summary>
     public Delve.DelveSave Delve { get; set; } = new();
 

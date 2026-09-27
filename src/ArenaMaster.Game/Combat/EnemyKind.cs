@@ -348,6 +348,12 @@ internal sealed record EnemyKind(
                 Damage: 0f, Reach: 8f),
         },
     };
+
+    /// <summary>Every creature the player can meet (not the crate), fodder first, then elites and bosses: the stats page's bestiary. After them all, so they are set.</summary>
+    public static readonly IReadOnlyList<EnemyKind> Foes = new[]
+    {
+        Ghoul, CrossbowGhoul, GhoulMage, BeastRider, GhoulTactician, GhoulBeast, Brute, HollowKing, DelveBosses.HollowKingUnbound,
+    };
 }
 
 /// <summary>The Delve boss: the Hollow King unbound, fought alone in the arena of a Boss node. Long, and in three stages.</summary>

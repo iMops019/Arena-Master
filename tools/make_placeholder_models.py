@@ -61,6 +61,8 @@
                           a pole, an iron brazier (the engine's fire burns on it), a straw bale, a training dummy, a well, a supply cart,
                           a cooking fire with a pot, a bedroll, a lantern post, and grain sacks
   camp_armorstand.glb     the gear station: an armour stand wearing mail and an orange tabard, a helm on top, a sword and shield by it
+  camp_lectern.glb        the ledger station (the stats page): a wooden lectern with a thick open ledger and a quill, a candle, and a
+                          stack of old books at its foot
   fire_nova.glb           a flat ring of bright fire of radius 1, scaled as the Emberbrand's nova spreads (gear, any class)
   delve_cache.glb         the chest a Delve boss leaves: black and iron-bound, with a burning-orange seal and trim, on a stone slab
   camp_quartermaster.glb  the quartermaster behind the stall, skinned (8 joints) with a looping 6 s "Idle" clip: he breathes, shifts his
@@ -1280,6 +1282,31 @@ def build_armour_stand():
     return m
 
 
+def build_lectern():
+    """The ledger station: a lectern 1.25 m tall with a thick ledger lying open on its top, a quill in an inkpot and a candle by it, and a
+    stack of old ledgers at its foot. The reader stands at its front (+Z)."""
+    m = Mesh()
+    m.box(-0.35, 0.0, -0.3, 0.35, 0.08, 0.3, "chest_wood")                 # the foot
+    m.box(-0.08, 0.08, -0.08, 0.08, 1.0, 0.08, "wood")                     # the post
+    m.box(-0.36, 0.98, -0.28, 0.36, 1.17, 0.26, "chest_wood")              # the top
+    m.box(-0.38, 1.0, 0.26, 0.38, 1.21, 0.3, "chest_dark")                 # a lip along its front edge
+    m.box(-0.3, 1.17, -0.22, 0.3, 1.2, 0.24, "leather")                    # the ledger's covers
+    m.box(-0.28, 1.2, -0.2, -0.01, 1.24, 0.22, "target_white")             # its open pages
+    m.box(0.01, 1.2, -0.2, 0.28, 1.24, 0.22, "target_white")
+    for z in (-0.12, -0.04, 0.04, 0.12):                                   # lines written on them
+        m.box(-0.24, 1.24, z, -0.05, 1.245, z + 0.015, "dark")
+        m.box(0.05, 1.24, z, 0.22, 1.245, z + 0.015, "dark")
+    m.box(-0.01, 1.2, -0.2, 0.01, 1.26, 0.22, "target_red")                # the ribbon down the middle
+    m.prism(0.3, -0.24, 0.045, 1.2, 1.26, "dark", sides=8, top="dark")     # the inkpot, at the back corner
+    m.box(0.29, 1.26, -0.25, 0.31, 1.46, -0.23, "fletching")               # its quill
+    m.prism(-0.31, -0.23, 0.035, 1.2, 1.34, "canvas", sides=8, top="canvas")   # a candle, the other corner
+    m.box(-0.32, 1.34, -0.24, -0.3, 1.4, -0.22, "holy_light")
+    for i, (w, colour) in enumerate(((0.26, "leather"), (0.23, "chest_dark"), (0.24, "king_robe"))):   # the old ledgers stacked at its foot
+        y0 = 0.08 + i * 0.07
+        m.box(0.42, y0, 0.05 - w / 2 + i * 0.02, 0.42 + 0.32, y0 + 0.065, 0.05 + w / 2 + i * 0.02, colour)
+    return m
+
+
 def png_bytes():
     width, height = SWATCH * len(COLOURS), SWATCH
     row = b"".join(bytes(PALETTE[c]) * SWATCH for c in COLOURS)
@@ -1467,6 +1494,7 @@ if __name__ == "__main__":
                         ("camp_dummy.glb", build_dummy), ("camp_well.glb", build_well), ("camp_cart.glb", build_cart),
                         ("camp_cookpot.glb", build_cookpot), ("camp_bedroll.glb", build_bedroll), ("camp_lantern.glb", build_lantern),
                         ("camp_sacks.glb", build_sacks), ("camp_armorstand.glb", build_armour_stand),
+                        ("camp_lectern.glb", build_lectern),
                         ("delve_cache.glb", build_delve_cache), ("fire_nova.glb", lambda: build_ring(0.82, 1.0, "fire_light")), ):
         mesh = build()
         write_glb(mesh, MODELS / name)

@@ -7,7 +7,7 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game;
 
 // Camp: walking up to a station and pressing E opens its screen - the item chest, the passive tree, the class rack, the bounty board, the quartermaster, the
-// armour stand's gear, or the Delve chart at the departure gate, which leads through the loadout to a run: a Delve node, or a classic run.
+// armour stand's gear, the ledger's stats, or the Delve chart at the departure gate, which leads through the loadout to a run: a Delve node, or a classic run.
 // A screen pauses the world (the engine's GamePaused) and frees the cursor until it is closed.
 // Camp is walled in and dressed, with the quartermaster idling behind his stall; the trip to a run and back goes through a fade to black (Travel).
 public sealed partial class ArenaMasterContent
@@ -21,6 +21,7 @@ public sealed partial class ArenaMasterContent
     private readonly ClassScreen _classScreen = new();
     private readonly DelveChartScreen _delveScreen = new();
     private readonly GearScreen _gearScreen = new();
+    private readonly StatsScreen _statsScreen = new();
 
     /// <summary>The run chosen on the Delve chart, waiting on the loadout screen.</summary>
     private Delve.RunPlan _nextPlan = Delve.RunPlan.Classic;
@@ -78,6 +79,9 @@ public sealed partial class ArenaMasterContent
                 break;
             case CampStation.Classes:
                 _classScreen.Open();
+                break;
+            case CampStation.Ledger:
+                _statsScreen.Open();
                 break;
         }
 
@@ -160,6 +164,16 @@ public sealed partial class ArenaMasterContent
             return true;
         }
 
+        if (_statsScreen.IsOpen)
+        {
+            if (_statsScreen.Draw(_profile, _classes))
+            {
+                CloseScreen(window);
+            }
+
+            return true;
+        }
+
         if (_gearScreen.IsOpen)
         {
             bool closed = _gearScreen.Draw(_profile);
@@ -235,6 +249,7 @@ public sealed partial class ArenaMasterContent
         _classScreen.Close();
         _delveScreen.Close();
         _gearScreen.Close();
+        _statsScreen.Close();
     }
 
     private void CloseScreen(EngineWindow window)

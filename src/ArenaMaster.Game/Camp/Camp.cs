@@ -26,11 +26,14 @@ internal enum CampStation
 
     /// <summary>The armour stand: the gear, and what is worn.</summary>
     Gear,
+
+    /// <summary>The lectern with the camp ledger: the player's stats over every run.</summary>
+    Ledger,
 }
 
 /// <summary>
 /// Where camp is and what is in it: a clearing of packed earth in a corner of the map (painted with the engine's bed colour, which keeps trees and plants off it),
-/// walled in by a palisade (<see cref="CampWalls"/>) with the departure gate set in it, a fire in the middle, the six stations, the quartermaster behind his stall,
+/// walled in by a palisade (<see cref="CampWalls"/>) with the departure gate set in it, a fire in the middle, the stations, the quartermaster behind his stall,
 /// and the camp's dressing (<see cref="Decor"/>). Low hills ring it outside the wall, so it sits in a hollow of its own. Runs are played around the middle of the
 /// map, far off: travelling between the two goes through a fade to black (<c>Ui/ScreenFade</c>), so camp reads as its own small place.
 /// </summary>
@@ -62,6 +65,7 @@ internal static class CampLayout
         (CampStation.Quartermaster, "camp_stall.glb", new(-9.5f, -3f), "Visit the quartermaster"),
         (CampStation.Classes, "camp_rack.glb", new(4f, -10f), "Choose your class"),
         (CampStation.Gear, "camp_armorstand.glb", new(-4.5f, 8.5f), "Wear your gear"),
+        (CampStation.Ledger, "camp_lectern.glb", new(4.5f, 8.5f), "Read the ledger: your records"),
     };
 
     /// <summary>

@@ -48,6 +48,9 @@ internal sealed class PlayerHealth
 
     public float ShieldMax { get; set; }
 
+    /// <summary>All the health blows have taken off, ever (not what the shields held): a running total that nothing resets, for the stats page.</summary>
+    public double HealthLost { get; private set; }
+
     /// <summary>
     /// Takes <paramref name="amount"/> off (the <see cref="Barrier"/> first) unless the player is dead or still in the grace after the last hit. True if it landed, even
     /// if the barrier held all of it.
@@ -72,6 +75,7 @@ internal sealed class PlayerHealth
             return true;   // the shields took it all: no flash
         }
 
+        HealthLost += MathF.Min(Current, damage);
         Current = MathF.Max(0f, Current - damage);
         if (Current <= 0f && LastStands > 0)
         {

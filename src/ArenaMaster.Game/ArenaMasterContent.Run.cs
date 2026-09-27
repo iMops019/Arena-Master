@@ -59,6 +59,10 @@ public sealed partial class ArenaMasterContent
     private int _elitesKilled;
     private int _bossesKilled;
 
+    /// <summary>What this run counts for the stats page, and the player's lifetime health lost as it set out.</summary>
+    private readonly RunTally _tally = new();
+    private double _healthLostBefore;
+
     private string _announcement = "";
     private float _announcementLeft;
 
@@ -112,6 +116,8 @@ public sealed partial class ArenaMasterContent
         _banishesLeft = Shop.BanishesPerRun(_profile);
         _elitesKilled = 0;
         _bossesKilled = 0;
+        _tally.Begin();
+        _healthLostBefore = _health.HealthLost;
 
         DismissQuartermaster(window);
         _mode = GameMode.Run;
@@ -152,6 +158,7 @@ public sealed partial class ArenaMasterContent
         if (_rush.Update(deltaSeconds, allowed: _plan.Kind != Delve.RunKind.Arena && _enemies.Boss is null))
         {
             Announce("MONSTER RUSH!  Hold out for 30 seconds");
+            _tally.Rushes++;
         }
 
         _rush.Apply(_enemies);
@@ -165,6 +172,11 @@ public sealed partial class ArenaMasterContent
         _health.DamageTaken = _hero.DamageTaken * Armour.Cut(ArmourNow);
         var player = new PlayerTarget(window.PlayerFeet, window.PlayerGrounded, _health, _condition, _hero.BlockChance, LookingWay(window));
         var gone = _enemies.Update(deltaSeconds, player, groundAt);
+        foreach (var strike in _enemies.Strikes)
+        {
+            _tally.Struck(strike);
+        }
+
         foreach (var legendary in _enemies.TakeLegendarySpawns())
         {
             Announce($"A {legendary.Name} approaches!");
@@ -241,6 +253,14 @@ public sealed partial class ArenaMasterContent
         long silver = (long)MathF.Round(RunRewards.Silver(record) * (1f + carried.SilverGain) * carried.SilverMultiplier) + _runSilver;   // and what crates gave
         _profile.Silver += silver;
         var bounties = Bounties.Settle(record, _profile, _tree);
+        _tally.Slain = ending == RunEnding.Slain;
+        _tally.Returned = ending == RunEnding.ReturnedToCamp;
+        _tally.DamageDealt = _enemies.DamageDealt;
+        _tally.HealthLost = (float)(_health.HealthLost - _healthLostBefore);
+        _tally.Silver = silver + (delve?.CacheSilver ?? 0) + bounties.Sum(b => b.Silver);
+        _tally.ItemsFound = _items.Found.Count;
+        _tally.GearFound = delve?.Gear is null ? 0 : 1;
+        _profile.Stats.Settle(record, _tally);
         SaveProfile();
 
         _summaryScreen.Open(new RunSummary(ending, _runSeconds, _experience.Level, _enemies.Kills, _items.Found.ToList(),
@@ -283,8 +303,11 @@ public sealed partial class ArenaMasterContent
         if (killed.Kind.IsProp)
         {
             OnCrateBroken(killed);   // a crate: its pickup, not a kill
+            _tally.CratesBroken++;
             return;
         }
+
+        _tally.Kill(killed.Kind, killed.Rarity.Rarity);
 
         _gems.Drop(killed.Position, killed.Experience);
         _health.Heal(_items.Carried.Bonuses.HealOnKill);
@@ -487,6 +510,7 @@ public sealed partial class ArenaMasterContent
         if (action.Reroll && _rerollsLeft > 0)
         {
             _rerollsLeft--;
+            _tally.Rerolls++;
             _levelUp.Refresh(_hero.RollLevelUp(_random), _rerollsLeft, _banishesLeft);
             return;
         }
@@ -494,6 +518,7 @@ public sealed partial class ArenaMasterContent
         if (action.Banish is { } index && _banishesLeft > 0)
         {
             _banishesLeft--;
+            _tally.Banishes++;
             _levelUp.Refresh(_hero.BanishCard(index, _random), _rerollsLeft, _banishesLeft);
             return;
         }
