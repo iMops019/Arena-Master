@@ -30,8 +30,11 @@ internal sealed class DelveDirector
     /// <summary>Whether the King comes at 10:00 (false for a Descent).</summary>
     public bool King { get; }
 
-    /// <summary>How far along the classic run's curves (in its minutes) this floor's swarm is at the boss: 10:00 on the first floor, 1.5 minutes more each floor, 28:00 at most.</summary>
-    public static float PeakMinutes(int depth) => MathF.Min(20f, 10f + 1f * (Math.Max(1, depth) - 1));
+    /// <summary>
+    /// How far along the classic run's curves (in its minutes) this floor's swarm is at the boss: 10:00 on the first floor, half a minute more each floor, 20:00 at
+    /// most (a minute a floor until 2026-09-27, when depth 8 had about 135 monsters at the King).
+    /// </summary>
+    public static float PeakMinutes(int depth) => MathF.Min(20f, 10f + 0.5f * (Math.Max(1, depth) - 1));
 
     /// <summary>The classic run's clock that <paramref name="seconds"/> into this run matches: running quicker, and holding once the boss is due.</summary>
     public float ClassicSeconds(float seconds) => MathF.Min(seconds, BossAt) / BossAt * PeakMinutes(Depth) * 60f;

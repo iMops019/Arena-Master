@@ -89,6 +89,9 @@ internal sealed class QuartermasterScreen : GameScreen
     /// <summary>Set when something is bought, so the caller knows to save.</summary>
     public bool Changed { get; set; }
 
+    /// <summary>Set when the player asked to sell gear: the stall has closed, and the caller opens the <see cref="GearSaleScreen"/>.</summary>
+    public bool WantsSale { get; set; }
+
     /// <summary>Draws the stall: the upgrades, and the Battle Elixirs under them (the active class's tree at <paramref name="treeLevel"/>). Returns true when the player closes it.</summary>
     public bool Draw(Profile profile, int treeLevel)
     {
@@ -157,13 +160,19 @@ internal sealed class QuartermasterScreen : GameScreen
         ImGui.SetCursorScreenPos(origin + new Vector2(0f, count * (cardHeight + gap) + elixirBlock + 4f * scale));
         var start = ImGui.GetCursorScreenPos();
         float closeWidth = 150f * scale;
-        UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.3f), "Silver comes at the end of every run: kills, elites, bosses, time survived, and a bonus for a win.",
-            UiTheme.Muted, 0.8f, width - closeWidth - 20f * scale);
+        float sellWidth = 170f * scale;
+        if (UiTheme.Button("Sell gear", new Vector2(sellWidth, buttonHeight)))
+        {
+            WantsSale = true;
+        }
+
+        UiTheme.Text(start + new Vector2(sellWidth + 16f * scale, buttonHeight * 0.3f), "Silver comes at the end of every run, and from selling spare gear.",
+            UiTheme.Muted, 0.8f, width - closeWidth - sellWidth - 36f * scale);
         ImGui.SetCursorScreenPos(start + new Vector2(width - closeWidth, 0f));
         bool close = UiTheme.Button("Close  [E]", new Vector2(closeWidth, buttonHeight));
         UiTheme.EndScreen();
 
-        if (close || ClosedByKey(ImGuiKey.E))
+        if (close || WantsSale || ClosedByKey(ImGuiKey.E))
         {
             Close();
             return true;

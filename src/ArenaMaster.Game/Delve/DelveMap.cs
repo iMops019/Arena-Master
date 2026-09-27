@@ -9,9 +9,6 @@ internal enum DelveNodeKind
     /// <summary>A heavy purse of silver.</summary>
     Currency,
 
-    /// <summary>A chance at a piece of gear (see <see cref="DelveRules.ArmouryGearChance"/>), besides the cache's silver.</summary>
-    Armoury,
-
     /// <summary>Experience for the active passive tree.</summary>
     Knowledge,
 
@@ -20,9 +17,6 @@ internal enum DelveNodeKind
 
     /// <summary>No King: hold out for 10 minutes and the cache appears. A modest purse and some tree experience. Most of a floor's nodes are these.</summary>
     Descent,
-
-    /// <summary>A fight with the Hollow King Unbound in the arena, for Delve Marks, an item, silver and a chance at gear. Every <see cref="DelveMap.BossEvery"/>th floor.</summary>
-    Boss,
 }
 
 /// <summary>
@@ -33,54 +27,41 @@ internal sealed record DelveNode(int Depth, int Slot, DelveNodeKind Kind)
 {
     public string Id => $"{Depth}-{Slot}";
 
-    public bool IsBoss => Kind == DelveNodeKind.Boss;
-
-    /// <summary>Whether its run ends with the Hollow King at 10:00 (every run node but a Descent).</summary>
-    public bool HasKing => Kind != DelveNodeKind.Descent && !IsBoss;
+    /// <summary>Whether its run ends with the Hollow King at 10:00 (every node but a Descent).</summary>
+    public bool HasKing => Kind != DelveNodeKind.Descent;
 
     public string Name => DelveMap.NameOf(Kind);
 }
 
 /// <summary>
-/// The Delve's chart: every floor down from depth 1, each with <see cref="NodesPerFloor"/> nodes - some Descents (no King) and some King nodes of different kinds -
-/// and on every <see cref="BossEvery"/>th floor one more, the Boss node. A floor is the same every time it is asked for (seeded by its depth), so the chart doesn't reshuffle between visits. Pure.
+/// The Delve's chart: every floor down from depth 1, each with <see cref="NodesPerFloor"/> nodes - some Descents (no King) and some King nodes of different kinds.
+/// A floor is the same every time it is asked for (seeded by its depth), so the chart doesn't reshuffle between visits. The Delve is for going down; gear comes
+/// from the boss hunt (<see cref="BossHunt"/>), a fight of its own. Pure.
 /// </summary>
 internal static class DelveMap
 {
     public const int NodesPerFloor = 5;
-    public const int BossEvery = 5;
 
     /// <summary>How many of a floor's nodes have a King: this many or one more, the rest Descents.</summary>
     public const int FewestKingNodes = 2;
 
-    /// <summary>The first floor with Armoury nodes: the first boss tier's floors have none, so gear is something found deeper down.</summary>
-    public const int ArmouryFrom = BossEvery + 1;
-
     /// <summary>The kinds of node with a King at the end. A floor never has two of the same.</summary>
-    private static readonly DelveNodeKind[] KingKinds = { DelveNodeKind.Currency, DelveNodeKind.Armoury, DelveNodeKind.Knowledge, DelveNodeKind.Relic };
-
-    public static bool IsBossFloor(int depth) => depth % BossEvery == 0;
+    private static readonly DelveNodeKind[] KingKinds = { DelveNodeKind.Currency, DelveNodeKind.Knowledge, DelveNodeKind.Relic };
 
     /// <summary>
-    /// The nodes of floor <paramref name="depth"/> (1 and down): <see cref="NodesPerFloor"/> run nodes, 2 or 3 with a King (of different kinds, no Armoury before
-    /// <see cref="ArmouryFrom"/>) and the rest Descents, mixed along the row. Picked the same way every time for the same depth. On a boss floor, the Boss node after them.
+    /// The nodes of floor <paramref name="depth"/> (1 and down): <see cref="NodesPerFloor"/> run nodes, 2 or 3 with a King (of different kinds) and the rest
+    /// Descents, mixed along the row. Picked the same way every time for the same depth.
     /// </summary>
     public static IReadOnlyList<DelveNode> Floor(int depth)
     {
         var random = new Random(depth * 7919 + 17);
         int kings = FewestKingNodes + random.Next(2);
-        var kinds = KingKinds.Where(k => depth >= ArmouryFrom || k != DelveNodeKind.Armoury).OrderBy(_ => random.Next()).Take(kings)
+        var kinds = KingKinds.OrderBy(_ => random.Next()).Take(kings)
             .Concat(Enumerable.Repeat(DelveNodeKind.Descent, NodesPerFloor))
             .Take(NodesPerFloor)
             .OrderBy(_ => random.Next())
             .ToList();
-        var nodes = kinds.Select((kind, slot) => new DelveNode(depth, slot, kind)).ToList();
-        if (IsBossFloor(depth))
-        {
-            nodes.Add(new DelveNode(depth, NodesPerFloor, DelveNodeKind.Boss));
-        }
-
-        return nodes;
+        return kinds.Select((kind, slot) => new DelveNode(depth, slot, kind)).ToList();
     }
 
     /// <summary>The node with <paramref name="id"/> ("depth-slot"), or null if there is none.</summary>
@@ -98,21 +79,17 @@ internal static class DelveMap
     public static string NameOf(DelveNodeKind kind) => kind switch
     {
         DelveNodeKind.Currency => "Currency Delve",
-        DelveNodeKind.Armoury => "Armoury Delve",
         DelveNodeKind.Knowledge => "Knowledge Delve",
         DelveNodeKind.Relic => "Relic Delve",
-        DelveNodeKind.Descent => "Descent",
-        _ => "Delve Boss",
+        _ => "Descent",
     };
 
     public static string RewardOf(DelveNodeKind kind) => kind switch
     {
         DelveNodeKind.Currency => "A heavy purse of silver in the cache.",
-        DelveNodeKind.Armoury => "A chance at a piece of gear (any piece, even one you have), and silver either way.",
         DelveNodeKind.Knowledge => "A large sum of experience for your active passive tree.",
         DelveNodeKind.Relic => "An item, rare or better.",
-        DelveNodeKind.Descent => "No King: hold out for 10 minutes and the cache appears. A modest purse of silver and some tree experience.",
-        _ => "Delve Marks, an epic or better item, silver, and a good chance at a piece of gear. The Hollow King Unbound waits in the arena: no swarm, just the two of you.",
+        _ => "No King: hold out for 10 minutes and the cache appears. A modest purse of silver and some tree experience.",
     };
 }
 
@@ -125,18 +102,18 @@ internal sealed class DelveSave
     /// <summary>The ids of the nodes cleared. A cleared node is done; the floor's others stay open.</summary>
     public List<string> Cleared { get; set; } = new();
 
-    /// <summary>Delve Marks: the currency only Delve bosses give.</summary>
+    /// <summary>Delve Marks: the currency only the boss hunt gives.</summary>
     public long Marks { get; set; }
 
+    /// <summary>How many times the Hollow King Unbound has been slain (on a boss hunt; before those, on the old Boss nodes).</summary>
     public int BossesSlain { get; set; }
 
     /// <summary>Node kind -> how many of that kind have been cleared.</summary>
     public Dictionary<string, int> ClearedByKind { get; set; } = new();
 }
 
-/// <summary>What clearing a node pays: <paramref name="Items"/> items rolled at <paramref name="ItemOdds"/>. <paramref name="GearChance"/> is the chance (0 to 1) the
-/// cache also holds a piece of gear: never a sure thing, so gear stays a hunt.</summary>
-internal sealed record DelveReward(long Silver, long TreeExperience, int Items, float GearChance, long Marks, RarityWeights ItemOdds = default);
+/// <summary>What clearing a node pays: <paramref name="Items"/> items rolled at <paramref name="ItemOdds"/>.</summary>
+internal sealed record DelveReward(long Silver, long TreeExperience, int Items, RarityWeights ItemOdds = default);
 
 /// <summary>The Delve's rules: which floors and nodes are open, what clearing one does, how hard a floor is and what it pays. Pure.</summary>
 internal static class DelveRules
@@ -157,33 +134,16 @@ internal static class DelveRules
         }
 
         save.Deepest = Math.Max(save.Deepest, node.Depth + 1);
-        if (node.IsBoss)
-        {
-            save.BossesSlain++;
-        }
     }
 
-    /// <summary>The chance an Armoury node's cache holds a piece of gear, and a Boss node's.</summary>
-    public const float ArmouryGearChance = 0.30f;
-    public const float BossGearChance = 0.40f;
+    /// <summary>
+    /// What everything on floor <paramref name="depth"/> has its health multiplied by, on top of the run's own ramp: +8% a floor (+15% until 2026-09-27, when the
+    /// user found depth 8 and past a wall).
+    /// </summary>
+    public static float HealthMultiplier(int depth) => 1f + 0.08f * (Math.Max(1, depth) - 1);
 
-    /// <summary>Whether this cache holds gear: a roll against <paramref name="reward"/>'s chance.</summary>
-    public static bool RollsGear(DelveReward reward, Random random) => reward.GearChance > 0f && random.NextDouble() < reward.GearChance;
-
-    /// <summary>The boss tier of a floor: 1 for depths 1-5, 2 for 6-10, and so on.</summary>
-    public static int Tier(int depth) => (Math.Max(1, depth) - 1) / DelveMap.BossEvery + 1;
-
-    /// <summary>What everything on floor <paramref name="depth"/> has its health multiplied by, on top of the run's own ramp.</summary>
-    public static float HealthMultiplier(int depth) => 1f + 0.15f * (Math.Max(1, depth) - 1);
-
-    /// <summary>What everything on floor <paramref name="depth"/> has its damage multiplied by, on top of the run's own ramp.</summary>
-    public static float DamageMultiplier(int depth) => 1f + 0.06f * (Math.Max(1, depth) - 1);
-
-    /// <summary>The level the player starts a Boss node's fight at (picking every level's upgrade first): 15 at depth 5, 2 more each boss floor after.</summary>
-    public static int ArenaLevel(int depth) => 15 + 2 * (Tier(depth) - 1);
-
-    /// <summary>The Hollow King Unbound's health on floor <paramref name="depth"/>.</summary>
-    public static float ArenaBossHealth(int depth) => Combat.DelveBosses.HollowKingUnbound.MaxHealth * HealthMultiplier(depth);
+    /// <summary>What everything on floor <paramref name="depth"/> has its damage multiplied by, on top of the run's own ramp: +4% a floor (was +6%).</summary>
+    public static float DamageMultiplier(int depth) => 1f + 0.04f * (Math.Max(1, depth) - 1);
 
     /// <summary>What clearing <paramref name="node"/> pays. Deeper pays more.</summary>
     public static DelveReward Reward(DelveNode node)
@@ -192,12 +152,43 @@ internal static class DelveRules
         long silver = 80 + 30 * depth;
         return node.Kind switch
         {
-            DelveNodeKind.Currency => new DelveReward(silver * 4, 0, 0, 0f, 0),
-            DelveNodeKind.Armoury => new DelveReward(silver * 2, 0, 0, ArmouryGearChance, 0),
-            DelveNodeKind.Knowledge => new DelveReward(silver, 1000 + 250L * depth, 0, 0f, 0),
-            DelveNodeKind.Relic => new DelveReward(silver, 0, 1, 0f, 0, RarityWeights.Elite),
-            DelveNodeKind.Descent => new DelveReward(silver, 400 + 100L * depth, 0, 0f, 0),
-            _ => new DelveReward(silver * 3, 0, 1, BossGearChance, 1 + Tier(depth), RarityWeights.Boss),
+            DelveNodeKind.Currency => new DelveReward(silver * 4, 0, 0),
+            DelveNodeKind.Knowledge => new DelveReward(silver, 1000 + 250L * depth, 0),
+            DelveNodeKind.Relic => new DelveReward(silver, 0, 1, RarityWeights.Elite),
+            _ => new DelveReward(silver, 400 + 100L * depth, 0),
         };
     }
+}
+
+/// <summary>
+/// The boss hunt: the Hollow King Unbound alone in his arena, a fight of its own, taken from the departure gate as often as the player likes - the way to hunt for
+/// gear (the user's call, 2026-09-27: finding gear in Armoury and Boss nodes deep in the Delve was too rare and too hard). Always the same fight, for now; tiers of
+/// it, and more bosses with their own chase gear, are for later. Pure.
+/// </summary>
+internal static class BossHunt
+{
+    /// <summary>The chance a kill's cache holds a piece of gear: pure luck, every kill its own roll.</summary>
+    public const float GearChance = 0.20f;
+
+    /// <summary>The chance a kill's cache holds an item, at a boss chest's odds.</summary>
+    public const float ItemChance = 0.10f;
+
+    public const long Silver = 150;
+    public const long Marks = 1;
+
+    /// <summary>The level the player starts the fight at, every level's upgrade picked first.</summary>
+    public const int StartLevel = 16;
+
+    /// <summary>How much tougher than his base numbers the King is on a hunt: 45,500 health (the old depth-5 Boss node's was 41,600) and hitting 30% harder.</summary>
+    public static readonly Combat.EnemyScaling Scaling = new(1.75f, 1.3f, 1f);
+
+    /// <summary>The Delve band whose sky and weather the arena has (the Amber Hollows).</summary>
+    public const int LookDepth = 5;
+
+    public static float BossHealth => Combat.DelveBosses.HollowKingUnbound.MaxHealth * Scaling.Health;
+
+    /// <summary>Whether this kill's cache holds gear.</summary>
+    public static bool RollsGear(Random random) => random.NextDouble() < GearChance;
+
+    public static bool RollsItem(Random random) => random.NextDouble() < ItemChance;
 }

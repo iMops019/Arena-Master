@@ -152,7 +152,7 @@ internal sealed class StatsScreen : GameScreen
         {
             new("Silver earned", $"{stats.SilverEarned:N0}", $"{profile.Silver:N0} in hand"),
             new("Items found", $"{stats.ItemsFound:N0}", $"{kinds} of {ItemCatalog.All.Count} kinds owned"),
-            new("Gear found", $"{stats.GearFound:N0}", $"{profile.Gear.Owned.Count} of {Gear.GearCatalog.All.Count} pieces owned"),
+            new("Gear found", $"{stats.GearFound:N0}", $"{Gear.GearCatalog.PiecesFound(profile)} of {Gear.GearCatalog.All.Count} pieces owned"),
             new("Bounties done", $"{profile.Bounties.Count} of {Bounties.All.Count}"),
             new("Crates broken", $"{stats.CratesBroken:N0}"),
             new("Monster Rushes", $"{stats.Rushes:N0}", "lived through or not"),
@@ -275,8 +275,14 @@ internal sealed class StatsScreen : GameScreen
             new("Deepest floor open", $"{delve.Deepest}", "", true),
             new("Nodes cleared", $"{delve.Cleared.Count:N0}", "", true),
             new("Delve runs", $"{stats.DelveRuns:N0}", "", true),
-            new("Hollow King Unbound", $"{delve.BossesSlain:N0}", "times slain", true),
-            new("Fastest clear", stats.FastestDelveClear > 0f ? Clock(stats.FastestDelveClear) : "-"),
+            new("Fastest clear", stats.FastestDelveClear > 0f ? Clock(stats.FastestDelveClear) : "-", "", true),
+        });
+
+        Tiles("The boss hunt", width, new Tile[]
+        {
+            new("Hunts", $"{stats.BossHunts:N0}"),
+            new("Hollow King Unbound", $"{delve.BossesSlain:N0}", "times slain"),
+            new("Fastest kill", stats.FastestBossKill > 0f ? Clock(stats.FastestBossKill) : "-"),
             new("Delve Marks", $"{delve.Marks:N0}", "held"),
         });
 

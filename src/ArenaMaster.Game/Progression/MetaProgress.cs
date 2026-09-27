@@ -215,10 +215,10 @@ internal static class Bounties
         new("abyss_gazer", "Abyss Gazer", "Open Delve depth 30.", 1000, null, (_, profile, _) => profile.Delve.Deepest >= 30),
         new("delver", "Delver", "Clear 10 Delve nodes.", 125, null, (_, profile, _) => profile.Delve.Cleared.Count >= 10),
         new("veteran_delver", "Veteran Delver", "Clear 40 Delve nodes.", 400, null, (_, profile, _) => profile.Delve.Cleared.Count >= 40),
-        new("every_path", "Every Path", "Clear a Currency, Armoury, Knowledge and Relic Delve.", 200, null, (_, profile, _) =>
-            new[] { "Currency", "Armoury", "Knowledge", "Relic" }.All(k => profile.Delve.ClearedByKind.GetValueOrDefault(k) > 0)),
+        new("every_path", "Every Path", "Clear a Currency, Knowledge and Relic Delve, and a Descent.", 200, null, (_, profile, _) =>
+            new[] { "Currency", "Knowledge", "Relic", "Descent" }.All(k => profile.Delve.ClearedByKind.GetValueOrDefault(k) > 0)),
         new("swift_delve", "Swift Delve", "Clear a King's Delve node within 11 minutes.", 150, null, (run, _, _) => run.DelveCleared && !run.DelveBoss && run.BossesKilled > 0 && run.Seconds <= 660f),
-        new("unbound", "Unbound", "Defeat the Hollow King Unbound in a Boss Delve.", 250, null, (_, profile, _) => profile.Delve.BossesSlain >= 1),
+        new("unbound", "Unbound", "Defeat the Hollow King Unbound on a boss hunt.", 250, null, (_, profile, _) => profile.Delve.BossesSlain >= 1),
         new("kingbreaker", "Kingbreaker", "Defeat the Hollow King Unbound 3 times.", 600, null, (_, profile, _) => profile.Delve.BossesSlain >= 3),
         new("deep_ranger", "Ranger of the Deep", "Clear a Delve node at depth 10 or deeper as the Ranger.", 200, null,
             (run, _, _) => run.ClassId == Ranger && run.DelveCleared && run.Depth >= 10),
@@ -241,7 +241,7 @@ internal static class Bounties
         new("deep_priest", "Priest of the Deep", "Clear a Delve node at depth 10 or deeper as the Priest.", 200, "bonebound_aegis",
             (run, _, _) => run.ClassId == Priest && run.DelveCleared && run.Depth >= 10),
 
-        new("armourer", "Armourer", "Own 4 pieces of gear.", 150, null, (_, profile, _) => profile.Gear.Owned.Count >= 4),
+        new("armourer", "Armourer", "Own 4 different pieces of gear.", 150, null, (_, profile, _) => Gear.GearCatalog.PiecesFound(profile) >= 4),
         new("fully_kitted", "Fully Kitted", "Wear gear in all three slots.", 125, null, (_, profile, _) => Gear.GearCatalog.Worn(profile).Count() >= 3),
         new("armoury_complete", "The Full Armoury", "Own every piece of gear.", 750, null,
             (_, profile, _) => Gear.GearCatalog.All.All(piece => Gear.GearCatalog.Owns(profile, piece))),

@@ -94,6 +94,10 @@ public sealed partial class ArenaMasterContent
         {
             hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 82f), $"Depth {node.Depth}  ·  {node.Name}", Unique, 0.75f);
         }
+        else if (_plan.Kind == Delve.RunKind.Arena)
+        {
+            hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 82f), "Boss hunt", Unique, 0.75f);
+        }
         hud.Text(HudAnchor.TopRight, new Vector2D<float>(-26f, 32f), $"Kills  {_enemies.Kills}", White, 0.9f);
 
         // A Monster Rush's countdown, under the clock (under the boss's bar, if one turned up during it).

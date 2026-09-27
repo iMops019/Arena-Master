@@ -1215,27 +1215,87 @@ internal sealed class EnemyField
     /// <summary>How high above its landing spot a barrage's fireball starts to fall.</summary>
     public const float BarrageHeight = 16f;
 
+    /// <summary>How far apart the Line of Fire's fireballs land, and how much later each lands than the one before it.</summary>
+    public const float LineSpacing = 2.4f;
+    public const float LineStagger = 0.12f;
+
+    /// <summary>How many of the Crown of Fire's ring places are left empty, side by side: the way out.</summary>
+    public const int CrownGap = 2;
+
     /// <summary>
-    /// Calls <paramref name="attack"/>'s fireballs down from the sky: the first on the spot where the player stands, the rest scattered within its reach around it.
-    /// Each falls from high above its spot, a little aslant, at about the attack's speed - its landing marked the whole way down.
+    /// Where <paramref name="attack"/>'s fireballs land (flat x, z) and how much later than the attack's own fall each one lands, by its pattern: scattered round the
+    /// player (the first on them), a ring round them with a gap, or a row from the caster through them.
+    /// </summary>
+    public List<(float X, float Z, float Delay)> BarrageSpots(Vector3D<float> caster, AttackSpec attack, Vector3D<float> playerFeet)
+    {
+        var spots = new List<(float, float, float)>();
+        switch (attack.Pattern)
+        {
+            case BarragePattern.Ring:
+            {
+                spots.Add((playerFeet.X, playerFeet.Z, 0f));
+                int places = Math.Max(CrownGap + 3, attack.Count - 1 + CrownGap);
+                int gap = _random.Next(places);
+                for (int i = 0; i < places; i++)
+                {
+                    if ((i - gap + places) % places < CrownGap)
+                    {
+                        continue;
+                    }
+
+                    float angle = MathF.Tau * i / places;
+                    spots.Add((playerFeet.X + MathF.Sin(angle) * attack.Reach, playerFeet.Z + MathF.Cos(angle) * attack.Reach, 0f));
+                }
+
+                break;
+            }
+
+            case BarragePattern.Line:
+            {
+                var way = Geometry.FlatDirection(caster, playerFeet, out float toPlayer);
+                float length = toPlayer + attack.Reach;
+                int n = 0;
+                for (float d = 2.5f; d <= length; d += LineSpacing, n++)
+                {
+                    spots.Add((caster.X + way.X * d, caster.Z + way.Z * d, n * LineStagger));
+                }
+
+                break;
+            }
+
+            default:
+                for (int i = 0; i < Math.Max(1, attack.Count); i++)
+                {
+                    float angle = (float)_random.NextDouble() * MathF.Tau;
+                    float distance = i == 0 ? 0f : attack.Reach * MathF.Sqrt((float)_random.NextDouble());
+                    float late = (float)_random.NextDouble() * 0.3f;   // not all landing at once
+                    spots.Add((playerFeet.X + MathF.Sin(angle) * distance, playerFeet.Z + MathF.Cos(angle) * distance, late));
+                }
+
+                break;
+        }
+
+        return spots;
+    }
+
+    /// <summary>
+    /// Calls <paramref name="attack"/>'s fireballs down from the sky on its pattern's spots (see <see cref="BarrageSpots"/>). Each falls from high above its spot, a
+    /// little aslant, at about the attack's speed - its landing marked the whole way down.
     /// </summary>
     private void Barrage(Enemy caster, AttackSpec attack, PlayerTarget player, Func<float, float, float?> groundAt)
     {
-        for (int i = 0; i < Math.Max(1, attack.Count); i++)
+        foreach (var (x, z, delay) in BarrageSpots(caster.Position, attack, player.Feet))
         {
-            float angle = (float)_random.NextDouble() * MathF.Tau;
-            float distance = i == 0 ? 0f : attack.Reach * MathF.Sqrt((float)_random.NextDouble());
-            float x = player.Feet.X + MathF.Sin(angle) * distance;
-            float z = player.Feet.Z + MathF.Cos(angle) * distance;
             if (groundAt(x, z) is not { } ground)
             {
                 continue;
             }
 
+            float angle = (float)_random.NextDouble() * MathF.Tau;
             var target = new Vector3D<float>(x, ground, z);
-            var from = target + new Vector3D<float>(MathF.Sin(angle + 1f) * 3f, BarrageHeight, MathF.Cos(angle + 1f) * 3f);
+            var from = target + new Vector3D<float>(MathF.Sin(angle) * 3f, BarrageHeight, MathF.Cos(angle) * 3f);
             var fall = target - from;
-            float speed = attack.ProjectileSpeed * (0.85f + 0.3f * (float)_random.NextDouble());   // not all landing at once
+            float speed = fall.Length / (fall.Length / attack.ProjectileSpeed + delay);
             _bolts.Add(new EnemyBolt
             {
                 Shooter = caster,

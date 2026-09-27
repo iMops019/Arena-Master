@@ -154,7 +154,7 @@ public sealed partial class ArenaMasterContent
             FollowOrders(_director.Update(_runSeconds, _enemies), window.PlayerFeet, groundAt);
         }
 
-        // The Monster Rush, on top of whichever director set the numbers: not in a Boss node's arena, and not while a boss is on the field.
+        // The Monster Rush, on top of whichever director set the numbers: not in the boss hunt's arena, and not while a boss is on the field.
         if (_rush.Update(deltaSeconds, allowed: _plan.Kind != Delve.RunKind.Arena && _enemies.Boss is null))
         {
             Announce("MONSTER RUSH!  Hold out for 30 seconds");

@@ -9,7 +9,7 @@ namespace ArenaMaster.Game.Ui;
 /// <summary>
 /// The Delve chart, at the departure gate: the floors going down from depth 1, each with its nodes, joined to the floor below; cleared nodes ticked off, floors not
 /// yet open dark. Picking a node shows what it pays and how hard it is; from there the player sets out on it (through the loadout), or takes a classic 30-minute
-/// run instead.
+/// run or the boss hunt instead.
 /// </summary>
 internal sealed class DelveChartScreen : GameScreen
 {
@@ -19,6 +19,7 @@ internal sealed class DelveChartScreen : GameScreen
         Close,
         Delve,
         Classic,
+        Boss,
     }
 
     /// <summary>How many floors past the deepest open one are shown, dark.</summary>
@@ -37,11 +38,9 @@ internal sealed class DelveChartScreen : GameScreen
     public static Vector4 ColourOf(DelveNodeKind kind) => kind switch
     {
         DelveNodeKind.Currency => UiTheme.BrassHi,
-        DelveNodeKind.Armoury => UiTheme.Unique,
         DelveNodeKind.Knowledge => UiTheme.Teal,
         DelveNodeKind.Relic => UiTheme.Rarity(Items.ItemRarity.Epic),
-        DelveNodeKind.Descent => new Vector4(0.62f, 0.68f, 0.74f, 1f),
-        _ => new Vector4(0.92f, 0.3f, 0.28f, 1f),
+        _ => new Vector4(0.62f, 0.68f, 0.74f, 1f),
     };
 
     /// <summary>Draws the chart. Returns what the player chose, and for a Delve, which node.</summary>
@@ -82,14 +81,27 @@ internal sealed class DelveChartScreen : GameScreen
         ImGui.EndChild();
 
         var start = ImGui.GetCursorScreenPos();
-        float classicWidth = 260f * scale;
+        float classicWidth = 250f * scale;
+        float huntWidth = 300f * scale;
         float closeWidth = 150f * scale;
         if (UiTheme.Button("Classic run  ·  30 minutes", new Vector2(classicWidth, buttonHeight)))
         {
             choice = Choice.Classic;
         }
 
-        UiTheme.Text(start + new Vector2(classicWidth + 16f * scale, buttonHeight * 0.3f), "The old way: survive 30:00, three Kings, no Delve reward.", UiTheme.Muted, 0.75f);
+        ImGui.SetCursorScreenPos(start + new Vector2(classicWidth + 12f * scale, 0f));
+        if (UiTheme.Button("Boss hunt  ·  the Hollow King Unbound", new Vector2(huntWidth, buttonHeight)))
+        {
+            choice = Choice.Boss;
+        }
+
+        float noteX = classicWidth + huntWidth + 28f * scale;
+        UiTheme.Text(start + new Vector2(noteX, buttonHeight * 0.05f),
+            $"Him alone: {BossHunt.BossHealth:N0} health, four stages, you start at level {BossHunt.StartLevel}.",
+            UiTheme.Muted, 0.72f, width - noteX - closeWidth - 16f * scale);
+        UiTheme.Text(start + new Vector2(noteX, buttonHeight * 0.05f + ImGui.GetFontSize() * 1.5f),
+            $"A kill: {BossHunt.Silver} silver, 1 Mark, {BossHunt.GearChance * 100f:0}% gear, {BossHunt.ItemChance * 100f:0}% item.",
+            UiTheme.Unique, 0.72f, width - noteX - closeWidth - 16f * scale);
         ImGui.SetCursorScreenPos(start + new Vector2(width - closeWidth, 0f));
         if (UiTheme.Button("Close  [E]", new Vector2(closeWidth, buttonHeight)) || (choice == Choice.None && ClosedByKey(ImGuiKey.E)))
         {
@@ -171,34 +183,22 @@ internal sealed class DelveChartScreen : GameScreen
                 bool selected = _selected == node;
                 var colour = ColourOf(node.Kind);
                 var fill = !open ? UiTheme.Locked : cleared ? UiTheme.WithAlpha(colour, 0.25f) : UiTheme.WithAlpha(colour, 0.85f);
-                float r = node.IsBoss ? radius * 1.25f : radius;
+                float r = radius;
 
                 if (selected)
                 {
                     draw.AddCircle(centre, r + 6f * scale, UiTheme.U32(UiTheme.Ink), 32, 2f * scale);
                 }
 
-                if (node.IsBoss)
-                {
-                    // A diamond for a boss.
-                    draw.AddQuadFilled(centre + new Vector2(0f, -r), centre + new Vector2(r, 0f), centre + new Vector2(0f, r), centre + new Vector2(-r, 0f), UiTheme.U32(fill));
-                    draw.AddQuad(centre + new Vector2(0f, -r), centre + new Vector2(r, 0f), centre + new Vector2(0f, r), centre + new Vector2(-r, 0f),
-                        UiTheme.U32(open ? colour : UiTheme.Faint), 2f * scale);
-                }
-                else
-                {
-                    draw.AddCircleFilled(centre, r, UiTheme.U32(fill), 32);
-                    draw.AddCircle(centre, r, UiTheme.U32(open ? colour : UiTheme.Faint), 32, 2f * scale);
-                }
+                draw.AddCircleFilled(centre, r, UiTheme.U32(fill), 32);
+                draw.AddCircle(centre, r, UiTheme.U32(open ? colour : UiTheme.Faint), 32, 2f * scale);
 
                 string glyph = !open ? "?" : cleared ? "x" : node.Kind switch
                 {
                     DelveNodeKind.Currency => "$",
-                    DelveNodeKind.Armoury => "A",
                     DelveNodeKind.Knowledge => "K",
                     DelveNodeKind.Relic => "R",
-                    DelveNodeKind.Descent => "D",
-                    _ => "B",
+                    _ => "D",
                 };
                 var glyphColour = !open ? UiTheme.Faint : cleared ? UiTheme.WithAlpha(colour, 0.9f) : new Vector4(0.05f, 0.06f, 0.08f, 1f);
                 UiTheme.Text(centre - new Vector2(UiTheme.TextWidth(glyph, 0.95f) * 0.5f, font * 0.48f), glyph, glyphColour, 0.95f);
@@ -265,16 +265,6 @@ internal sealed class DelveChartScreen : GameScreen
             lines.Add(reward.Items == 1 ? "1 item" : $"{reward.Items} items");
         }
 
-        if (reward.GearChance > 0f)
-        {
-            lines.Add($"{reward.GearChance * 100f:0}% chance of a piece of gear");
-        }
-
-        if (reward.Marks > 0)
-        {
-            lines.Add($"{reward.Marks} Delve Marks");
-        }
-
         foreach (string line in lines)
         {
             UiTheme.Text(new Vector2(x, y), "·  " + line, UiTheme.BrassHi, 0.85f);
@@ -289,9 +279,7 @@ internal sealed class DelveChartScreen : GameScreen
         string toughness = node.Depth == 1 ? "Enemies at their plain strength." : $"Enemies +{health:0}% health, +{damage:0}% damage.";
         UiTheme.Text(new Vector2(x, y), toughness, UiTheme.Ink, 0.8f, inner);
         y += font * 1.1f;
-        string how = node.IsBoss
-            ? $"The arena: the Hollow King Unbound alone, {DelveRules.ArenaBossHealth(node.Depth):N0} health, in three stages. You start at level {DelveRules.ArenaLevel(node.Depth)} and pick your upgrades first."
-            : !node.HasKing
+        string how = !node.HasKing
             ? $"10 minutes, no King: a Brute at 5:00, and the cache turns up at 10:00. The swarm grows as a classic run does to {DelveDirector.PeakMinutes(node.Depth):0}:00."
             : $"About 10 minutes: a Brute at 5:00, the Hollow King and two Brutes at 10:00, three more Brutes when he is at half. The swarm grows as a classic run does to {DelveDirector.PeakMinutes(node.Depth):0}:00. Slay the King and open his cache.";
         UiTheme.Text(new Vector2(x, y), how, UiTheme.Muted, 0.78f, inner);

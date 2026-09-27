@@ -54,6 +54,11 @@ internal sealed class StatsRecord
     /// <summary>The quickest Delve node cleared, in seconds (0: none yet). A classic win is always at 30:00, so it has no fastest.</summary>
     public float FastestDelveClear { get; set; }
 
+    public int BossHunts { get; set; }
+
+    /// <summary>The quickest boss hunt won, in seconds (0: none yet).</summary>
+    public float FastestBossKill { get; set; }
+
     public double DamageDealt { get; set; }
 
     public float MostDamage { get; set; }
@@ -123,15 +128,21 @@ internal sealed class StatsRecord
     public void Settle(RunRecord run, RunTally tally)
     {
         bool delve = run.Depth > 0;
+        bool nodeCleared = run.DelveCleared && !run.DelveBoss;
         Deaths += tally.Slain ? 1 : 0;
         ReturnedToCamp += tally.Returned ? 1 : 0;
         DelveRuns += delve ? 1 : 0;
-        DelveCleared += run.DelveCleared ? 1 : 0;
+        DelveCleared += nodeCleared ? 1 : 0;
+        BossHunts += run.DelveBoss ? 1 : 0;
+        if (run.DelveBoss && run.DelveCleared && (FastestBossKill <= 0f || run.Seconds < FastestBossKill))
+        {
+            FastestBossKill = run.Seconds;
+        }
         SecondsPlayed += run.Seconds;
         MostKills = Math.Max(MostKills, run.Kills);
         BestStreak = Math.Max(BestStreak, tally.BestStreak);
         HighestLevel = Math.Max(HighestLevel, run.Level);
-        if (run.DelveCleared && (FastestDelveClear <= 0f || run.Seconds < FastestDelveClear))
+        if (nodeCleared && (FastestDelveClear <= 0f || run.Seconds < FastestDelveClear))
         {
             FastestDelveClear = run.Seconds;
         }
@@ -181,7 +192,7 @@ internal sealed class StatsRecord
         hero.MostKills = Math.Max(hero.MostKills, run.Kills);
         hero.HighestLevel = Math.Max(hero.HighestLevel, run.Level);
         hero.BestStreak = Math.Max(hero.BestStreak, tally.BestStreak);
-        if (run.DelveCleared)
+        if (nodeCleared)
         {
             hero.NodesCleared++;
             hero.DeepestCleared = Math.Max(hero.DeepestCleared, run.Depth);

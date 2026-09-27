@@ -23,7 +23,7 @@ internal sealed record DelveOutcome(
     long CacheSilver = 0,
     long TreeExperience = 0,
     long Marks = 0,
-    Gear.GearPiece? Gear = null,
+    Gear.GearItem? Gear = null,
     IReadOnlyList<RunItem>? Items = null,
     bool GearMissed = false,
     int GearCopies = 0);
@@ -73,6 +73,7 @@ internal sealed class RunSummaryScreen : GameScreen
         {
             RunEnding.Won => ("VICTORY", UiTheme.BrassHi),
             RunEnding.Slain => ("YOU WERE SLAIN", new Vector4(0.95f, 0.36f, 0.34f, 1f)),
+            RunEnding.DelveCleared when s.Delve is { Depth: 0 } => ("THE KING UNBOUND FALLS", UiTheme.Unique),
             RunEnding.DelveCleared => ($"DEPTH {s.Delve?.Depth} CLEARED", UiTheme.Unique),
             _ => ("BACK TO CAMP", UiTheme.Teal),
         };
@@ -88,7 +89,7 @@ internal sealed class RunSummaryScreen : GameScreen
 
         if (s.Delve is { } delve)
         {
-            string where = $"{delve.NodeName}  ·  depth {delve.Depth}";
+            string where = delve.Depth > 0 ? $"{delve.NodeName}  ·  depth {delve.Depth}" : delve.NodeName;
             UiTheme.Text(new Vector2(origin.X + (width - UiTheme.TextWidth(where, 0.85f)) * 0.5f, y - font * 0.9f), where, UiTheme.Muted, 0.85f);
             y += font * 0.5f;
         }
@@ -120,9 +121,11 @@ internal sealed class RunSummaryScreen : GameScreen
                 Row("Delve Marks", $"+{cache.Marks:N0}", UiTheme.Unique);
             }
 
-            if (cache.Gear is { } piece)
+            if (cache.Gear is { } gear)
             {
-                Row("Gear found", cache.GearCopies > 1 ? $"{piece.Name}  (again: x{cache.GearCopies})" : $"{piece.Name}  (new!)", UiTheme.Unique);
+                var piece = Gear.GearCatalog.PieceOf(gear);
+                string rolled = $"rolled {Gear.GearCatalog.Quality(gear) * 100f:0}%";
+                Row("Gear found", cache.GearCopies > 1 ? $"{piece.Name}  ({rolled}, copy {cache.GearCopies})" : $"{piece.Name}  (new!  {rolled})", UiTheme.Unique);
             }
             else if (cache.GearMissed)
             {

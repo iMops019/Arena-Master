@@ -9,25 +9,38 @@ internal enum RunKind
     /// <summary>A Delve node: about 10 minutes, one King, his cache the prize.</summary>
     Delve,
 
-    /// <summary>A Boss node: the Hollow King Unbound, alone, in the arena.</summary>
+    /// <summary>The boss hunt: the Hollow King Unbound, alone, in the arena.</summary>
     Arena,
 }
 
-/// <summary>The run the player set out on: its kind, and for a Delve or a Boss node, which node.</summary>
+/// <summary>The run the player set out on: its kind, and for a Delve node, which node.</summary>
 internal sealed record RunPlan(RunKind Kind, DelveNode? Node)
 {
     public static readonly RunPlan Classic = new(RunKind.Classic, null);
 
-    public static RunPlan For(DelveNode node) => new(node.IsBoss ? RunKind.Arena : RunKind.Delve, node);
+    public static readonly RunPlan Boss = new(RunKind.Arena, null);
 
-    /// <summary>The floor's depth, 0 for a classic run.</summary>
+    public static RunPlan For(DelveNode node) => new(RunKind.Delve, node);
+
+    /// <summary>The floor's depth, 0 for a classic run or the boss hunt.</summary>
     public int Depth => Node?.Depth ?? 0;
 
-    public bool IsDelve => Node is not null;
+    /// <summary>A run that ends with a Delve cache: a Delve node, or the boss hunt.</summary>
+    public bool IsDelve => Kind != RunKind.Classic;
 
     /// <summary>What the fade into the run shows.</summary>
-    public string Title => Node is { } node ? $"Depth {node.Depth}  ·  {DelveBands.For(node.Depth).Name}" : "Into the Wilds";
+    public string Title => Kind switch
+    {
+        RunKind.Arena => "The Hollow King's Arena",
+        _ when Node is { } node => $"Depth {node.Depth}  ·  {DelveBands.For(node.Depth).Name}",
+        _ => "Into the Wilds",
+    };
 
     /// <summary>Where the loadout screen says the run is going.</summary>
-    public string Destination => Node is { } node ? $"Depth {node.Depth} {node.Name}" : "A classic run";
+    public string Destination => Kind switch
+    {
+        RunKind.Arena => "The boss hunt: the Hollow King Unbound",
+        _ when Node is { } node => $"Depth {node.Depth} {node.Name}",
+        _ => "A classic run",
+    };
 }

@@ -5,7 +5,7 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Delve;
 
 /// <summary>
-/// Where a Boss node is fought: a ring of bare earth walled in by the palisade, in a corner of the map far from both camp and the run area, sized for the player and
+/// Where the boss hunt is fought: a ring of bare earth walled in by the palisade, in a corner of the map far from both camp and the run area, sized for the player and
 /// the Hollow King Unbound and nothing else. Braziers burn round its edge and banners hang by the way in. The player arrives at the south edge; the King waits
 /// in the middle.
 /// </summary>

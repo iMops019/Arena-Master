@@ -73,6 +73,7 @@ public sealed partial class ArenaMasterContent : IGameContent
         _profilePath = profilePath;
         _profile = ProfileStore.Load(profilePath);
         Loadout.Sanitize(_profile);
+        Gear.GearCatalog.Migrate(_profile);   // gear from before it rolled: perfect copies
         _classes = new IHeroClass[] { new RangerClass(_random), new PaladinClass(_random), new MageClass(_random), new ShamanClass(_random), new Warrior.WarriorClass(_random),
             new Priest.PriestClass(_random) };
         UseClass(ClassFor(_profile.ActiveClass));

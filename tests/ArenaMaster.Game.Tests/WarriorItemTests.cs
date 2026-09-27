@@ -88,7 +88,7 @@ public class WarriorItemTests
     public void BerserkersHide_MoreDamage_AsHealthDrops()
     {
         var items = new ItemBonuses();
-        GearCatalog.Find("berserkers_hide")!.Apply(items);
+        GearTesting.Best("berserkers_hide")(items);
         var field = Field();
         var health = new PlayerHealth(100f);
         health.TakeDamage(50f);

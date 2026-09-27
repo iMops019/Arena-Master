@@ -21,6 +21,22 @@ internal enum EnemyTier
     Boss,
 }
 
+/// <summary>Where a <see cref="AttackType.Barrage"/>'s fireballs fall.</summary>
+internal enum BarragePattern
+{
+    /// <summary>The first on the player, the rest scattered round them within the attack's reach.</summary>
+    Scatter,
+
+    /// <summary>
+    /// The Crown of Fire: one on the player and the rest in a ring round them at the attack's reach, with one gap in it - out through the gap before the middle
+    /// burns.
+    /// </summary>
+    Ring,
+
+    /// <summary>The Line of Fire: a row from the caster through the player and on past them, landing one after another outward from the caster - step aside.</summary>
+    Line,
+}
+
 internal enum AttackType
 {
     /// <summary>
@@ -73,6 +89,7 @@ internal enum AttackType
 /// <param name="Count">Barrage: how many fireballs fall. Lob: how many times the bomb bounces before it rolls.</param>
 /// <param name="Chain">How many times more it goes straight into the same attack once one ends (a double or triple leap, rolling shockwaves), each with half the wind-up.</param>
 /// <param name="Tracking">Lunge: for this many seconds of the wind-up the lane keeps turning to follow the player; then it locks, and stepping out of it is the answer.</param>
+/// <param name="Pattern">Barrage: where the fireballs fall (see <see cref="BarragePattern"/>).</param>
 internal sealed record AttackSpec(
     AttackType Type,
     float MinRange,
@@ -91,7 +108,8 @@ internal sealed record AttackSpec(
     string? ProjectileModel = null,
     int Count = 0,
     int Chain = 0,
-    float Tracking = 0f);
+    float Tracking = 0f,
+    BarragePattern Pattern = BarragePattern.Scatter);
 
 /// <summary>
 /// A boss's next stage, once its health falls to <paramref name="Below"/> of its most (0 to 1): a new set of attacks, a shorter breather between them, a faster walk,
@@ -356,7 +374,7 @@ internal sealed record EnemyKind(
     };
 }
 
-/// <summary>The Delve boss: the Hollow King unbound, fought alone in the arena of a Boss node. Long, and in three stages.</summary>
+/// <summary>The boss hunt's boss: the Hollow King unbound, fought alone in his arena. Long, and in four stages.</summary>
 internal static class DelveBosses
 {
     private const string Fireball = "ghoul_fireball.glb";
@@ -375,10 +393,19 @@ internal static class DelveBosses
 
     private static AttackSpec Court(int count) => new(AttackType.Summon, MinRange: 0f, MaxRange: 60f, WindUp: 1f, Active: 0.1f, Recover: 0.6f, Damage: 0f, Reach: count);
 
+    /// <summary>The Crown of Fire: a ring of fireballs round the player, one gap in it, and one on the player to make them move.</summary>
+    private static AttackSpec Crown(int chain) => new(AttackType.Barrage, MinRange: 0f, MaxRange: 40f, WindUp: 1.3f, Active: 0.1f, Recover: 1f,
+        Damage: 34f, Reach: 5f, Knockback: 7f, ProjectileSpeed: 10f, Splash: 2.4f, ProjectileModel: Fireball, Count: 14, Chain: chain, Pattern: BarragePattern.Ring);
+
+    /// <summary>The Line of Fire: a row of fireballs from the King through the player and 10 m past, landing outward from him.</summary>
+    private static AttackSpec Line(int chain) => new(AttackType.Barrage, MinRange: 4f, MaxRange: 30f, WindUp: 1f, Active: 0.1f, Recover: 0.8f,
+        Damage: 30f, Reach: 10f, Knockback: 8f, ProjectileSpeed: 12f, Splash: 2f, ProjectileModel: Fireball, Chain: chain, Pattern: BarragePattern.Line);
+
     /// <summary>
-    /// The Hollow King Unbound: 5.6 m tall, eight times the run King's health, and in three stages. At first he leaps, sends shockwaves, charges down a long
-    /// lane and calls fire from the sky. Below two thirds he calls his court too, and leaps and charges twice over. Below a third he is enraged: faster, barely
-    /// resting, leaping three times, sending three rings in a row, and raining fire wider.
+    /// The Hollow King Unbound: 5.6 m tall, eight times the run King's health, and in four stages. At first he leaps, sends shockwaves, charges down a long lane,
+    /// calls fire from the sky and crowns the player in a ring of it. Below 70% he calls his court too, sends the Line of Fire, and leaps, charges and sends his
+    /// rings twice over. Below 40% he is enraged: faster, barely resting, three of everything. Below 15% he makes his last stand: faster still, and hardly a breath
+    /// between attacks. (The boss hunt's fight since 2026-09-27; the Crown, the Line and the last stand were added then, the user asking for more to dodge.)
     /// </summary>
     public static readonly EnemyKind HollowKingUnbound = new(
         Name: "The Hollow King Unbound",
@@ -392,14 +419,16 @@ internal static class DelveBosses
         ContactInterval: 1f,
         Experience: 200)
     {
-        AttackCooldown = 1.9f,
-        Attacks = new[] { Leap(0), Wave(0), Charge(0), Rain(6, 7f) },
+        AttackCooldown = 1.8f,
+        Attacks = new[] { Leap(0), Wave(0), Charge(0), Rain(8, 8f), Crown(0) },
         Phases = new[]
         {
-            new BossPhase(0.66f, new[] { Leap(1), Wave(0), Charge(1), Rain(10, 9f), Court(8) }, AttackCooldown: 1.5f, SpeedMultiplier: 1.1f,
+            new BossPhase(0.7f, new[] { Leap(1), Wave(1), Charge(1), Rain(10, 9f), Court(8), Line(0), Crown(0) }, AttackCooldown: 1.4f, SpeedMultiplier: 1.1f,
                 "The Hollow King Unbound calls his court!"),
-            new BossPhase(0.33f, new[] { Leap(2), Wave(2), Charge(2), Rain(14, 11f), Court(10) }, AttackCooldown: 1.1f, SpeedMultiplier: 1.25f,
+            new BossPhase(0.4f, new[] { Leap(2), Wave(2), Charge(2), Rain(14, 11f), Court(10), Line(1), Crown(1) }, AttackCooldown: 1.05f, SpeedMultiplier: 1.25f,
                 "The Hollow King Unbound is enraged!"),
+            new BossPhase(0.15f, new[] { Leap(2), Wave(2), Charge(2), Rain(18, 12f), Line(2), Crown(2) }, AttackCooldown: 0.75f, SpeedMultiplier: 1.35f,
+                "The Hollow King Unbound makes his last stand!"),
         },
     };
 }

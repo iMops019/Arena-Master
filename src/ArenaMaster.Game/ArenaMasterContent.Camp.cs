@@ -22,6 +22,7 @@ public sealed partial class ArenaMasterContent
     private readonly DelveChartScreen _delveScreen = new();
     private readonly GearScreen _gearScreen = new();
     private readonly StatsScreen _statsScreen = new();
+    private readonly GearSaleScreen _saleScreen = new();
 
     /// <summary>The run chosen on the Delve chart, waiting on the loadout screen.</summary>
     private Delve.RunPlan _nextPlan = Delve.RunPlan.Classic;
@@ -138,7 +139,33 @@ public sealed partial class ArenaMasterContent
                 SaveProfile();
             }
 
-            if (closed)
+            if (_shopScreen.WantsSale)
+            {
+                _shopScreen.WantsSale = false;
+                _saleScreen.Open();   // still paused: on to selling gear
+            }
+            else if (closed)
+            {
+                CloseScreen(window);
+            }
+
+            return true;
+        }
+
+        if (_saleScreen.IsOpen)
+        {
+            var result = _saleScreen.Draw(_profile);
+            if (_saleScreen.Changed)
+            {
+                _saleScreen.Changed = false;
+                SaveProfile();
+            }
+
+            if (result == GearSaleScreen.Result.Back)
+            {
+                _shopScreen.Open();
+            }
+            else if (result == GearSaleScreen.Result.Close)
             {
                 CloseScreen(window);
             }
@@ -206,6 +233,11 @@ public sealed partial class ArenaMasterContent
                     Loadout.Sanitize(_profile);
                     _loadoutScreen.Open();
                     break;
+                case DelveChartScreen.Choice.Boss:
+                    _nextPlan = Delve.RunPlan.Boss;
+                    Loadout.Sanitize(_profile);
+                    _loadoutScreen.Open();
+                    break;
                 case DelveChartScreen.Choice.Close:
                     CloseScreen(window);
                     break;
@@ -250,6 +282,7 @@ public sealed partial class ArenaMasterContent
         _delveScreen.Close();
         _gearScreen.Close();
         _statsScreen.Close();
+        _saleScreen.Close();
     }
 
     private void CloseScreen(EngineWindow window)

@@ -33,15 +33,15 @@ public class ArmourTests
         foreach (var piece in GearCatalog.All.Where(p => p.Slot == GearSlot.BodyArmour))
         {
             var bonuses = new ItemBonuses();
-            piece.Apply(bonuses);
+            GearCatalog.Apply(GearCatalog.Perfect(piece), bonuses);
             Assert.True(bonuses.Armour > 0f, $"{piece.Name} gives no armour");
-            Assert.Contains($"+{bonuses.Armour:0} armour", piece.Effect);
+            Assert.Contains(piece.Stats, stat => stat.Line(stat.Max) == $"+{bonuses.Armour:0} armour");
         }
 
         Assert.All(GearCatalog.All.Where(p => p.Slot != GearSlot.BodyArmour), piece =>
         {
             var bonuses = new ItemBonuses();
-            piece.Apply(bonuses);
+            GearCatalog.Apply(GearCatalog.Perfect(piece), bonuses);
             Assert.Equal(0f, bonuses.Armour);
         });
     }

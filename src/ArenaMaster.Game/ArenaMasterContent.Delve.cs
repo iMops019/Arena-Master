@@ -10,9 +10,10 @@ using Silk.NET.Maths;
 
 namespace ArenaMaster.Game;
 
-// The Delve: a run on one of the chart's nodes. A Delve node is about 10 minutes on the usual map (DelveDirector's schedule), lit and weathered for its floor's
-// band; a Boss node is the Hollow King Unbound alone in the arena. Either way the boss leaves a Delve cache, and opening it clears the node: its reward is paid,
-// the floor below opens, and the run's summary follows. Gear worn at the armour stand counts on every run.
+// The Delve: a run on one of the chart's nodes, about 10 minutes on the usual map (DelveDirector's schedule), lit and weathered for its floor's band; or the boss
+// hunt, the Hollow King Unbound alone in the arena, as often as the player likes. Either way the boss leaves a Delve cache: opening a node's clears it (its reward
+// is paid, the floor below opens), and opening the hunt's pays silver, a Mark and by chance an item and a piece of gear. Then the run's summary. Gear worn at the
+// armour stand counts on every run.
 public sealed partial class ArenaMasterContent
 {
     /// <summary>How close the player must come to the Delve cache to open it, and how long it takes to open.</summary>
@@ -54,48 +55,55 @@ public sealed partial class ArenaMasterContent
         }
     }
 
-    /// <summary>The worn gear's bonuses join the run's, after the loadout's items.</summary>
+    /// <summary>The worn gear's bonuses, as each copy rolled, join the run's, after the loadout's items.</summary>
     private void WearGear()
     {
-        foreach (var piece in GearCatalog.Worn(_profile))
+        foreach (var worn in GearCatalog.Worn(_profile))
         {
-            _items.Carried.AddBonus(piece.Apply);
+            _items.Carried.AddBonus(bonuses => GearCatalog.Apply(worn, bonuses));
         }
     }
 
     /// <summary>
-    /// The start of a Delve or Boss node's run, after the common setup: the floor's look, and for a Delve node its director; for a Boss node the arena - the player at
-    /// its edge, the King in the middle, no swarm, and the player's levels to pick before the fight.
+    /// The start of a Delve node's run or the boss hunt, after the common setup: for a Delve node the floor's look and its director; for the boss hunt the arena - the
+    /// player at its edge, the King in the middle, no swarm, and the player's levels to pick before the fight.
     /// </summary>
     private void BeginDelve(EngineWindow window, Terrain terrain)
     {
         _cacheAt = null;
         _cacheOpening = null;
         _delveDirector = null;
+        if (_plan.Kind == RunKind.Arena)
+        {
+            BeginHunt(window, terrain);
+            return;
+        }
+
         if (_plan.Node is not { } node)
         {
             return;
         }
 
         ApplyLook(window, DelveBands.For(node.Depth));
-        if (_plan.Kind == RunKind.Delve)
-        {
-            _delveDirector = new DelveDirector(node.Depth, node.HasKing);
-            window.TeleportPlayer(CampLayout.Ground(terrain, CampLayout.RunStart));
-            Announce(node.HasKing ? $"Depth {node.Depth}: the Hollow King comes at 10:00" : $"Depth {node.Depth}: hold out until 10:00");
-            return;
-        }
+        _delveDirector = new DelveDirector(node.Depth, node.HasKing);
+        window.TeleportPlayer(CampLayout.Ground(terrain, CampLayout.RunStart));
+        Announce(node.HasKing ? $"Depth {node.Depth}: the Hollow King comes at 10:00" : $"Depth {node.Depth}: hold out until 10:00");
+    }
 
+    /// <summary>The boss hunt's arena: the player at its edge, the Hollow King Unbound in the middle, no swarm, and the player's levels to pick before the fight.</summary>
+    private void BeginHunt(EngineWindow window, Terrain terrain)
+    {
+        ApplyLook(window, DelveBands.For(BossHunt.LookDepth));
         window.TeleportPlayer(BossArena.Ground(terrain, BossArena.Start));
         _enemies.TargetCount = 0;
         _enemies.Mix = Array.Empty<(EnemyKind, float)>();
-        _enemies.Scaling = new EnemyScaling(DelveRules.HealthMultiplier(node.Depth), DelveRules.DamageMultiplier(node.Depth), 1f);
+        _enemies.Scaling = BossHunt.Scaling;
         var king = _enemies.Spawn(BossArena.Ground(terrain, BossArena.BossStart), DelveBosses.HollowKingUnbound);
         king.Yaw = MathF.PI;   // facing the way in
         king.AttackCooldown = ArenaGrace;
 
         // The fight starts at a set level: every level's upgrade is picked first, one screen at a time.
-        int level = DelveRules.ArenaLevel(node.Depth);
+        int level = BossHunt.StartLevel;
         int experience = 0;
         for (int l = 1; l < level; l++)
         {
@@ -106,7 +114,7 @@ public sealed partial class ArenaMasterContent
         Announce("The Hollow King Unbound awaits");
     }
 
-    /// <summary>A Delve run's own frame: its director (a Boss node has none), the boss's stages, and the cache.</summary>
+    /// <summary>A Delve run's own frame: its director (the boss hunt has none), the boss's stages, and the cache.</summary>
     private void UpdateDelve(EngineWindow window, float deltaSeconds, Func<float, float, float?> groundAt)
     {
         if (_delveDirector is { } director)
@@ -155,7 +163,7 @@ public sealed partial class ArenaMasterContent
         _cacheSpin = 0f;
         _cacheProp = window.PlaceProp(new PropPlacement(CacheModel, spot, 0f, 1.2f, Collision: PropCollision.None));
         _cacheBeam = window.PlaceProp(new PropPlacement(CacheBeamModel, spot, 0f, 1.6f));
-        Announce("The Delve cache is yours: open it to clear the floor");
+        Announce(_plan.Kind == RunKind.Arena ? "The King's cache is yours: open it" : "The Delve cache is yours: open it to clear the floor");
     }
 
     /// <summary>Turns the cache to catch the eye, and opens it when the player reaches it; once open, the node is cleared.</summary>
@@ -207,11 +215,16 @@ public sealed partial class ArenaMasterContent
     }
 
     /// <summary>
-    /// The end of a Delve run: if its node was cleared, the cache pays out (silver, tree experience, items, Delve Marks, and gear if its chance comes up, as the node says) and the node is
-    /// marked cleared, opening the floor below. Returns what happened, for the summary; null for a classic run.
+    /// The end of a Delve run: if its node was cleared, the cache pays out (silver, tree experience, items, as the node says) and the node is marked cleared, opening
+    /// the floor below; the boss hunt's cache pays its own (see <see cref="SettleHunt"/>). Returns what happened, for the summary; null for a classic run.
     /// </summary>
     private DelveOutcome? SettleDelve(RunEnding ending)
     {
+        if (_plan.Kind == RunKind.Arena)
+        {
+            return SettleHunt(ending);
+        }
+
         if (_plan.Node is not { } node)
         {
             return null;
@@ -223,19 +236,12 @@ public sealed partial class ArenaMasterContent
         }
 
         var reward = DelveRules.Reward(node);
-        var carried = _items.Carried.Bonuses;
-        long silver = (long)MathF.Round(reward.Silver * (1f + carried.CacheSilver));
-
+        long silver = CacheSilver(reward.Silver);
         var items = new List<RunItem>();
         for (int i = 0; i < reward.Items; i++)
         {
-            var item = Items.ItemCatalog.Roll(_random, Shop.Lucky(reward.ItemOdds, _profile), item => Bounties.CanDrop(item, _profile));
-            GainItem(item);
-            items.Add(item);
+            items.Add(CacheItem(reward.ItemOdds));
         }
-
-        bool gearRolled = DelveRules.RollsGear(reward, _random);   // a chance, not a promise; and any piece, so the one wanted may take a while
-        var gear = gearRolled ? GearCatalog.Grant(_profile, _random) : null;
 
         if (reward.TreeExperience > 0)
         {
@@ -243,10 +249,42 @@ public sealed partial class ArenaMasterContent
         }
 
         _profile.Silver += silver;
-        _profile.Delve.Marks += reward.Marks;
         DelveRules.Clear(_profile.Delve, node);
-        return new DelveOutcome(node.Depth, node.Name, Cleared: true, silver, reward.TreeExperience, reward.Marks, gear, items,
-            GearMissed: reward.GearChance > 0f && !gearRolled, GearCopies: gear is null ? 0 : GearCatalog.CopiesOf(_profile, gear));
+        return new DelveOutcome(node.Depth, node.Name, Cleared: true, silver, reward.TreeExperience, Items: items);
+    }
+
+    /// <summary>
+    /// The end of a boss hunt: if the King fell and his cache was opened, it pays silver and a Delve Mark, and by chance an item and a piece of gear - pure luck
+    /// every kill, and any piece, rolled, so the one wanted (and a good roll of it) is the hunt.
+    /// </summary>
+    private DelveOutcome SettleHunt(RunEnding ending)
+    {
+        const string Name = "Boss hunt";
+        if (ending != RunEnding.DelveCleared)
+        {
+            return new DelveOutcome(0, Name, Cleared: false);
+        }
+
+        long silver = CacheSilver(BossHunt.Silver);
+        var items = BossHunt.RollsItem(_random) ? new List<RunItem> { CacheItem(RarityWeights.Boss) } : new List<RunItem>();
+        bool gearRolled = BossHunt.RollsGear(_random);
+        var gear = gearRolled ? GearCatalog.Grant(_profile, _random) : null;
+        _profile.Silver += silver;
+        _profile.Delve.Marks += BossHunt.Marks;
+        _profile.Delve.BossesSlain++;
+        return new DelveOutcome(0, Name, Cleared: true, silver, 0, BossHunt.Marks, gear, items, GearMissed: !gearRolled,
+            GearCopies: gear is null ? 0 : GearCatalog.CopiesOf(_profile, GearCatalog.PieceOf(gear)));
+    }
+
+    /// <summary>A cache's silver, raised by what the run carried (the Delver's Compass).</summary>
+    private long CacheSilver(long silver) => (long)MathF.Round(silver * (1f + _items.Carried.Bonuses.CacheSilver));
+
+    /// <summary>An item from a cache at <paramref name="odds"/> (with Lucky Charm), into the chest.</summary>
+    private RunItem CacheItem(RarityWeights odds)
+    {
+        var item = Items.ItemCatalog.Roll(_random, Shop.Lucky(odds, _profile), candidate => Bounties.CanDrop(candidate, _profile));
+        GainItem(item);
+        return item;
     }
 
     /// <summary>Lights and weathers the world for a floor's band, keeping camp's own to put back afterwards.</summary>

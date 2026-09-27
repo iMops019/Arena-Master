@@ -5,7 +5,7 @@ namespace ArenaMaster.Game.Combat;
 /// <see cref="Duration"/> seconds, monsters pour in: the field's fodder target climbs over <see cref="RampSeconds"/> to <see cref="CrowdMultiplier"/> times
 /// the director's plus <see cref="CrowdExtra"/> (at most <see cref="MaxCrowd"/>), and it tops up almost at once, so every kill is replaced straight away.
 /// Once it ends the director's numbers come back; the extra monsters stay until they are killed. A rush waits while it isn't allowed (a boss on the field, or
-/// a Boss node's arena) and starts as soon as it is. Pure: it only sets the enemy field's numbers.
+/// the boss hunt's arena) and starts as soon as it is. Pure: it only sets the enemy field's numbers.
 /// </summary>
 internal sealed class MonsterRush
 {

@@ -16,7 +16,7 @@ public class DelveMapTests
         for (int depth = 1; depth <= 30; depth++)
         {
             var floor = DelveMap.Floor(depth);
-            var runs = floor.Where(n => !n.IsBoss).ToList();
+            var runs = floor.ToList();
             Assert.Equal(DelveMap.NodesPerFloor, runs.Count);
             var kings = runs.Where(n => n.HasKing).ToList();
             Assert.InRange(kings.Count, DelveMap.FewestKingNodes, DelveMap.FewestKingNodes + 1);
@@ -34,33 +34,23 @@ public class DelveMapTests
         var descent = new DelveNode(4, 0, DelveNodeKind.Descent);
         Assert.False(descent.HasKing);
         Assert.True(new DelveNode(4, 0, DelveNodeKind.Relic).HasKing);
-        Assert.False(DelveMap.Floor(5).Single(n => n.IsBoss).HasKing);   // the arena's King is his own thing
 
         var reward = DelveRules.Reward(descent);
         var currency = DelveRules.Reward(new DelveNode(4, 0, DelveNodeKind.Currency));
-        Assert.True(reward.Silver < currency.Silver && reward.TreeExperience > 0 && reward.Items == 0 && reward.GearChance == 0f);
+        Assert.True(reward.Silver < currency.Silver && reward.TreeExperience > 0 && reward.Items == 0);
     }
 
     [Fact]
-    public void ArmouryNodes_OnlyTurnUpPastTheFirstBossTier()
+    public void TheChart_HasNoArmouryOrBossNodes_GearIsTheBossHuntsNow()
     {
+        var kinds = new[] { DelveNodeKind.Currency, DelveNodeKind.Knowledge, DelveNodeKind.Relic, DelveNodeKind.Descent };
         for (int depth = 1; depth <= 30; depth++)
         {
-            bool armoury = DelveMap.Floor(depth).Any(n => n.Kind == DelveNodeKind.Armoury);
-            Assert.False(depth < DelveMap.ArmouryFrom && armoury, $"depth {depth} has an Armoury node");
+            Assert.Equal(DelveMap.NodesPerFloor, DelveMap.Floor(depth).Count);
+            Assert.All(DelveMap.Floor(depth), n => Assert.Contains(n.Kind, kinds));
         }
 
-        Assert.Contains(Enumerable.Range(DelveMap.ArmouryFrom, 10), d => DelveMap.Floor(d).Any(n => n.Kind == DelveNodeKind.Armoury));
-    }
-
-    [Fact]
-    public void BossNodes_AreOnEveryFifthFloor_AndOnlyThere()
-    {
-        for (int depth = 1; depth <= 30; depth++)
-        {
-            int bosses = DelveMap.Floor(depth).Count(n => n.IsBoss);
-            Assert.Equal(depth % 5 == 0 ? 1 : 0, bosses);
-        }
+        Assert.Null(DelveMap.Find("5-5"));   // an old save's Boss node is gone
     }
 
     [Fact]
@@ -130,64 +120,47 @@ public class DelveRulesTests
     }
 
     [Fact]
-    public void ABossNode_CountsTheBoss()
-    {
-        var save = new DelveSave { Deepest = 5 };
-        var boss = DelveMap.Floor(5).Single(n => n.IsBoss);
-        DelveRules.Clear(save, boss);
-        Assert.Equal(1, save.BossesSlain);
-        Assert.Equal(6, save.Deepest);
-    }
-
-    [Fact]
     public void EachKind_PaysWhatItSays_AndDeeperPaysMore()
     {
         DelveNode Node(int depth, DelveNodeKind kind) => new(depth, 0, kind);
         var currency = DelveRules.Reward(Node(3, DelveNodeKind.Currency));
-        var armoury = DelveRules.Reward(Node(3, DelveNodeKind.Armoury));
         var knowledge = DelveRules.Reward(Node(3, DelveNodeKind.Knowledge));
         var relic = DelveRules.Reward(Node(3, DelveNodeKind.Relic));
-        var boss = DelveRules.Reward(Node(10, DelveNodeKind.Boss));
 
-        Assert.Equal(armoury.Silver * 2, currency.Silver);
-        Assert.Equal(DelveRules.ArmouryGearChance, armoury.GearChance);
-        Assert.Equal(0f, currency.GearChance);
+        Assert.Equal(knowledge.Silver * 4, currency.Silver);
         Assert.True(knowledge.TreeExperience > 0);
         Assert.True(relic.Items == 1 && relic.ItemOdds == RarityWeights.Elite);
-        Assert.True(boss.GearChance == DelveRules.BossGearChance && boss.Items == 1 && boss.ItemOdds == RarityWeights.Boss && boss.Marks == 3);
         Assert.True(DelveRules.Reward(Node(9, DelveNodeKind.Currency)).Silver > currency.Silver);
     }
 
     [Fact]
-    public void Gear_IsAChance_NeverASureThing()
+    public void TheBossHunt_GearIsPureLuck_AboutOneKillInFive()
     {
         var random = new Random(11);
-        var armoury = DelveRules.Reward(new DelveNode(3, 0, DelveNodeKind.Armoury));
-        var relic = DelveRules.Reward(new DelveNode(3, 0, DelveNodeKind.Relic));
-        int drops = Enumerable.Range(0, 4000).Count(_ => DelveRules.RollsGear(armoury, random));
-        Assert.InRange(drops / 4000f, DelveRules.ArmouryGearChance - 0.03f, DelveRules.ArmouryGearChance + 0.03f);
-        Assert.False(Enumerable.Range(0, 200).Any(_ => DelveRules.RollsGear(relic, random)));
-        Assert.True(DelveRules.ArmouryGearChance < 1f && DelveRules.BossGearChance < 1f);
+        int drops = Enumerable.Range(0, 4000).Count(_ => BossHunt.RollsGear(random));
+        Assert.InRange(drops / 4000f, BossHunt.GearChance - 0.03f, BossHunt.GearChance + 0.03f);
+        Assert.Equal(0.2f, BossHunt.GearChance);
+        Assert.True(BossHunt.BossHealth > DelveBosses.HollowKingUnbound.MaxHealth);
     }
 
     [Fact]
-    public void DeeperFloors_AreTougher_AndTheArenaStartsHigher()
+    public void DeeperFloors_AreTougher_ButNotAWall()
     {
         Assert.Equal(1f, DelveRules.HealthMultiplier(1));
         Assert.True(DelveRules.HealthMultiplier(10) > DelveRules.HealthMultiplier(5));
         Assert.True(DelveRules.DamageMultiplier(10) > DelveRules.DamageMultiplier(5));
-        Assert.Equal(15, DelveRules.ArenaLevel(5));
-        Assert.Equal(17, DelveRules.ArenaLevel(10));
-        Assert.True(DelveRules.ArenaBossHealth(10) > DelveRules.ArenaBossHealth(5));
+        Assert.Equal(1.56f, DelveRules.HealthMultiplier(8), 3);   // gentler than before: depth 8 was 2.05
     }
 
     [Fact]
     public void APlan_KnowsItsKind()
     {
-        var run = DelveMap.Floor(5).First(n => !n.IsBoss);
-        var boss = DelveMap.Floor(5).Single(n => n.IsBoss);
+        var run = DelveMap.Floor(5)[0];
         Assert.Equal(RunKind.Delve, RunPlan.For(run).Kind);
-        Assert.Equal(RunKind.Arena, RunPlan.For(boss).Kind);
+        Assert.Equal(RunKind.Arena, RunPlan.Boss.Kind);
+        Assert.True(RunPlan.Boss.IsDelve);   // it ends in a cache
+        Assert.Equal(0, RunPlan.Boss.Depth);
+        Assert.Null(RunPlan.Boss.Node);
         Assert.Equal(5, RunPlan.For(run).Depth);
         Assert.False(RunPlan.Classic.IsDelve);
         Assert.Equal(0, RunPlan.Classic.Depth);
@@ -258,7 +231,7 @@ public class DelveDirectorTests
     {
         Assert.Equal(10f, DelveDirector.PeakMinutes(1));
         Assert.Equal(20f, DelveDirector.PeakMinutes(50));
-        Assert.Equal(17f, DelveDirector.PeakMinutes(8));
+        Assert.Equal(13.5f, DelveDirector.PeakMinutes(8));
         var shallow = new DelveDirector(1);
         var deep = new DelveDirector(9);
         Assert.Equal(600f, shallow.ClassicSeconds(600f));
@@ -306,21 +279,26 @@ public class BossFightTests
         Assert.Contains(king.AttacksNow, a => a.Type == AttackType.Summon);
         Assert.True(king.WalkSpeed > king.Speed);
 
-        king.Health = king.MaxHealth * 0.1f;
+        king.Health = king.MaxHealth * 0.3f;
         Tick(field, player, far);
         Assert.Equal(1, king.PhaseIndex);
-        Assert.Single(field.TakePhaseChanges());
-        Assert.Equal(DelveBosses.HollowKingUnbound.Phases[1].AttackCooldown, king.AttackCooldownNow);
+        Assert.Contains("enraged", Assert.Single(field.TakePhaseChanges()).Phase.Announcement);
+
+        king.Health = king.MaxHealth * 0.1f;
+        Tick(field, player, far);
+        Assert.Equal(2, king.PhaseIndex);
+        Assert.Contains("last stand", Assert.Single(field.TakePhaseChanges()).Phase.Announcement);
+        Assert.Equal(DelveBosses.HollowKingUnbound.Phases[2].AttackCooldown, king.AttackCooldownNow);
     }
 
     [Fact]
-    public void AFallStraightToTheLastStage_SkipsTheMiddleOne()
+    public void AFallStraightToTheLastStage_SkipsTheOnesBetween()
     {
         var field = QuietField();
         var king = field.Spawn(Vector3D<float>.Zero, DelveBosses.HollowKingUnbound);
         king.Health = 1f;
         Tick(field, new PlayerHealth(100f), new Vector3D<float>(100f, 0f, 0f));
-        Assert.Equal(1, king.PhaseIndex);
+        Assert.Equal(DelveBosses.HollowKingUnbound.Phases.Count - 1, king.PhaseIndex);
         Assert.Single(field.TakePhaseChanges());
     }
 
@@ -382,6 +360,50 @@ public class BossFightTests
     }
 
     [Fact]
+    public void TheCrownOfFire_RingsThePlayer_WithOneGap_AndOneOnThem()
+    {
+        var king = DelveBosses.HollowKingUnbound;
+        var crown = king.Attacks.Single(a => a.Pattern == BarragePattern.Ring);
+        var feet = new Vector3D<float>(10f, 0f, 4f);
+        var spots = QuietField().BarrageSpots(Vector3D<float>.Zero, crown, feet);
+
+        Assert.Equal(crown.Count, spots.Count);
+        Assert.Contains(spots, s => s.X == feet.X && s.Z == feet.Z);
+        var ring = spots.Where(s => s.X != feet.X || s.Z != feet.Z).ToList();
+        Assert.All(ring, s => Assert.Equal(crown.Reach, MathF.Sqrt((s.X - feet.X) * (s.X - feet.X) + (s.Z - feet.Z) * (s.Z - feet.Z)), 3));
+
+        // The widest space between neighbours round the ring is the gap: wide enough to get through between two bursts.
+        var angles = ring.Select(s => MathF.Atan2(s.X - feet.X, s.Z - feet.Z)).OrderBy(a => a).ToList();
+        float widest = angles.Zip(angles.Skip(1), (a, b) => b - a).Append(angles[0] + MathF.Tau - angles[^1]).Max();
+        float gap = widest * crown.Reach - 2f * crown.Splash;
+        Assert.InRange(gap, 1.2f, 4f);
+    }
+
+    [Fact]
+    public void TheLineOfFire_RunsFromTheKingThroughThePlayer_LandingOutward()
+    {
+        var line = DelveBosses.HollowKingUnbound.Phases[0].Attacks.Single(a => a.Pattern == BarragePattern.Line);
+        var feet = new Vector3D<float>(12f, 0f, 0f);
+        var spots = QuietField().BarrageSpots(Vector3D<float>.Zero, line, feet);
+
+        Assert.All(spots, s => Assert.Equal(0f, s.Z, 3));                 // on the line from him to the player
+        Assert.Contains(spots, s => MathF.Abs(s.X - feet.X) < EnemyField.LineSpacing);
+        Assert.True(spots.Max(s => s.X) > feet.X + line.Reach - EnemyField.LineSpacing);   // and on past them
+        Assert.Equal(spots.OrderBy(s => s.X).Select(s => s.Delay), spots.Select(s => s.Delay));   // landing one after another, outward
+        Assert.True(spots[^1].Delay > spots[0].Delay);
+    }
+
+    [Fact]
+    public void TheUnboundKing_HasMoreToDodge_ThanBefore()
+    {
+        var king = DelveBosses.HollowKingUnbound;
+        Assert.Equal(3, king.Phases.Count);
+        Assert.Contains(king.Attacks, a => a.Pattern == BarragePattern.Ring);
+        Assert.All(king.Phases, phase => Assert.Contains(phase.Attacks, a => a.Pattern == BarragePattern.Line));
+        Assert.True(king.Phases[^1].AttackCooldown < king.Phases[^2].AttackCooldown);
+    }
+
+    [Fact]
     public void ABarrage_Hurts_WhereItLands()
     {
         var rain = new AttackSpec(AttackType.Barrage, MinRange: 0f, MaxRange: 50f, WindUp: 0.2f, Active: 0.1f, Recover: 0.2f, Damage: 10f, Reach: 0f,
@@ -404,7 +426,7 @@ public class BossFightTests
 public class GearTests
 {
     [Fact]
-    public void ThereAreFiveUniquesForEachSlot()
+    public void ThereAreSixUniquesForEachSlot()
     {
         Assert.Equal(18, GearCatalog.All.Count);
         Assert.Equal(GearCatalog.All.Count, GearCatalog.All.Select(p => p.Id).Distinct().Count());
@@ -414,44 +436,92 @@ public class GearTests
         }
 
         Assert.All(GearCatalog.All, p => Assert.False(string.IsNullOrWhiteSpace(p.Flavour)));
+        Assert.All(GearCatalog.All, p => Assert.Contains(p.Stats, s => s.Rolls));   // every piece has something to roll
     }
 
     [Fact]
-    public void AFind_IsAnyPiece_WornIfItsSlotIsEmpty_AndDuplicatesCount()
+    public void ARoll_FallsWithinEachStatsRange()
+    {
+        var random = new Random(9);
+        foreach (var piece in GearCatalog.All)
+        {
+            for (int n = 0; n < 50; n++)
+            {
+                var item = GearCatalog.RollCopy(piece, random);
+                Assert.Equal(piece.Stats.Count, item.Rolls.Count);
+                for (int i = 0; i < piece.Stats.Count; i++)
+                {
+                    var stat = piece.Stats[i];
+                    Assert.InRange(item.Rolls[i], MathF.Min(stat.Min, stat.Max) - 1e-4f, MathF.Max(stat.Min, stat.Max) + 1e-4f);
+                }
+
+                Assert.InRange(GearCatalog.Quality(item), 0f, 1f);
+            }
+        }
+    }
+
+    [Fact]
+    public void APerfectCopy_IsTheOldFixedNumbers()
+    {
+        var hauberk = GearCatalog.Perfect(GearCatalog.Find("ironhide_hauberk")!);
+        var bonuses = new ItemBonuses();
+        GearCatalog.Apply(hauberk, bonuses);
+        Assert.Equal(80f, bonuses.Armour);
+        Assert.Equal(0.85f, bonuses.DamageTaken, 4);
+        Assert.Equal(30f, bonuses.MaxHealth);
+        Assert.Equal(1f, GearCatalog.Quality(hauberk));
+    }
+
+    [Fact]
+    public void ALowRoll_GivesLess_AndQualityReadsWhereItSits()
+    {
+        var piece = GearCatalog.Find("tempest_fang")!;
+        var worst = new GearItem { Id = "a", Piece = piece.Id, Rolls = new List<float> { piece.Stats[0].Min } };
+        var bonuses = new ItemBonuses();
+        GearCatalog.Apply(worst, bonuses);
+        Assert.Equal(1.06f, bonuses.AttackSpeedMultiplier, 4);
+        Assert.Equal(0f, GearCatalog.Quality(worst));
+        Assert.Equal("x1.06 attack speed", piece.Stats[0].Line(worst.Rolls[0]));
+        Assert.Equal("1.06-1.20", piece.Stats[0].Range);
+    }
+
+    [Fact]
+    public void ALowerIsBetterStat_RollsTheRightWay()
+    {
+        var chalice = GearCatalog.Find("blood_chalice")!.Stats[0];
+        Assert.Equal(1f, chalice.Quality(40f));
+        Assert.Equal(0f, chalice.Quality(80f));
+        Assert.Equal("40-80", chalice.Range);
+    }
+
+    [Fact]
+    public void AFind_IsAnyPiece_Rolled_WornIfItsSlotIsEmpty_AndEveryCopyKept()
     {
         var profile = new Profile();
         var random = new Random(4);
         var first = GearCatalog.Grant(profile, random);
-        Assert.Equal(first, GearCatalog.WornIn(profile, first.Slot));
-        Assert.Equal(1, GearCatalog.CopiesOf(profile, first));
+        var slot = GearCatalog.PieceOf(first).Slot;
+        Assert.Equal(first, GearCatalog.WornIn(profile, slot));
 
         var finds = Enumerable.Range(0, 400).Select(_ => GearCatalog.Grant(profile, random)).ToList();
-        Assert.Equal(GearCatalog.All.Count, finds.Distinct().Count());               // any piece can come
-        Assert.Equal(GearCatalog.All.Count, profile.Gear.Owned.Count);               // each owned once
-        Assert.Equal(401, GearCatalog.All.Sum(p => GearCatalog.CopiesOf(profile, p))); // every find counted
-        Assert.Equal(first, GearCatalog.WornIn(profile, first.Slot));                 // a later find doesn't swap what is worn
-    }
-
-    [Fact]
-    public void AnOldSave_CountsItsOwnedPiecesAsOneCopy()
-    {
-        var profile = new Profile();
-        var fang = GearCatalog.Find("tempest_fang")!;
-        profile.Gear.Owned.Add(fang.Id);
-        Assert.Equal(1, GearCatalog.CopiesOf(profile, fang));
-        Assert.Equal(0, GearCatalog.CopiesOf(profile, GearCatalog.Find("kingsbane")!));
+        Assert.Equal(GearCatalog.All.Count, finds.Select(f => f.Piece).Distinct().Count());   // any piece can come
+        Assert.Equal(401, profile.Gear.Items.Count);                                          // every copy kept, each its own
+        Assert.Equal(401, profile.Gear.Items.Select(i => i.Id).Distinct().Count());
+        Assert.Equal(GearCatalog.All.Count, GearCatalog.PiecesFound(profile));
+        Assert.Equal(first, GearCatalog.WornIn(profile, slot));                               // a later find doesn't swap what is worn
+        Assert.True(finds.Select(GearCatalog.Quality).Distinct().Count() > 20);               // and they roll differently
     }
 
     [Fact]
     public void OnlyOwnedGear_CanBeWorn_AndItCanBeTakenOff()
     {
         var profile = new Profile();
-        var fang = GearCatalog.Find("tempest_fang")!;
+        var fang = GearCatalog.Perfect(GearCatalog.Find("tempest_fang")!);
         Assert.False(GearCatalog.Wear(profile, fang));
         profile.Gear.Worn[GearSlot.Weapon.ToString()] = fang.Id;   // a hand-edited save
         Assert.Null(GearCatalog.WornIn(profile, GearSlot.Weapon));
 
-        profile.Gear.Owned.Add(fang.Id);
+        profile.Gear.Items.Add(fang);
         Assert.True(GearCatalog.Wear(profile, fang));
         Assert.Equal(fang, GearCatalog.WornIn(profile, GearSlot.Weapon));
         GearCatalog.TakeOff(profile, GearSlot.Weapon);
@@ -459,11 +529,75 @@ public class GearTests
     }
 
     [Fact]
+    public void SpareCopies_SellForMore_TheBetterTheyRolled_ButNotWhileWorn()
+    {
+        var piece = GearCatalog.Find("kingsbane")!;
+        var best = GearCatalog.Perfect(piece);
+        var worst = new GearItem { Id = "w", Piece = piece.Id, Rolls = new List<float> { piece.Stats[0].Min } };
+        Assert.Equal(GearCatalog.SellCeiling, GearCatalog.SellPrice(best));
+        Assert.Equal(GearCatalog.SellFloor, GearCatalog.SellPrice(worst));
+
+        var profile = new Profile();
+        profile.Gear.Items.Add(best);
+        profile.Gear.Items.Add(worst);
+        GearCatalog.Wear(profile, best);
+        Assert.False(GearCatalog.Sell(profile, best));
+        Assert.Equal(0, profile.Silver);
+
+        Assert.True(GearCatalog.Sell(profile, worst));
+        Assert.Equal(GearCatalog.SellFloor, profile.Silver);
+        Assert.Equal(new[] { best }, profile.Gear.Items);
+        Assert.False(GearCatalog.Sell(profile, worst));   // gone
+    }
+
+    [Fact]
+    public void AnOldSave_BecomesPerfectCopies_AndKeepsWhatWasWorn()
+    {
+        var profile = new Profile();
+        profile.Gear.Owned.AddRange(new[] { "tempest_fang", "heart_of_the_mountain", "gone_from_the_game" });
+        profile.Gear.Copies["tempest_fang"] = 2;
+        profile.Gear.Worn[GearSlot.Weapon.ToString()] = "tempest_fang";
+
+        GearCatalog.Migrate(profile);
+
+        Assert.Empty(profile.Gear.Owned);
+        Assert.Empty(profile.Gear.Copies);
+        Assert.Equal(3, profile.Gear.Items.Count);   // two fangs and the heart
+        Assert.All(profile.Gear.Items, item => Assert.Equal(1f, GearCatalog.Quality(item)));
+        Assert.Equal("tempest_fang", GearCatalog.WornIn(profile, GearSlot.Weapon)!.Piece);
+        Assert.Null(GearCatalog.WornIn(profile, GearSlot.Trinket));
+
+        GearCatalog.Migrate(profile);   // twice does nothing more
+        Assert.Equal(3, profile.Gear.Items.Count);
+    }
+
+    [Fact]
+    public void RolledGear_LastsInTheSave()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"am-gear-{Guid.NewGuid():N}.json");
+        try
+        {
+            var profile = new Profile();
+            var item = GearCatalog.Grant(profile, new Random(2));
+            ProfileStore.Save(profile, path);
+            var loaded = ProfileStore.Load(path);
+            var back = Assert.Single(loaded.Gear.Items);
+            Assert.Equal(item.Id, back.Id);
+            Assert.Equal(item.Rolls, back.Rolls);
+            Assert.Equal(item.Id, GearCatalog.WornIn(loaded, GearCatalog.PieceOf(item).Slot)!.Id);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public void WornGear_AddsToTheRunsBonuses_WithoutBeingAnItem()
     {
         var inventory = new ItemInventory();
         inventory.Add(ItemCatalog.All.First(i => i.Id == "swiftwind_sigil"));
-        inventory.AddBonus(GearCatalog.Find("tempest_fang")!.Apply);
+        inventory.AddBonus(GearTesting.Best("tempest_fang"));
         Assert.Equal(1.15f * 1.2f, inventory.Bonuses.AttackSpeedMultiplier, 4);
         Assert.Single(inventory.Items);
 
@@ -475,7 +609,7 @@ public class GearTests
     public void TheVestmentsShield_TakesTheHitFirst_AndComesBackAfterItsCooldown()
     {
         var bonuses = new ItemBonuses();
-        GearCatalog.Find("great_mages_vestments")!.Apply(bonuses);
+        GearTesting.Best("great_mages_vestments")(bonuses);
         var effects = new ItemEffects();
         effects.Begin();
         var health = new PlayerHealth(100f) { Barrier = 20f };
@@ -516,7 +650,7 @@ public class GearTests
     public void Emberbrand_BurnsWhatIsNear_EveryFiveSeconds()
     {
         var bonuses = new ItemBonuses();
-        GearCatalog.Find("emberbrand")!.Apply(bonuses);
+        GearTesting.Best("emberbrand")(bonuses);
         var effects = new ItemEffects();
         effects.Begin();
         var field = new EnemyField(new Random(1)) { TargetCount = 0 };
@@ -635,8 +769,8 @@ public class DelveSaveTests : IDisposable
         Assert.Equal(2, back.Delve.Deepest);
         Assert.Equal(profile.Delve.Cleared, back.Delve.Cleared);
         Assert.Equal(7, back.Delve.Marks);
-        Assert.Equal(profile.Gear.Owned, back.Gear.Owned);
-        Assert.Equal(GearCatalog.Worn(profile), GearCatalog.Worn(back));
+        Assert.Equal(profile.Gear.Items.Select(i => i.Id), back.Gear.Items.Select(i => i.Id));
+        Assert.Equal(GearCatalog.Worn(profile).Select(i => i.Id), GearCatalog.Worn(back).Select(i => i.Id));
     }
 
     [Fact]
@@ -645,7 +779,13 @@ public class DelveSaveTests : IDisposable
         File.WriteAllText(_path, "{\"Version\":1,\"Silver\":50}");
         var profile = ProfileStore.Load(_path);
         Assert.Equal(1, profile.Delve.Deepest);
-        Assert.Empty(profile.Gear.Owned);
+        Assert.Empty(profile.Gear.Items);
         Assert.Equal(50, profile.Silver);
     }
+}
+
+/// <summary>Gear at its best rolls, for tests of what a piece does.</summary>
+internal static class GearTesting
+{
+    public static Action<ItemBonuses> Best(string id) => bonuses => GearCatalog.Apply(GearCatalog.Perfect(GearCatalog.Find(id)!), bonuses);
 }
