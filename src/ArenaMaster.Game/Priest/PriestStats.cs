@@ -20,14 +20,14 @@ internal sealed class PriestStats
     /// </summary>
     public const float BaseCastInterval = 1.3f;
     public const float CastRange = 22f;
-    public const float BaseSkullDamage = 12f;
+    public const float BaseSkullDamage = 13.5f;
     public const float BaseSkullSpeed = 12f;
-    public const float BaseSkullLife = 1.8f;
+    public const float BaseSkullLife = 2.2f;
     public const int BasePierce = 4;
     public const float BaseSeekRange = 9f;
 
     /// <summary>Plague: every stack deals this much over its time, up to this many stacks on one enemy (Virulent Strain: <see cref="VirulentStacks"/>).</summary>
-    public const float BasePlagueDamage = 26f;
+    public const float BasePlagueDamage = 29.5f;
     public const float BasePlagueDuration = 2f;
     public const int BasePlagueStacks = 3;
     public const int VirulentStacks = 5;

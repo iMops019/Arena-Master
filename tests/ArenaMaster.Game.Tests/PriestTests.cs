@@ -130,7 +130,7 @@ public class PriestStatsTests
         Assert.Equal(3, new PriestStats().PlagueStacks);
         Assert.Equal(5, PriestTesting.With((UnholyTree.VirulentStrain, 1)).PlagueStacks);
         Assert.Equal(2f, new PriestStats().PlagueDuration);
-        Assert.Equal(1.8f, new PriestStats().SkullLife);
+        Assert.Equal(2.2f, new PriestStats().SkullLife);
     }
 
     [Fact]
