@@ -286,7 +286,7 @@ internal sealed class PriestClass : IHeroClass
         }
     }
 
-    /// <summary>The skull's hits as damage numbers; Plague and rot tick too often to number, and show as the enemies flinching.</summary>
+    /// <summary>The skull's hits as damage numbers; Plague, rot and the Aura tick too often to number one by one, and are added up for each enemy instead.</summary>
     private void Report(DamageNumbers numbers)
     {
         foreach (var hit in _hits)
@@ -294,6 +294,10 @@ internal sealed class PriestClass : IHeroClass
             if (hit.Source == PriestSource.Skull)
             {
                 numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
+            }
+            else
+            {
+                numbers.AddOverTime(hit.Enemy, hit.Position, hit.Damage, hit.Killed);
             }
         }
     }

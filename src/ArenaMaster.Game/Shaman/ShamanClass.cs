@@ -220,8 +220,8 @@ internal sealed class ShamanClass : IHeroClass
     }
 
     /// <summary>
-    /// The hits just dealt, on screen, and Galvanic Recovery's heal for each kill. The zaps' and rods' steady crackle, and the Eye's, show as the enemies flashing
-    /// rather than as numbers, so they don't bury the ball's and the forks'.
+    /// The hits just dealt, on screen, and Galvanic Recovery's heal for each kill. The zaps' and rods' steady crackle, and the Eye's, are added up for each enemy and
+    /// shown as damage over time, so they don't bury the ball's and the forks'.
     /// </summary>
     private void Report(DamageNumbers numbers, PlayerHealth health)
     {
@@ -230,6 +230,10 @@ internal sealed class ShamanClass : IHeroClass
             if (hit.Source is not (StormSource.Zap or StormSource.Rod or StormSource.Eye))
             {
                 numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
+            }
+            else
+            {
+                numbers.AddOverTime(hit.Enemy, hit.Position, hit.Damage, hit.Killed);
             }
 
             if (hit.Killed)

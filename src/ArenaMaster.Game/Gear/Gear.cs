@@ -83,6 +83,12 @@ internal sealed class GearItem
     public string Piece { get; set; } = "";
 
     public List<float> Rolls { get; set; } = new();
+
+    /// <summary>
+    /// Which version of the catalogue its rolls were made for: 0 for a copy from a save older than <see cref="GearCatalog.Revision"/>, whose piece may have changed
+    /// its stats since (see <see cref="GearCatalog.Migrate"/>).
+    /// </summary>
+    public int Revision { get; set; }
 }
 
 /// <summary>What the player owns and wears, saved in the <see cref="Profile"/>.</summary>
@@ -109,6 +115,10 @@ internal static class GearCatalog
     private static GearStat MaxHealth(float min, float max) => new("+{0} max health", GearUnit.Flat, min, max, (b, v) => b.MaxHealth += v);
 
     private static GearStat Damage(float min, float max) => new("+{0}% damage", GearUnit.Percent, min, max, (b, v) => b.Damage += v / 100f);
+
+    /// <summary>Damage over time: Plague, rot, holy circles, the Blizzard, the Shaman's zaps. Nothing for the Ranger and Warrior, who have none.</summary>
+    private static GearStat OverTime(float min, float max) =>
+        new("+{0}% damage over time", GearUnit.Percent, min, max, (b, v) => b.DotDamage += v / 100f);
 
     public static readonly IReadOnlyList<GearPiece> All = new GearPiece[]
     {
@@ -188,7 +198,7 @@ internal static class GearCatalog
         // Trinkets
         new("reliquary_of_rot", "Reliquary of Rot", GearSlot.Trinket, new[]
         {
-            new GearStat("x{0} damage to enemies below half health", GearUnit.Multiplier, 1.06f, 1.2f, (b, v) => b.WoundedDamage *= v),
+            OverTime(10, 25),
             new GearStat("+{0}% area", GearUnit.Percent, 4, 10, (b, v) => b.Area += v / 100f),
         }, "What is inside is not a saint. It is, however, still hungry."),
         new("lantern_of_the_deep", "Lantern of the Deep", GearSlot.Trinket, new[]
@@ -276,8 +286,8 @@ internal static class GearCatalog
         }, "More pouches than a merchant, and every one of them heavy."),
         new("sash_of_lingering_rites", "Sash of Lingering Rites", GearSlot.Belt, new[]
         {
+            OverTime(8, 20),
             new GearStat("Lingering effects last {0} s longer", GearUnit.Flat, 0.4f, 1f, (b, v) => b.Duration += v, Decimals: 1),
-            new GearStat("+{0}% area", GearUnit.Percent, 4, 10, (b, v) => b.Area += v / 100f),
         }, "The rites were said long ago. They have not finished."),
 
         // Rings: two can be worn
@@ -299,11 +309,11 @@ internal static class GearCatalog
                 b.FireNovaInterval = 5f;
             }),
         }, "Warm as a hearth. Then warmer. Then much warmer."),
-        new("loop_of_iron_will", "Loop of Iron Will", GearSlot.Ring, new[]
+        new("rotwood_band", "Rotwood Band", GearSlot.Ring, new[]
         {
-            MaxHealth(15, 35),
-            new GearStat("+{0} health per second", GearUnit.Flat, 0.2f, 0.5f, (b, v) => b.Regeneration += v, Decimals: 1),
-        }, "Plain iron. It has never once needed to be anything else."),
+            OverTime(5, 15),
+            MaxHealth(10, 25),
+        }, "Carved from a tree that grew in a plague pit. It grew very well."),
         new("stormcallers_loop", "Stormcaller's Loop", GearSlot.Ring, new[]
         {
             new GearStat("Every 6 s lightning strikes the nearest enemy for {0} damage", GearUnit.Flat, 15, 40, (b, v) => b.SkyStrike += v),
@@ -332,6 +342,22 @@ internal static class GearCatalog
 
     /// <summary>The places a piece of <paramref name="slot"/> can be worn: one, or two for a ring.</summary>
     public static IReadOnlyList<GearPlace> PlacesFor(GearSlot slot) => Places.Where(place => place.Slot == slot).ToList();
+
+    /// <summary>
+    /// The catalogue's version, for copies' <see cref="GearItem.Revision"/>. 1: damage over time came in (2026-09-27), and the Reliquary of Rot and the Sash of
+    /// Lingering Rites took it in place of a stat each.
+    /// </summary>
+    public const int Revision = 1;
+
+    /// <summary>
+    /// The pieces whose stats changed at a revision, and how each old copy's rolls carry over: for each of the piece's stats now, the old stat whose roll it takes
+    /// the place of and that stat's old range. A carried-over roll keeps its quality: as far up the new range as it was up the old.
+    /// </summary>
+    private static readonly Dictionary<string, (int From, float Min, float Max)[]> ChangedAtRevision1 = new()
+    {
+        ["reliquary_of_rot"] = new[] { (0, 1.06f, 1.2f), (1, 4f, 10f) },            // wounded damage became damage over time; the area stays
+        ["sash_of_lingering_rites"] = new[] { (1, 4f, 10f), (0, 0.4f, 1f) },         // the area became damage over time, now first; the duration second
+    };
 
     /// <summary>What a copy sells for at the quartermaster: from <see cref="SellFloor"/> for the worst rolls up to <see cref="SellCeiling"/> for perfect ones.</summary>
     public const long SellFloor = 100;
@@ -393,6 +419,7 @@ internal static class GearCatalog
         Id = Guid.NewGuid().ToString("N"),
         Piece = piece.Id,
         Rolls = piece.Stats.Select(stat => stat.At((float)random.NextDouble())).ToList(),
+        Revision = Revision,
     };
 
     /// <summary>A copy of <paramref name="piece"/> with every stat at its best.</summary>
@@ -401,6 +428,7 @@ internal static class GearCatalog
         Id = Guid.NewGuid().ToString("N"),
         Piece = piece.Id,
         Rolls = piece.Stats.Select(stat => stat.Max).ToList(),
+        Revision = Revision,
     };
 
     /// <summary>The copy worn at <paramref name="place"/>, or null.</summary>
@@ -490,12 +518,29 @@ internal static class GearCatalog
     }
 
     /// <summary>
-    /// Brings a save from before gear rolled up to date: every piece it owned (and every extra copy it had found) becomes a copy with perfect rolls - the numbers it
-    /// had then are the top of each range now - and what was worn stays worn. Does nothing to a save already up to date.
+    /// Brings a save's gear up to date. A save from before gear rolled: every piece it owned (and every extra copy it had found) becomes a copy with perfect rolls -
+    /// the numbers it had then are the top of each range now - and what was worn stays worn. A copy from before a piece's stats changed (<see cref="Revision"/>):
+    /// each roll carries over at the same quality. Does nothing to a save already up to date.
     /// </summary>
     public static void Migrate(Profile profile)
     {
         var save = profile.Gear;
+        foreach (var item in save.Items.Where(item => item.Revision < Revision))
+        {
+            if (ChangedAtRevision1.TryGetValue(item.Piece, out var carried) && Find(item.Piece) is { } changed)
+            {
+                var old = item.Rolls.ToList();
+                item.Rolls = carried.Select((from, i) =>
+                {
+                    float roll = from.From < old.Count ? old[from.From] : from.Max;
+                    float quality = Math.Clamp((roll - from.Min) / (from.Max - from.Min), 0f, 1f);
+                    return changed.Stats[i].At(quality);
+                }).ToList();
+            }
+
+            item.Revision = Revision;
+        }
+
         if (save.Owned.Count == 0)
         {
             save.Copies.Clear();

@@ -195,9 +195,15 @@ internal sealed class ItemBonuses
 
     // Only the Priest reads these: they speak of Plague, rot and the Skull Shield.
 
-    /// <summary>More damage over time: Plague and rot. And what it is multiplied by.</summary>
+    /// <summary>
+    /// More damage over time, and what it is multiplied by: the Priest's Plague, rot and Aura, the Paladin's holy circles, the Mage's Blizzard, and the Shaman's zaps,
+    /// rods and Eye. The Ranger and the Warrior have none, so it does nothing for them (the user's call: no stand-in for a stat a class can't use).
+    /// </summary>
     public float DotDamage;
     public float DotMultiplier = 1f;
+
+    /// <summary>What a class's damage over time is multiplied by, for one worked out from a hit's damage (the Blizzard, zaps, rods, the Eye).</summary>
+    public float OverTime => (1f + DotDamage) * DotMultiplier;
 
     /// <summary>More stacks of Plague one enemy can carry.</summary>
     public int PlagueStacks;
@@ -321,9 +327,9 @@ internal static class ItemCatalog
 
         // Shaman-leaning: chains, area, lightning.
         new("grounding_charm", "Grounding Charm", ItemRarity.Common, "Take 25% less damage from bolts, fireballs and bombs", b => b.RangedDamageTaken *= 0.75f, Cap: 2),
-        new("storm_glass", "Storm Glass", ItemRarity.Common, "+10% area, and lingering effects last 0.5 s longer", b =>
+        new("storm_glass", "Storm Glass", ItemRarity.Common, "+8% damage over time, and lingering effects last 0.5 s longer", b =>
         {
-            b.Area += 0.10f;
+            b.DotDamage += 0.08f;
             b.Duration += 0.5f;
         }),
         new("conductors_coil", "Conductor's Coil", ItemRarity.Rare, "+1 chain: one more fork, arrow chain or bolt pierce (the Paladin: +10% nova damage)", b => b.Chains += 1),
@@ -360,11 +366,7 @@ internal static class ItemCatalog
         }),
 
         // Priest-leaning: Plague, rot, the Skull Shield. Every class gets something from each.
-        new("grave_dust", "Grave Dust", ItemRarity.Common, "+4% damage (the Priest: +10% Plague and rot damage too)", b =>
-        {
-            b.Damage += 0.04f;
-            b.DotDamage += 0.10f;
-        }),
+        new("grave_dust", "Grave Dust", ItemRarity.Common, "+12% damage over time", b => b.DotDamage += 0.12f),
         new("bone_charm", "Bone Charm", ItemRarity.Common, "+3% block chance (the Priest: +4% Death and Decay chance too)", b =>
         {
             b.BlockChance += 0.03f;
@@ -376,9 +378,9 @@ internal static class ItemCatalog
             b.DashRecharge += 0.10f;
             b.StepRot += 0.30f;
         }),
-        new("plague_doctors_mask", "Plague Doctor's Mask", ItemRarity.Rare, "Take 8% less damage (the Priest: Plague stacks 1 higher)", b =>
+        new("plague_doctors_mask", "Plague Doctor's Mask", ItemRarity.Rare, "+20% damage over time (the Priest: Plague stacks 1 higher too)", b =>
         {
-            b.DamageTaken *= 0.92f;
+            b.DotDamage += 0.20f;
             b.PlagueStacks += 1;
         }),
         new("leech_jar", "Leech Jar", ItemRarity.Rare, "Heal 1 health per kill (the Priest: 2 more for every Plagued enemy that dies)", b =>
@@ -427,7 +429,7 @@ internal static class ItemCatalog
             b.RageDrains += 1;
         }),
 
-        new("tome_of_pestilence", "Tome of Pestilence", ItemRarity.Epic, "x1.12 damage (the Priest: and x1.25 Plague and rot damage)", b =>
+        new("tome_of_pestilence", "Tome of Pestilence", ItemRarity.Epic, "x1.12 damage, and x1.25 damage over time", b =>
         {
             b.DamageMultiplier *= 1.12f;
             b.DotMultiplier *= 1.25f;

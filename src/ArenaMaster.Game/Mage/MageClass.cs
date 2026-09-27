@@ -279,7 +279,7 @@ internal sealed class MageClass : IHeroClass
     }
 
     /// <summary>
-    /// The hits just dealt, on screen. The Blizzard's steady bite shows as the enemies flashing, not as numbers, so it doesn't bury the bolts'.
+    /// The hits just dealt, on screen. The Blizzard's steady bite is added up for each enemy and shown as damage over time, so it doesn't bury the bolts'.
     /// </summary>
     private void Report(DamageNumbers numbers)
     {
@@ -288,6 +288,10 @@ internal sealed class MageClass : IHeroClass
             if (hit.Source != FrostSource.Blizzard)
             {
                 numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
+            }
+            else
+            {
+                numbers.AddOverTime(hit.Enemy, hit.Position, hit.Damage, hit.Killed);
             }
         }
     }

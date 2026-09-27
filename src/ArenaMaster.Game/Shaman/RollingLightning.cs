@@ -483,7 +483,7 @@ internal sealed class RollingLightning
         }
 
         _eyeIn = MathF.Max(0f, _eyeIn + ShamanStats.EyeTick);
-        Zap(feet, ShamanStats.EyeRadius * stats.AreaScale, stats.BallDamage * ShamanStats.EyeShare, StormSource.Eye, stats, enemies, hits);
+        Zap(feet, ShamanStats.EyeRadius * stats.AreaScale, stats.BallDamage * ShamanStats.EyeShare * stats.Items.OverTime, StormSource.Eye, stats, enemies, hits);
     }
 
     /// <summary>Call Lightning: every so often, strikes from the sky on the nearest enemies.</summary>

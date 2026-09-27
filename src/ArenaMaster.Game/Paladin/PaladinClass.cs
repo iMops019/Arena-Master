@@ -259,8 +259,8 @@ internal sealed class PaladinClass : IHeroClass
     }
 
     /// <summary>
-    /// The hits just dealt, on screen, and what answers kills: Bloodthorns heals for each thorns kill. The circles' steady burn shows as the enemies flashing, not as
-    /// numbers, so it doesn't bury the nova's.
+    /// The hits just dealt, on screen, and what answers kills: Bloodthorns heals for each thorns kill. The circles' steady burn is added up for each enemy and shown as
+    /// damage over time, so it doesn't bury the nova's.
     /// </summary>
     private void Report(DamageNumbers numbers, PlayerHealth health)
     {
@@ -269,6 +269,10 @@ internal sealed class PaladinClass : IHeroClass
             if (hit.Source != HolySource.Circle)
             {
                 numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
+            }
+            else
+            {
+                numbers.AddOverTime(hit.Enemy, hit.Position, hit.Damage, hit.Killed);
             }
 
             if (hit.Killed && hit.Source == HolySource.Thorns)

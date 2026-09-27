@@ -129,7 +129,7 @@ internal sealed class PaladinStats
 
     /// <summary>A circle's damage per second to each enemy in it.</summary>
     public float CircleDps =>
-        BaseCircleDps * (1f + 0.25f * LevelOf(PaladinUpgrade.Consecration) + Items.Damage + Tree.CircleDamage) * Items.DamageMultiplier;
+        BaseCircleDps * (1f + 0.25f * LevelOf(PaladinUpgrade.Consecration) + Items.Damage + Tree.CircleDamage + Items.DotDamage) * Items.DamageMultiplier * Items.DotMultiplier;
 
     /// <summary>Health per second from standing in a circle (from each circle, with Consecrated Ground).</summary>
     public float CircleHealing => BaseCircleHealing * (1f + 0.25f * LevelOf(PaladinUpgrade.SanctifiedGround) + Tree.CircleHealing);

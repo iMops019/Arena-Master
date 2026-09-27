@@ -514,7 +514,7 @@ public class PriestItemTests
     {
         var mask = new PriestStats { Items = With("plague_doctors_mask") };
         Assert.Equal(4, mask.PlagueStacks);
-        Assert.Equal(0.92f, mask.DamageTaken, 4);
+        Assert.Equal(new PriestStats().PlagueDamage * 1.2f, mask.PlagueDamage, 2);   // +20% damage over time
 
         var whisper = new PriestStats { Items = With("whispering_skull") };
         Assert.Equal(PriestStats.BasePierce + 1, whisper.Pierce);
@@ -524,7 +524,7 @@ public class PriestItemTests
         Assert.Equal(0.15f, bell.BlockChance, 3);
 
         var dust = new PriestStats { Items = With("grave_dust") };
-        Assert.True(dust.PlagueDamage > new PriestStats().PlagueDamage * 1.13f);
+        Assert.Equal(new PriestStats().PlagueDamage * 1.12f, dust.PlagueDamage, 2);
     }
 
     [Fact]

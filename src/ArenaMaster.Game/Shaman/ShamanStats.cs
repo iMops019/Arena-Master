@@ -159,7 +159,7 @@ internal sealed class ShamanStats
     public float ZapRadius =>
         BaseZapRadius * (1f + 0.15f * LevelOf(ShamanUpgrade.StaticField) + Items.Area) * Items.AreaMultiplier * (Tree.Thunderclap ? ThunderclapRadius : 1f);
 
-    public float ZapDamage => BallDamage * BaseZapShare * (1f + 0.25f * LevelOf(ShamanUpgrade.StaticField) + Tree.ZapDamage) * (Tree.Thunderclap ? ThunderclapDamage : 1f);
+    public float ZapDamage => BallDamage * BaseZapShare * (1f + 0.25f * LevelOf(ShamanUpgrade.StaticField) + Tree.ZapDamage) * (Tree.Thunderclap ? ThunderclapDamage : 1f) * Items.OverTime;
 
     public int Forks => BaseForks + LevelOf(ShamanUpgrade.BranchingBolts) + Tree.Forks + Items.Chains;
 
@@ -167,7 +167,7 @@ internal sealed class ShamanStats
 
     public float ForkDamage => BallDamage * BaseForkShare * (1f + Tree.ForkDamage + 0.20f * LevelOf(ShamanUpgrade.Conductive));
 
-    public float RodDamage => BallDamage * RodShare * (1f + Tree.RodDamage + 0.20f * LevelOf(ShamanUpgrade.RodMastery));
+    public float RodDamage => BallDamage * RodShare * (1f + Tree.RodDamage + 0.20f * LevelOf(ShamanUpgrade.RodMastery)) * Items.OverTime;
 
     /// <summary>How long a struck tree or rock stays charged.</summary>
     public float RodDuration => RodSeconds + 1.5f * LevelOf(ShamanUpgrade.RodMastery);

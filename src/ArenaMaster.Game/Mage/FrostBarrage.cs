@@ -447,7 +447,7 @@ internal sealed class FrostBarrage
         }
 
         _blizzardIn = MathF.Max(0f, _blizzardIn + BlizzardTick);
-        float damage = stats.BoltDamage * MageStats.BlizzardShare * BlizzardTick;
+        float damage = stats.BoltDamage * MageStats.BlizzardShare * BlizzardTick * stats.Items.OverTime;
         foreach (var enemy in enemies.Within(feet, MageStats.BlizzardRadius * stats.AreaScale))
         {
             Frost(enemy, damage, crit: false, FrostSource.Blizzard, stats, enemies, hits, out _);
