@@ -25,6 +25,9 @@
   ghoul_bomb.glb          a Ghoul Tactician's bomb: a black iron ball with a ghostly green band and a green-lit fuse, radius 0.2, centred on its middle
   ghoul_bomb_mark.glb     a flat ghostly green ring of radius 1 with spikes of energy on it, under a bouncing bomb: what its blast will catch
   ghoul_bomb_burst.glb    a flat ghostly green ring of radius 1, scaled as a bomb goes off
+  rarity_magic.glb, rarity_rare.glb, rarity_legendary.glb
+                          the ring of radius 1 under a Magic (blue), Rare (yellow, with little points) or Legendary (orange, with taller points and
+                          an inner ring) enemy
   xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
   telegraph_ring.glb      a flat red ring of radius 1 on y = 0, scaled to an attack's radius (outline of where it lands)
   telegraph_disc.glb      a flat dark-red disc of radius 1, scaled up inside the ring as an attack winds up
@@ -461,6 +464,26 @@ def build_ghoul_bomb_mark():
         a = 2 * math.pi * i / 10
         x, z = math.cos(a) * 0.95, math.sin(a) * 0.95
         m.pyramid(x - 0.04, 0.0, z - 0.04, x + 0.04, 0.0, z + 0.04, (x, 0.2, z), "ghost_eye")
+    return m
+
+
+def build_rarity_ring(outer, light, spikes, height, inner=None):
+    """The ring under a Magic, Rare or Legendary enemy, radius 1: a band of <outer> with <spikes> little points of <light> standing on it (and a thin
+    inner ring of <inner> if given)."""
+    import math
+    m = build_ring(0.86, 1.0, outer)
+    if inner:
+        ring = build_ring(0.7, 0.75, inner)
+        base = len(m.positions)
+        m.positions += ring.positions
+        m.normals += ring.normals
+        m.uvs += ring.uvs
+        m.joints += ring.joints
+        m.indices += [i + base for i in ring.indices]
+    for i in range(spikes):
+        a = 2 * math.pi * i / spikes
+        x, z = math.cos(a) * 0.93, math.sin(a) * 0.93
+        m.pyramid(x - 0.04, 0.0, z - 0.04, x + 0.04, 0.0, z + 0.04, (x, height, z), light)
     return m
 
 
@@ -1296,6 +1319,9 @@ if __name__ == "__main__":
                         ("ghoul_fireball.glb", build_ghoul_fireball), ("fireball_mark.glb", build_fireball_mark),
                         ("fireball_burst.glb", lambda: build_ring(0.75, 1.0, "fire")), ("ghoul_bomb.glb", build_ghoul_bomb),
                         ("ghoul_bomb_mark.glb", build_ghoul_bomb_mark), ("ghoul_bomb_burst.glb", lambda: build_ring(0.7, 1.0, "ghost_eye")),
+                        ("rarity_magic.glb", lambda: build_rarity_ring("rare", "rare_light", 0, 0.0)),
+                        ("rarity_rare.glb", lambda: build_rarity_ring("holy", "holy_light", 6, 0.15)),
+                        ("rarity_legendary.glb", lambda: build_rarity_ring("legendary", "legendary_light", 10, 0.3, inner="legendary_light")),
                         ("xp_gem_placeholder.glb", build_xp_gem),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
                         ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),

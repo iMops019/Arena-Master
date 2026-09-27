@@ -48,6 +48,7 @@ internal sealed class DelveDirector
         var scaling = RunDirector.ScalingAt(classic);
         field.Scaling = scaling with { Health = scaling.Health * DelveRules.HealthMultiplier(Depth), Damage = scaling.Damage * DelveRules.DamageMultiplier(Depth) };
         field.Mix = RunDirector.MixAt(classic);
+        field.RarityOdds = RarityOdds.Standard;
 
         int elites = 0;
         bool spawnBoss = false;

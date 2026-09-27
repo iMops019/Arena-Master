@@ -155,6 +155,11 @@ public sealed partial class ArenaMasterContent
         _health.DamageTaken = _hero.DamageTaken;
         var player = new PlayerTarget(window.PlayerFeet, window.PlayerGrounded, _health, _condition, _hero.BlockChance);
         var gone = _enemies.Update(deltaSeconds, player, groundAt);
+        foreach (var legendary in _enemies.TakeLegendarySpawns())
+        {
+            Announce($"A {legendary.Name} approaches!");
+        }
+
         _hero.Answer(frame);
         _itemEffects.Answer(_enemies.Strikes, window.PlayerFeet, _items.Carried.Bonuses, _enemies, _health, _itemHits);
         foreach (var hit in _itemHits)
@@ -275,10 +280,21 @@ public sealed partial class ArenaMasterContent
             return;
         }
 
-        _gems.Drop(killed.Position, killed.Kind.Experience);
+        _gems.Drop(killed.Position, killed.Experience);
         _health.Heal(_items.Carried.Bonuses.HealOnKill);
         _hero.OnKill(killed, _runSeconds);
         _itemEffects.OnKill(_items.Carried.Bonuses);
+        if (_loot.RollRarityDrop(killed.Rarity))
+        {
+            // A Rare's chest has the world's odds, a Legendary's an elite's; it takes the place of any drop its kind would have had.
+            _loot.DropChest(killed.Position, killed.Rarity.Rarity == MonsterRarity.Legendary ? RarityWeights.Elite : RarityWeights.World);
+            if (killed.Kind.Tier == EnemyTier.Elite)
+            {
+                _elitesKilled++;
+            }
+
+            return;
+        }
 
         switch (killed.Kind.Tier)
         {

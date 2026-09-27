@@ -78,6 +78,7 @@ public sealed partial class ArenaMasterContent
     {
         if (_window?.Camera is { } camera)
         {
+            DrawRarityTags(hud, camera);
             _numbers.Draw(hud, camera);
         }
 
@@ -169,6 +170,56 @@ public sealed partial class ArenaMasterContent
             hud.Text(HudAnchor.Center, new Vector2D<float>(0f, -120f), _announcement, new Vector4D<float>(Red.X, Red.Y, Red.Z, alpha), 1.4f);
         }
     }
+
+    /// <summary>How far off a Rare or Legendary enemy still shows its name tag.</summary>
+    private const float RarityTagDistance = 45f;
+
+    /// <summary>
+    /// Over each Rare and Legendary enemy near enough, its name in its rarity's colour and a thin health bar (a Magic one only has its ring, or a swarm would
+    /// be all tags).
+    /// </summary>
+    private void DrawRarityTags(IHud hud, CEngine.Core.Camera camera)
+    {
+        var screen = hud.ScreenSize;
+        if (screen.X <= 0 || screen.Y <= 0 || _window is not { } window)
+        {
+            return;
+        }
+
+        var viewProjection = camera.GetView() * camera.GetProjection((float)screen.X / screen.Y);
+        var feet = window.PlayerFeet;
+        foreach (var enemy in _enemies.Enemies)
+        {
+            if (!enemy.IsAlive || enemy.Rarity.Rarity < MonsterRarity.Rare || Vector3D.Distance(enemy.Position, feet) > RarityTagDistance)
+            {
+                continue;
+            }
+
+            var above = enemy.Position + new Vector3D<float>(0f, enemy.Kind.Height * enemy.Rarity.Size + 0.45f, 0f);
+            var clip = Vector4D.Transform(new Vector4D<float>(above, 1f), viewProjection);
+            if (clip.W <= 0.1f)
+            {
+                continue;   // behind the camera
+            }
+
+            float x = (clip.X / clip.W * 0.5f + 0.5f) * screen.X;
+            float y = (1f - (clip.Y / clip.W * 0.5f + 0.5f)) * screen.Y;
+            var colour = MonsterRarityColor(enemy.Rarity.Rarity);
+            float scale = enemy.Rarity.Rarity == MonsterRarity.Legendary ? 0.8f : 0.65f;
+            var size = hud.MeasureText(enemy.Name, scale);
+            hud.Text(HudAnchor.TopLeft, new Vector2D<float>(x - size.X / 2f, y - size.Y - 8f), enemy.Name, colour, scale);
+            hud.Bar(HudAnchor.TopLeft, new Vector2D<float>(x - 40f, y - 4f), new Vector2D<float>(80f, 5f), enemy.Health / enemy.MaxHealth, colour, Shade);
+        }
+    }
+
+    /// <summary>A Magic enemy's blue, a Rare's yellow, a Legendary's orange.</summary>
+    private static Vector4D<float> MonsterRarityColor(MonsterRarity rarity) => rarity switch
+    {
+        MonsterRarity.Magic => new Vector4D<float>(0.45f, 0.65f, 1f, 1f),
+        MonsterRarity.Rare => new Vector4D<float>(1f, 0.9f, 0.35f, 1f),
+        MonsterRarity.Legendary => new Vector4D<float>(1f, 0.58f, 0.12f, 1f),
+        _ => new Vector4D<float>(1f, 1f, 1f, 1f),
+    };
 
     /// <summary>The Shift move's charge, bottom centre: fills back up after each use.</summary>
     private void DrawDash(IHud hud)

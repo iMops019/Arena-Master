@@ -12,20 +12,33 @@ internal enum AttackPhase
 /// <summary>One enemy in the world. <see cref="Position"/> is its feet.</summary>
 internal sealed class Enemy
 {
-    public Enemy(int id, EnemyKind kind, Vector3D<float> position, EnemyScaling scaling)
+    public Enemy(int id, EnemyKind kind, Vector3D<float> position, EnemyScaling scaling, RarityTraits? rarity = null)
     {
         Id = id;
         Kind = kind;
+        Rarity = rarity ?? RarityTraits.Normal;
         Position = position;
-        MaxHealth = kind.MaxHealth * scaling.Health;
+        MaxHealth = kind.MaxHealth * scaling.Health * Rarity.Health;
         Health = MaxHealth;
-        Speed = kind.Speed * scaling.Speed;
-        DamageScale = scaling.Damage;
+        Speed = kind.Speed * scaling.Speed * Rarity.Speed;
+        DamageScale = scaling.Damage * Rarity.Damage;
     }
 
     public int Id { get; }
 
     public EnemyKind Kind { get; }
+
+    /// <summary>How rare it spawned (Magic, Rare, Legendary), and what that does to it.</summary>
+    public RarityTraits Rarity { get; }
+
+    /// <summary>Its name with its rarity: "Legendary Ghoul".</summary>
+    public string Name => Rarity.Prefix + Kind.Name;
+
+    /// <summary>What its gem is worth: its kind's experience, raised by its rarity.</summary>
+    public int Experience => (int)MathF.Round(Kind.Experience * Rarity.Experience);
+
+    /// <summary>How much faster than its kind it attacks: its wind-ups, blows, recoveries, breathers and claws all run this much quicker.</summary>
+    public float AttackSpeed => Rarity.AttackSpeed;
 
     public Vector3D<float> Position { get; set; }
 
@@ -259,6 +272,7 @@ internal sealed class EnemyField
     private readonly List<EnemyBlast> _blasts = new();
     private readonly List<EnemyBomb> _bombs = new();
     private readonly List<(Enemy Boss, BossPhase Phase)> _phaseChanges = new();
+    private readonly List<Enemy> _legendaries = new();
     private readonly EnemyGrid _grid = new();
     private readonly Random _random;
     private bool _gridStale = true;
@@ -280,6 +294,20 @@ internal sealed class EnemyField
     /// together at most 1).
     /// </summary>
     public IReadOnlyList<(EnemyKind Kind, float Share)> Mix { get; set; } = Array.Empty<(EnemyKind, float)>();
+
+    /// <summary>
+    /// The chance each spawning enemy (fodder and elites, never a boss or a crate) is Magic, Rare or Legendary. None unless set (the directors set it each
+    /// frame of a run).
+    /// </summary>
+    public RarityOdds RarityOdds { get; set; } = RarityOdds.None;
+
+    /// <summary>The Legendary enemies that have turned up since this was last asked, for an announcement.</summary>
+    public List<Enemy> TakeLegendarySpawns()
+    {
+        var spawned = _legendaries.ToList();
+        _legendaries.Clear();
+        return spawned;
+    }
 
     /// <summary>The enemies' shots in flight.</summary>
     public IReadOnlyList<EnemyBolt> Bolts => _bolts;
@@ -342,11 +370,21 @@ internal sealed class EnemyField
     /// <summary>The first living boss, if one is on the field.</summary>
     public Enemy? Boss => _enemies.FirstOrDefault(e => e.IsAlive && e.Kind.Tier == EnemyTier.Boss);
 
-    /// <summary>Puts an enemy (of <see cref="Kind"/> unless <paramref name="kind"/> says otherwise, at the current <see cref="Scaling"/>) at <paramref name="position"/>, its feet.</summary>
-    public Enemy Spawn(Vector3D<float> position, EnemyKind? kind = null)
+    /// <summary>
+    /// Puts an enemy (of <see cref="Kind"/> unless <paramref name="kind"/> says otherwise, at the current <see cref="Scaling"/>) at <paramref name="position"/>, its
+    /// feet. Its rarity is <paramref name="rarity"/> if given, otherwise rolled from <see cref="RarityOdds"/> (a boss or a crate is always normal).
+    /// </summary>
+    public Enemy Spawn(Vector3D<float> position, EnemyKind? kind = null, MonsterRarity? rarity = null)
     {
+        kind ??= Kind;
         var scaling = HealthBonus != 0f ? Scaling with { Health = Scaling.Health * (1f + HealthBonus) } : Scaling;
-        var enemy = new Enemy(_nextId++, kind ?? Kind, position, scaling) { Phase = (float)_random.NextDouble() * MathF.Tau };
+        var rolled = rarity ?? (kind.Tier == EnemyTier.Boss || kind.IsProp ? MonsterRarity.Normal : RarityOdds.Pick(_random.NextDouble()));
+        var enemy = new Enemy(_nextId++, kind, position, scaling, RarityTraits.Of(rolled)) { Phase = (float)_random.NextDouble() * MathF.Tau };
+        if (rolled == MonsterRarity.Legendary)
+        {
+            _legendaries.Add(enemy);
+        }
+
         enemy.AttackCooldown = enemy.Kind.AttackCooldown * 0.5f;   // a short breather after arriving
         _enemies.Add(enemy);
         _gridStale = true;
@@ -544,6 +582,7 @@ internal sealed class EnemyField
         _enemies.Clear();
         _newlyKilled.Clear();
         _summoned.Clear();
+        _legendaries.Clear();
         _strikes.Clear();
         _bolts.Clear();
         _bombs.Clear();
@@ -644,8 +683,8 @@ internal sealed class EnemyField
             return;   // frozen solid: no step, no claw, and an attack under way waits
         }
 
-        enemy.ContactCooldown = MathF.Max(0f, enemy.ContactCooldown - deltaSeconds);
-        enemy.AttackCooldown = MathF.Max(0f, enemy.AttackCooldown - deltaSeconds);
+        enemy.ContactCooldown = MathF.Max(0f, enemy.ContactCooldown - deltaSeconds * enemy.AttackSpeed);
+        enemy.AttackCooldown = MathF.Max(0f, enemy.AttackCooldown - deltaSeconds * enemy.AttackSpeed);
 
         if (enemy.Attack is not null)
         {
@@ -777,7 +816,7 @@ internal sealed class EnemyField
     private void RunAttack(Enemy enemy, float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
     {
         var attack = enemy.Attack!;
-        enemy.PhaseTime += deltaSeconds;
+        enemy.PhaseTime += deltaSeconds * enemy.AttackSpeed;   // a quicker enemy runs through its whole attack quicker
 
         switch (enemy.AttackPhase)
         {

@@ -11,7 +11,8 @@ namespace ArenaMaster.Game.Combat;
 /// faint to bright as a shot winds up. A prop (a crate) is a plain crowd. The shots in flight are crowds too; a fireball's landing spot is marked with a
 /// burning ring while it flies, and it bursts in a ring of fire; a bomb tumbles, a ghostly ring on the ground under it showing its blast and pulsing faster as
 /// it slows, and goes off in a ring of green. Attacks show their telegraphs on the ground as placed props: a red lane for a lunge, a red circle filling up for
-/// a leap slam's landing, a ring spreading out for a shockwave.
+/// a leap slam's landing, a ring spreading out for a shockwave. A Magic, Rare or Legendary enemy is drawn a little bigger, over a slowly turning ring in its
+/// rarity's colour.
 /// </summary>
 internal sealed class EnemyView
 {
@@ -43,6 +44,10 @@ internal sealed class EnemyView
     private readonly Dictionary<string, List<CrowdInstance>> _shots = new();   // shot model -> this frame's copies
     private readonly List<CrowdInstance> _landings = new();
     private readonly List<CrowdInstance> _bombMarks = new();
+    private readonly Dictionary<string, List<CrowdInstance>> _rings = new()   // rarity ring model -> this frame's
+    {
+        [RarityTraits.Magic.RingModel!] = new(), [RarityTraits.Rare.RingModel!] = new(), [RarityTraits.Legendary.RingModel!] = new(),
+    };
     private readonly Dictionary<string, List<CrowdInstance>> _blasts = new() { [BlastModel] = new(), [BombBurstModel] = new() };   // burst model -> this frame's
     private float _time;
 
@@ -66,9 +71,21 @@ internal sealed class EnemyView
             list.Clear();
         }
 
+        foreach (var list in _rings.Values)
+        {
+            list.Clear();
+        }
+
         var shown = new HashSet<(int, Marker)>();
         foreach (var enemy in field.Enemies)
         {
+            if (enemy.IsAlive && enemy.Rarity.RingModel is { } ring)
+            {
+                float size = enemy.Kind.Radius * enemy.Rarity.Size * 1.5f + 0.25f;
+                float spin = (enemy.Rarity.Rarity == MonsterRarity.Legendary ? 1.2f : 0.6f) * _time + enemy.Phase;
+                Copies(_rings, ring).Add(new CrowdInstance(Lift(enemy.Position, 0.06f), spin, size, Flash: 0.25f + 0.2f * MathF.Sin(_time * 4f + enemy.Phase)));
+            }
+
             if (enemy.Kind.IsProp || Clips(window, enemy.Kind.Model) is not { } clips)
             {
                 Copies(_crowds, enemy.Kind.Model).Add(Pose(enemy));
@@ -97,6 +114,11 @@ internal sealed class EnemyView
         {
             window.RemovePlacedProp(_markers[key]);
             _markers.Remove(key);
+        }
+
+        foreach (var (model, copies) in _rings)
+        {
+            window.SetCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(copies));
         }
 
         foreach (var (model, copies) in _crowds)
@@ -241,7 +263,7 @@ internal sealed class EnemyView
     {
         var position = enemy.Position;
         bool fodder = enemy.Kind.Tier == EnemyTier.Fodder;
-        float scale = 1f + 0.08f * enemy.HitFlash * (fodder ? 1f : 0.3f);
+        float scale = (1f + 0.08f * enemy.HitFlash * (fodder ? 1f : 0.3f)) * enemy.Rarity.Size;
         float pitch = -0.2f * enemy.HitFlash * (fodder ? 1f : 0.2f);
         float flash = enemy.IsFrozen ? MathF.Max(0.55f, enemy.HitFlash) : enemy.HitFlash;
         if (!enemy.IsAlive)
@@ -257,7 +279,7 @@ internal sealed class EnemyView
     private CrowdInstance Pose(Enemy enemy)
     {
         var position = enemy.Position;
-        float scale = 1f + 0.12f * enemy.HitFlash * (enemy.Kind.Tier == EnemyTier.Fodder ? 1f : 0.3f);   // a quick swell on a hit; big ones barely
+        float scale = (1f + 0.12f * enemy.HitFlash * (enemy.Kind.Tier == EnemyTier.Fodder ? 1f : 0.3f)) * enemy.Rarity.Size;   // a quick swell on a hit; big ones barely
         float pitch = -0.25f * enemy.HitFlash * (enemy.Kind.Tier == EnemyTier.Fodder ? 1f : 0.2f);         // and a flinch back
 
         if (!enemy.IsAlive)

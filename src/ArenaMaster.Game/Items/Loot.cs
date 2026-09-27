@@ -111,6 +111,9 @@ internal sealed class LootField
     /// <summary>Whether a fodder kill drops an item this time.</summary>
     public bool RollFodderDrop() => _random.NextDouble() < FodderDropChance;
 
+    /// <summary>Whether a Rare or Legendary enemy's kill leaves a chest this time (its <see cref="Combat.RarityTraits.ChestChance"/>).</summary>
+    public bool RollRarityDrop(Combat.RarityTraits rarity) => rarity.ChestChance > 0f && _random.NextDouble() < rarity.ChestChance;
+
     /// <summary>Whether an elite's kill leaves a chest this time.</summary>
     public bool RollEliteDrop() => _random.NextDouble() < EliteDropChance;
 

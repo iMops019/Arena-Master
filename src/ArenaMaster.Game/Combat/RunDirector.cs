@@ -92,6 +92,7 @@ internal sealed class RunDirector
         field.SpawnInterval = SpawnInterval(seconds);
         field.Scaling = ScalingAt(seconds);
         field.Mix = MixAt(seconds);
+        field.RarityOdds = RarityOdds.Standard;
 
         int elites = 0;
         if (seconds >= _nextElite)
