@@ -291,6 +291,7 @@ internal sealed class EnemyField
     private readonly List<EnemyBomb> _bombs = new();
     private readonly List<(Enemy Boss, BossPhase Phase)> _phaseChanges = new();
     private readonly List<Enemy> _legendaries = new();
+    private readonly Dictionary<AttackType, int> _fodderAttacking = new();
     private readonly EnemyGrid _grid = new();
     private readonly Random _random;
     private bool _gridStale = true;
@@ -422,6 +423,7 @@ internal sealed class EnemyField
         _strikes.Clear();
         SpawnTowardTarget(deltaSeconds, player.Feet, groundAt);
         RefreshGrid();
+        CountFodderAttacks();
 
         foreach (var enemy in _enemies)
         {
@@ -850,10 +852,11 @@ internal sealed class EnemyField
         else if (opening)
         {
             var pounce = enemy.AttacksNow.FirstOrDefault(a => distance >= a.MinRange && distance <= a.MaxRange);
-            if (pounce is not null && enemy.AttackCooldown <= 0f)
+            if (pounce is not null && enemy.AttackCooldown <= 0f && MayStart(enemy, pounce))
             {
                 enemy.Yaw = MathF.Atan2(toPlayer.X, toPlayer.Z);
                 StartAttack(enemy, pounce, player, groundAt);
+                Started(enemy, pounce);
                 enemy.ChainLeft = pounce.Chain;
                 step = Vector3D<float>.Zero;
                 return true;
@@ -922,10 +925,50 @@ internal sealed class EnemyField
         }
     }
 
-    /// <summary>Starts one of the enemy's attacks that suits how far away the player is, picked at random. False if none does.</summary>
+    /// <summary>
+    /// At most this many fodder at once may be winding up or in the middle of each kind of attack: past it, the rest wait their turn. It keeps a swarm deep in a
+    /// run or a Delve from filling the air with shots and the ground with charge lanes all at once. Elites and bosses are never held back.
+    /// </summary>
+    public static int FodderAttackCap(AttackType type) => type switch
+    {
+        AttackType.Shoot => 12,
+        AttackType.Lob => 6,
+        AttackType.Lunge => 8,
+        _ => int.MaxValue,
+    };
+
+    /// <summary>How many fodder are in the middle of an attack of <paramref name="type"/> right now.</summary>
+    public int FodderAttacking(AttackType type) => _fodderAttacking.GetValueOrDefault(type);
+
+    private void CountFodderAttacks()
+    {
+        _fodderAttacking.Clear();
+        foreach (var enemy in _enemies)
+        {
+            if (enemy.IsAlive && enemy.Attack is { } attack && enemy.Kind.Tier == EnemyTier.Fodder)
+            {
+                _fodderAttacking[attack.Type] = _fodderAttacking.GetValueOrDefault(attack.Type) + 1;
+            }
+        }
+    }
+
+    /// <summary>Whether <paramref name="enemy"/> may start <paramref name="attack"/> now: always, unless it is fodder and too many are at that kind of attack already.</summary>
+    private bool MayStart(Enemy enemy, AttackSpec attack) =>
+        enemy.Kind.Tier != EnemyTier.Fodder || _fodderAttacking.GetValueOrDefault(attack.Type) < FodderAttackCap(attack.Type);
+
+    /// <summary>Counts an attack just started toward the cap.</summary>
+    private void Started(Enemy enemy, AttackSpec attack)
+    {
+        if (enemy.Kind.Tier == EnemyTier.Fodder)
+        {
+            _fodderAttacking[attack.Type] = _fodderAttacking.GetValueOrDefault(attack.Type) + 1;
+        }
+    }
+
+    /// <summary>Starts one of the enemy's attacks that suits how far away the player is (and isn't held back by the cap), picked at random. False if none does.</summary>
     private bool TryStartAttack(Enemy enemy, float distance, PlayerTarget player, Func<float, float, float?> groundAt)
     {
-        var usable = enemy.AttacksNow.Where(a => distance >= a.MinRange && distance <= a.MaxRange).ToList();
+        var usable = enemy.AttacksNow.Where(a => distance >= a.MinRange && distance <= a.MaxRange && MayStart(enemy, a)).ToList();
         if (usable.Count == 0)
         {
             return false;
@@ -933,6 +976,7 @@ internal sealed class EnemyField
 
         var attack = usable[_random.Next(usable.Count)];
         StartAttack(enemy, attack, player, groundAt);
+        Started(enemy, attack);
         enemy.ChainLeft = attack.Chain;
         return true;
     }

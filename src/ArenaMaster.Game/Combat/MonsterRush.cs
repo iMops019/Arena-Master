@@ -18,9 +18,9 @@ internal sealed class MonsterRush
     public const float GapMax = 270f;
 
     /// <summary>How big the crowd gets: the director's fodder target times this, plus this, at most this.</summary>
-    public const float CrowdMultiplier = 2f;
-    public const int CrowdExtra = 30;
-    public const int MaxCrowd = 450;
+    public const float CrowdMultiplier = 1.5f;
+    public const int CrowdExtra = 20;
+    public const int MaxCrowd = 350;
 
     /// <summary>The crowd builds to its full size over this long at the start of a rush.</summary>
     public const float RampSeconds = 8f;

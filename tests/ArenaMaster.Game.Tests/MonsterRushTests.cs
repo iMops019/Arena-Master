@@ -70,12 +70,12 @@ public class MonsterRushTests
     }
 
     [Fact]
-    public void TheCrowd_BuildsOverTheRamp_ToTwiceThePlusExtra_AndIsCapped()
+    public void TheCrowd_BuildsOverTheRamp_ToItsFullSize_AndIsCapped()
     {
         Assert.Equal(75, MonsterRush.Crowd(75, 0f));
-        Assert.InRange(MonsterRush.Crowd(75, MonsterRush.RampSeconds / 2f), 127, 128);
-        Assert.Equal(180, MonsterRush.Crowd(75, MonsterRush.RampSeconds));
-        Assert.Equal(180, MonsterRush.Crowd(75, 25f));
+        Assert.InRange(MonsterRush.Crowd(75, MonsterRush.RampSeconds / 2f), 103, 104);   // halfway to 75 x 1.5 + 20
+        Assert.Equal(132, MonsterRush.Crowd(75, MonsterRush.RampSeconds));
+        Assert.Equal(132, MonsterRush.Crowd(75, 25f));
         Assert.Equal(MonsterRush.MaxCrowd, MonsterRush.Crowd(300, 25f));
     }
 
@@ -92,7 +92,7 @@ public class MonsterRushTests
         rush.Start();
         Run(rush, 10f);
         rush.Apply(field);
-        Assert.Equal(180, field.TargetCount);
+        Assert.Equal(132, field.TargetCount);
         Assert.Equal(MonsterRush.SpawnInterval, field.SpawnInterval);
     }
 
@@ -121,6 +121,6 @@ public class MonsterRushTests
         }
 
         Assert.Equal(75, before);
-        Assert.InRange(field.AliveCount, 175, 180);
+        Assert.InRange(field.AliveCount, 127, 132);
     }
 }

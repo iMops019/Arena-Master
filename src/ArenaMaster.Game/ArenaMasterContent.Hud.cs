@@ -134,6 +134,9 @@ public sealed partial class ArenaMasterContent
         }
 
         hud.Text(HudAnchor.BottomLeft, new Vector2D<float>(28f, -64f), $"HP  {MathF.Ceiling(_health.Current)} / {_health.Max}{barrier}", White, 0.75f);
+        float armour = ArmourNow;
+        hud.Text(HudAnchor.BottomLeft, new Vector2D<float>(28f, -86f), $"Armour  {armour:0}  (-{Armour.Reduction(armour) * 100f:0}% damage)",
+            new Vector4D<float>(0.75f, 0.8f, 0.9f, 0.85f), 0.65f);
         if (_health.HurtFlash > 0f)
         {
             hud.Rect(HudAnchor.TopLeft, Vector2D<float>.Zero, new Vector2D<float>(hud.ScreenSize.X, hud.ScreenSize.Y), new Vector4D<float>(0.7f, 0f, 0f, 0.18f * _health.HurtFlash));

@@ -257,7 +257,8 @@ public class DelveDirectorTests
     public void TheSwarm_RampsFaster_AndDeeperFloorsReachFurther()
     {
         Assert.Equal(10f, DelveDirector.PeakMinutes(1));
-        Assert.Equal(28f, DelveDirector.PeakMinutes(50));
+        Assert.Equal(20f, DelveDirector.PeakMinutes(50));
+        Assert.Equal(17f, DelveDirector.PeakMinutes(8));
         var shallow = new DelveDirector(1);
         var deep = new DelveDirector(9);
         Assert.Equal(600f, shallow.ClassicSeconds(600f));

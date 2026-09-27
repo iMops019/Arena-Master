@@ -51,6 +51,9 @@ internal sealed class ItemBonuses
     /// <summary>What damage taken is multiplied by (below 1 is less damage).</summary>
     public float DamageTaken = 1f;
 
+    /// <summary>Armour (see <see cref="Combat.Armour"/>): body armour gear gives it, on top of the class's own Defense.</summary>
+    public float Armour;
+
     /// <summary>Block chance added (any class can block with it), and what the whole block chance is multiplied by.</summary>
     public float BlockChance;
     public float BlockMultiplier = 1f;

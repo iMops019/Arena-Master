@@ -37,48 +37,57 @@ internal static class GearCatalog
     {
         // Body armour
         new("great_mages_vestments", "Great Mage's Vestments", GearSlot.BodyArmour,
-            "Gain a 100-point shield over your health. Once it breaks, it returns after 10 seconds.",
+            "+30 armour. Gain a 100-point shield over your health. Once it breaks, it returns after 10 seconds.",
             "Woven for an archmage who never once learned to dodge.",
             b =>
             {
+                b.Armour += 30f;
                 b.GearShield += 100f;
                 b.GearShieldCooldown = 10f;
             }),
         new("ironhide_hauberk", "Ironhide Hauberk", GearSlot.BodyArmour,
-            "Take 15% less damage. +30 max health.",
+            "+80 armour. Take 15% less damage. +30 max health.",
             "Every dent in it is a story. None of them end well for the other fellow.",
             b =>
             {
+                b.Armour += 80f;
                 b.DamageTaken *= 0.85f;
                 b.MaxHealth += 30f;
             }),
         new("thornmail_of_the_hollow", "Thornmail of the Hollow", GearSlot.BodyArmour,
-            "Every blow that reaches you is paid back to the attacker in full.",
+            "+50 armour. Every blow that reaches you is paid back to the attacker in full.",
             "Forged from the King's own briars. It remembers every hand that strikes it.",
-            b => b.Retaliation += 1f),
+            b =>
+            {
+                b.Armour += 50f;
+                b.Retaliation += 1f;
+            }),
         new("wraithskin_coat", "Wraithskin Coat", GearSlot.BodyArmour,
-            "+15% move speed. Your Shift move recharges 30% faster.",
+            "+20 armour. +15% move speed. Your Shift move recharges 30% faster.",
             "Light as a held breath, and twice as hard to catch.",
             b =>
             {
+                b.Armour += 20f;
                 b.MoveSpeed += 0.15f;
                 b.DashRecharge += 0.30f;
             }),
 
         new("shroud_of_the_ninth_grave", "Shroud of the Ninth Grave", GearSlot.BodyArmour,
-            "+30 max health. Thorns: 6 damage to every enemy touching you every 0.5 s.",
+            "+40 armour. +30 max health. Thorns: 6 damage to every enemy touching you every 0.5 s.",
             "Stitched from the burial cloths of nine kings. None of them are resting.",
             b =>
             {
+                b.Armour += 40f;
                 b.MaxHealth += 30f;
                 b.Thorns += 6f;
             }),
 
         new("berserkers_hide", "Berserker's Hide", GearSlot.BodyArmour,
-            "+40 max health. Up to +30% damage as your health drops.",
+            "+40 armour. +40 max health. Up to +30% damage as your health drops.",
             "Tanned from something that didn't know when to stop. Neither will you.",
             b =>
             {
+                b.Armour += 40f;
                 b.MaxHealth += 40f;
                 b.LowHealthDamage += 0.30f;
             }),

@@ -19,7 +19,7 @@ internal readonly record struct HitRules(float EliteDamage, float HealthyDamage,
 /// </summary>
 internal sealed class RangerStats
 {
-    public const float BaseDamage = 12f;
+    public const float BaseDamage = 17f;
     public const float BaseFireInterval = 0.5f;
     public const float BaseMoveSpeed = 7f;
     public const float BaseArrowSpeed = 50f;

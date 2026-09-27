@@ -94,7 +94,7 @@ public sealed partial class ArenaMasterContent
         _enemies.Obstacles = (centre, radius) => window.TouchesObstacle(centre, radius, out _, out _);
         _itemEffects.Begin();
         BeginCrates();
-        _health.DamageTaken = _hero.DamageTaken;
+        _health.DamageTaken = _hero.DamageTaken * Armour.Cut(ArmourNow);
         _condition.Clear();
         _experience.Reset();
         _experienceCarry = 0f;
@@ -162,7 +162,7 @@ public sealed partial class ArenaMasterContent
         _hero.Attack(frame);
         _itemHits.Clear();
         _itemEffects.Update(deltaSeconds, window.PlayerFeet, _items.Carried.Bonuses, _enemies, _health, _hero.KeepsOwnBarrier, _itemHits);
-        _health.DamageTaken = _hero.DamageTaken;
+        _health.DamageTaken = _hero.DamageTaken * Armour.Cut(ArmourNow);
         var player = new PlayerTarget(window.PlayerFeet, window.PlayerGrounded, _health, _condition, _hero.BlockChance, LookingWay(window));
         var gone = _enemies.Update(deltaSeconds, player, groundAt);
         foreach (var legendary in _enemies.TakeLegendarySpawns())
@@ -252,12 +252,8 @@ public sealed partial class ArenaMasterContent
     /// <summary>Takes everything of a run out of the world - enemies, gems, loot, arrows, numbers, a level-up in progress - with no rewards.</summary>
     private void ClearField(EngineWindow window)
     {
-        foreach (var enemy in _enemies.Clear())
-        {
-            _enemyView.Remove(window, enemy);
-        }
-
-        _enemyView.Sync(window, _enemies, Array.Empty<Enemy>(), 0f, (_, _) => null);   // an empty field: every enemy crowd drawn empty
+        var cleared = _enemies.Clear();
+        _enemyView.Sync(window, _enemies, cleared, 0f, (_, _) => null);   // an empty field: every enemy crowd drawn empty, their telegraphs gone
 
         _gems.Clear();
         _gemView.Sync(window, _gems, 0f);
@@ -401,6 +397,9 @@ public sealed partial class ArenaMasterContent
     }
 
     /// <summary>Spawns what the director asked for: a wave of elites, a boss.</summary>
+    /// <summary>The player's armour this moment: the class's Defense (from its tree's level) and what the body armour worn gives.</summary>
+    private float ArmourNow => Armour.Defense(_tree.Level) + _items.Carried.Bonuses.Armour;
+
     /// <summary>The flat way the player is looking: the camera's (every hero faces its aim), or zero if there is no camera.</summary>
     private static Vector3D<float> LookingWay(EngineWindow window)
     {

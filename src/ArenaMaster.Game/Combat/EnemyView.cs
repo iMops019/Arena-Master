@@ -10,8 +10,8 @@ namespace ArenaMaster.Game.Combat;
 /// crossbow, the Ghoul Mage's flame, the Ghoul Tactician's bomb) has it drawn as an animated crowd of its own on the same skeleton and clip, lighting up from
 /// faint to bright as a shot winds up. A prop (a crate) is a plain crowd. The shots in flight are crowds too; a fireball's landing spot is marked with a
 /// burning ring while it flies, and it bursts in a ring of fire; a bomb tumbles, a ghostly ring on the ground under it showing its blast and pulsing faster as
-/// it slows, and goes off in a ring of green. Attacks show their telegraphs on the ground as placed props: a red lane for a lunge, a red circle filling up for
-/// a leap slam's landing, a ring spreading out for a shockwave. A Magic, Rare or Legendary enemy is drawn a little bigger, over a slowly turning ring in its
+/// it slows, and goes off in a ring of green. Attacks show their telegraphs on the ground, as crowds too (so dozens at once cost what one does): a red lane for
+/// a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave. A Magic, Rare or Legendary enemy is drawn a little bigger, over a slowly turning ring in its
 /// rarity's colour.
 /// </summary>
 internal sealed class EnemyView
@@ -28,15 +28,10 @@ internal sealed class EnemyView
     public const string BombMarkModel = "ghoul_bomb_mark.glb";
     public const string BombBurstModel = "ghoul_bomb_burst.glb";
 
-    private enum Marker
+    private readonly Dictionary<string, List<CrowdInstance>> _telegraphs = new()   // telegraph model -> this frame's
     {
-        Ring,
-        Disc,
-        Lane,
-        Shockwave,
-    }
-
-    private readonly Dictionary<(int Enemy, Marker Marker), int> _markers = new();   // telegraph -> placed prop id
+        [RingModel] = new(), [DiscModel] = new(), [LaneModel] = new(), [ShockwaveModel] = new(),
+    };
     private readonly Dictionary<string, List<CrowdInstance>> _crowds = new();       // model -> this frame's copies (props)
     private readonly Dictionary<string, List<SkinnedCrowdInstance>> _animated = new();   // model -> this frame's animated copies
     private readonly Dictionary<string, IReadOnlyDictionary<string, float>> _clips = new();   // model -> its clips' lengths
@@ -57,7 +52,6 @@ internal sealed class EnemyView
 
         foreach (var enemy in gone)
         {
-            Remove(window, enemy);
             _motion.Forget(enemy);
         }
 
@@ -76,7 +70,11 @@ internal sealed class EnemyView
             list.Clear();
         }
 
-        var shown = new HashSet<(int, Marker)>();
+        foreach (var list in _telegraphs.Values)
+        {
+            list.Clear();
+        }
+
         foreach (var enemy in field.Enemies)
         {
             if (enemy.IsAlive && enemy.Rarity.RingModel is { } ring)
@@ -102,18 +100,13 @@ internal sealed class EnemyView
 
             if (enemy.IsAlive)
             {
-                foreach (var (marker, placement) in Telegraphs(enemy, groundAt))
-                {
-                    Place(window, _markers, (enemy.Id, marker), placement);
-                    shown.Add((enemy.Id, marker));
-                }
+                AddTelegraphs(enemy, groundAt);
             }
         }
 
-        foreach (var key in _markers.Keys.Where(k => !shown.Contains(k)).ToList())
+        foreach (var (model, copies) in _telegraphs)
         {
-            window.RemovePlacedProp(_markers[key]);
-            _markers.Remove(key);
+            window.SetCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(copies));
         }
 
         foreach (var (model, copies) in _rings)
@@ -207,29 +200,6 @@ internal sealed class EnemyView
             AttackPhase.Active => 1f,
             _ => 0f,
         };
-    }
-
-    /// <summary>Takes away an enemy's ground telegraphs (its body goes with the next <see cref="Sync"/>).</summary>
-    public void Remove(EngineWindow window, Enemy enemy)
-    {
-        foreach (var key in _markers.Keys.Where(k => k.Enemy == enemy.Id).ToList())
-        {
-            window.RemovePlacedProp(_markers[key]);
-            _markers.Remove(key);
-        }
-    }
-
-    private static void Place<TKey>(EngineWindow window, Dictionary<TKey, int> props, TKey key, PropPlacement placement)
-        where TKey : notnull
-    {
-        if (props.TryGetValue(key, out int id))
-        {
-            window.SetPlacedProp(id, placement);
-        }
-        else
-        {
-            props[key] = window.PlaceProp(placement);
-        }
     }
 
     private static List<T> Copies<T>(Dictionary<string, List<T>> crowds, string model)
@@ -340,12 +310,12 @@ internal sealed class EnemyView
         return new CrowdInstance(position, enemy.Yaw, scale, pitch, Flash: enemy.HitFlash);
     }
 
-    /// <summary>What an enemy's current attack shows on the ground.</summary>
-    private IEnumerable<(Marker, PropPlacement)> Telegraphs(Enemy enemy, Func<float, float, float?> groundAt)
+    /// <summary>What an enemy's current attack shows on the ground, added to this frame's telegraph crowds.</summary>
+    private void AddTelegraphs(Enemy enemy, Func<float, float, float?> groundAt)
     {
         if (enemy.Attack is not { } attack)
         {
-            yield break;
+            return;
         }
 
         switch (attack.Type)
@@ -354,7 +324,7 @@ internal sealed class EnemyView
             {
                 var direction = enemy.AttackTarget - enemy.AttackOrigin;
                 float yaw = MathF.Atan2(direction.X, direction.Z);
-                yield return (Marker.Lane, new PropPlacement(LaneModel, Lift(enemy.AttackOrigin, 0.06f), yaw, attack.Reach / LaneLength));   // a longer charge, a longer (and wider) lane
+                _telegraphs[LaneModel].Add(new CrowdInstance(Lift(enemy.AttackOrigin, 0.06f), yaw, attack.Reach / LaneLength));   // a longer charge, a longer (and wider) lane
                 break;
             }
 
@@ -365,8 +335,8 @@ internal sealed class EnemyView
                     ? enemy.PhaseTime / (attack.WindUp + attack.Active)
                     : (attack.WindUp + enemy.PhaseTime) / (attack.WindUp + attack.Active);
                 var at = enemy.AttackTarget;
-                yield return (Marker.Ring, new PropPlacement(RingModel, Lift(at, 0.08f), 0f, attack.Reach));
-                yield return (Marker.Disc, new PropPlacement(DiscModel, Lift(at, 0.05f), 0f, MathF.Max(0.05f, attack.Reach * Math.Clamp(progress, 0f, 1f))));
+                _telegraphs[RingModel].Add(new CrowdInstance(Lift(at, 0.08f), 0f, attack.Reach));
+                _telegraphs[DiscModel].Add(new CrowdInstance(Lift(at, 0.05f), 0f, MathF.Max(0.05f, attack.Reach * Math.Clamp(progress, 0f, 1f))));
                 break;
             }
 
@@ -374,7 +344,7 @@ internal sealed class EnemyView
             {
                 var centre = enemy.AttackOrigin;
                 float ground = groundAt(centre.X, centre.Z) ?? centre.Y;
-                yield return (Marker.Shockwave, new PropPlacement(ShockwaveModel, new Vector3D<float>(centre.X, ground + 0.15f, centre.Z), 0f, enemy.ShockwaveRadius));
+                _telegraphs[ShockwaveModel].Add(new CrowdInstance(new Vector3D<float>(centre.X, ground + 0.15f, centre.Z), 0f, enemy.ShockwaveRadius));
                 break;
             }
         }
