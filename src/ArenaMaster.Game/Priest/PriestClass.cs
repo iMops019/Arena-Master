@@ -157,7 +157,12 @@ internal sealed class PriestClass : IHeroClass
         return 0f;
     }
 
-    public void Hide(EngineWindow window) => _controller.Hide(window);
+    /// <summary>The body goes, and with it the wisps, motes and ash drawn at camp: they'd hang frozen in the air once nothing moved them.</summary>
+    public void Hide(EngineWindow window)
+    {
+        _controller.Hide(window);
+        _view.Clear(window);
+    }
 
     public void Attack(RunFrame frame)
     {
