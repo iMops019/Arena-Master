@@ -167,8 +167,8 @@ internal static class DelveRules
 /// </summary>
 internal static class BossHunt
 {
-    /// <summary>The chance a kill's cache holds a piece of gear: pure luck, every kill its own roll.</summary>
-    public const float GearChance = 0.20f;
+    /// <summary>The chance a kill's cache holds a piece of gear: pure luck, every kill its own roll. 25% since 2026-09-27, with the new slots (was 20%).</summary>
+    public const float GearChance = 0.25f;
 
     /// <summary>The chance a kill's cache holds an item, at a boss chest's odds.</summary>
     public const float ItemChance = 0.10f;

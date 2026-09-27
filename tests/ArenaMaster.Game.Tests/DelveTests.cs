@@ -139,7 +139,7 @@ public class DelveRulesTests
         var random = new Random(11);
         int drops = Enumerable.Range(0, 4000).Count(_ => BossHunt.RollsGear(random));
         Assert.InRange(drops / 4000f, BossHunt.GearChance - 0.03f, BossHunt.GearChance + 0.03f);
-        Assert.Equal(0.2f, BossHunt.GearChance);
+        Assert.Equal(0.25f, BossHunt.GearChance);
         Assert.True(BossHunt.BossHealth > DelveBosses.HollowKingUnbound.MaxHealth);
     }
 
@@ -428,7 +428,7 @@ public class GearTests
     [Fact]
     public void ThereAreSixUniquesForEachSlot()
     {
-        Assert.Equal(18, GearCatalog.All.Count);
+        Assert.Equal(36, GearCatalog.All.Count);
         Assert.Equal(GearCatalog.All.Count, GearCatalog.All.Select(p => p.Id).Distinct().Count());
         foreach (var slot in Enum.GetValues<GearSlot>())
         {
@@ -526,6 +526,105 @@ public class GearTests
         Assert.Equal(fang, GearCatalog.WornIn(profile, GearSlot.Weapon));
         GearCatalog.TakeOff(profile, GearSlot.Weapon);
         Assert.Empty(GearCatalog.Worn(profile));
+    }
+
+    [Fact]
+    public void GearIsWornInSevenPlaces_TwoOfThemRings()
+    {
+        Assert.Equal(7, GearCatalog.Places.Count);
+        Assert.Equal(GearCatalog.Places.Count, GearCatalog.Places.Select(p => p.Key).Distinct().Count());
+        Assert.Equal(2, GearCatalog.PlacesFor(GearSlot.Ring).Count);
+        Assert.All(Enum.GetValues<GearSlot>().Where(s => s != GearSlot.Ring), slot => Assert.Single(GearCatalog.PlacesFor(slot)));
+        Assert.All(new[] { GearSlot.BodyArmour, GearSlot.Weapon, GearSlot.Trinket }, slot =>
+            Assert.Equal(slot.ToString(), GearCatalog.PlacesFor(slot)[0].Key));   // an old save's worn gear stays worn
+    }
+
+    [Fact]
+    public void TwoRings_CanBeWorn_AndARingMovesBetweenThem()
+    {
+        var profile = new Profile();
+        var left = GearCatalog.Places.First(p => p.Key == "Ring");
+        var right = GearCatalog.Places.First(p => p.Key == "Ring2");
+        var signet = GearCatalog.Perfect(GearCatalog.Find("signet_of_the_deep")!);
+        var band = GearCatalog.Perfect(GearCatalog.Find("band_of_the_hollow_court")!);
+        var another = GearCatalog.Perfect(GearCatalog.Find("signet_of_the_deep")!);
+        profile.Gear.Items.AddRange(new[] { signet, band, another });
+
+        Assert.True(GearCatalog.Wear(profile, signet));
+        Assert.True(GearCatalog.Wear(profile, band));   // the empty one
+        Assert.Equal(signet, GearCatalog.WornAt(profile, left));
+        Assert.Equal(band, GearCatalog.WornAt(profile, right));
+
+        Assert.True(GearCatalog.Wear(profile, band, left));   // moved across: the right is free again
+        Assert.Equal(band, GearCatalog.WornAt(profile, left));
+        Assert.Null(GearCatalog.WornAt(profile, right));
+
+        Assert.True(GearCatalog.Wear(profile, another, right));   // two of the same ring is fine
+        Assert.Equal(2, GearCatalog.Worn(profile).Count());
+        Assert.False(GearCatalog.Wear(profile, band, GearCatalog.Places.First(p => p.Slot == GearSlot.Amulet)));   // a ring isn't an amulet
+
+        var bonuses = new ItemBonuses();
+        foreach (var worn in GearCatalog.Worn(profile))
+        {
+            GearCatalog.Apply(worn, bonuses);
+        }
+
+        Assert.Equal(0.08f, bonuses.Damage, 4);       // the band's
+        Assert.Equal(0.15f, bonuses.CritChance, 4);   // one signet's: the first came off when the band took its hand
+    }
+
+    [Fact]
+    public void ARingFind_GoesOnTheSecondHand_IfTheFirstIsTaken()
+    {
+        var profile = new Profile();
+        var random = new Random(5);
+        GearItem? first = null, second = null;
+        while (second is null)
+        {
+            var found = GearCatalog.Grant(profile, random);
+            if (GearCatalog.PieceOf(found).Slot == GearSlot.Ring)
+            {
+                (first, second) = first is null ? (found, null) : (first, found);
+            }
+        }
+
+        Assert.Equal(first, GearCatalog.WornAt(profile, GearCatalog.PlacesFor(GearSlot.Ring)[0]));
+        Assert.Equal(second, GearCatalog.WornAt(profile, GearCatalog.PlacesFor(GearSlot.Ring)[1]));
+    }
+
+    [Fact]
+    public void TheNewPieces_DoWhatTheySay()
+    {
+        var bonuses = new ItemBonuses();
+        GearTesting.Best("soulbound_amulet")(bonuses);
+        GearTesting.Best("wardstone_ring")(bonuses);
+        GearTesting.Best("studded_war_belt")(bonuses);
+        Assert.Equal(1, bonuses.LastStands);
+        Assert.Equal(20f, bonuses.Ward);
+        Assert.Equal(0.25f, bonuses.WardShield, 4);   // a Mage's Frost Shield grows instead
+        Assert.Equal(0.75f, bonuses.RangedDamageTaken, 4);
+        Assert.Equal(50f, bonuses.Armour);
+    }
+
+    [Fact]
+    public void FullyKitted_AsksForEveryPlace()
+    {
+        var profile = new Profile();
+        var bounty = Bounties.All.Single(b => b.Id == "fully_kitted");
+        var tree = new TreeProgress(Ranger.SharpshooterTree.Tree, new TreeSave());
+        var run = new RunRecord(0, 0, 0, 0f, false, 1);
+        foreach (var place in GearCatalog.Places.Skip(1))
+        {
+            var item = GearCatalog.Perfect(GearCatalog.All.First(p => p.Slot == place.Slot));
+            profile.Gear.Items.Add(item);
+            GearCatalog.Wear(profile, item, place);
+        }
+
+        Assert.False(bounty.Met(run, profile, tree));
+        var weapon = GearCatalog.Perfect(GearCatalog.All.First(p => p.Slot == GearSlot.Weapon));
+        profile.Gear.Items.Add(weapon);
+        GearCatalog.Wear(profile, weapon);
+        Assert.True(bounty.Met(run, profile, tree));
     }
 
     [Fact]

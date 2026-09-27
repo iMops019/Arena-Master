@@ -242,7 +242,8 @@ internal static class Bounties
             (run, _, _) => run.ClassId == Priest && run.DelveCleared && run.Depth >= 10),
 
         new("armourer", "Armourer", "Own 4 different pieces of gear.", 150, null, (_, profile, _) => Gear.GearCatalog.PiecesFound(profile) >= 4),
-        new("fully_kitted", "Fully Kitted", "Wear gear in all three slots.", 125, null, (_, profile, _) => Gear.GearCatalog.Worn(profile).Count() >= 3),
+        new("fully_kitted", "Fully Kitted", "Wear gear in every slot, both rings too.", 125, null,
+            (_, profile, _) => Gear.GearCatalog.Worn(profile).Count() >= Gear.GearCatalog.Places.Count),
         new("armoury_complete", "The Full Armoury", "Own every piece of gear.", 750, null,
             (_, profile, _) => Gear.GearCatalog.All.All(piece => Gear.GearCatalog.Owns(profile, piece))),
     };

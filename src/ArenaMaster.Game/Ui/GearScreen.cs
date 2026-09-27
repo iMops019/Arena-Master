@@ -7,13 +7,19 @@ using ImGuiNET;
 namespace ArenaMaster.Game.Ui;
 
 /// <summary>
-/// The armour stand at camp: the three slots side by side, each listing every copy of gear owned for it - its name in the unique orange, how well it rolled, and
-/// each stat's number with the range it can roll in - and the pieces not found yet. Clicking a copy wears it (or takes it off if it is worn). Each column scrolls.
+/// The armour stand at camp: the seven places gear is worn in a row across the top (weapon, body armour, belt, amulet, two rings, trinket), each showing what is
+/// worn there; and under them every copy owned for the place picked - its name in the unique orange, how well it rolled, and each stat's number with the range it
+/// can roll in - and how many of its pieces aren't found yet. Clicking a copy wears it at the picked place (or takes it off if it is worn there). The list scrolls.
 /// </summary>
 internal sealed class GearScreen : GameScreen
 {
+    private const int Columns = 3;
+
     /// <summary>Set when the player changed what is worn; the content saves and clears it.</summary>
     public bool Changed { get; set; }
+
+    /// <summary>The place picked in the row across the top: its copies are listed, and a click wears one there.</summary>
+    private GearPlace _place = GearCatalog.Places[0];
 
     /// <summary>Draws the screen. Returns true when it closes.</summary>
     public bool Draw(Profile profile)
@@ -25,52 +31,58 @@ internal sealed class GearScreen : GameScreen
 
         MarkDrawn();
         float scale = UiTheme.Scale;
+        float font = ImGui.GetFontSize();
         UiTheme.BeginScreen("##gear", 0.9f, 0.9f);
         int copies = GearCatalog.Owned(profile).Count();
         UiTheme.Header("Camp · Armour stand", "Gear", $"{GearCatalog.PiecesFound(profile)} / {GearCatalog.All.Count} pieces found  ·  {copies} {(copies == 1 ? "copy" : "copies")} held");
 
         float width = ImGui.GetContentRegionAvail().X;
         float buttonHeight = 42f * scale;
-        float gap = 14f * scale;
-        var slots = Enum.GetValues<GearSlot>();
-        float columnWidth = (width - gap * (slots.Length - 1)) / slots.Length;
-        float bodyHeight = ImGui.GetContentRegionAvail().Y - buttonHeight - 14f * scale;
+        float gap = 10f * scale;
+
+        // The places, across the top.
         var origin = ImGui.GetCursorScreenPos();
-        float font = ImGui.GetFontSize();
-
-        for (int c = 0; c < slots.Length; c++)
+        int count = GearCatalog.Places.Count;
+        float placeWidth = (width - gap * (count - 1)) / count;
+        float placeHeight = font * 3.9f;
+        for (int i = 0; i < count; i++)
         {
-            var slot = slots[c];
-            float x = origin.X + c * (columnWidth + gap);
-            UiTheme.Text(new Vector2(x, origin.Y), GearCatalog.SlotName(slot).ToUpperInvariant(), UiTheme.Muted, 0.9f);
-            var worn = GearCatalog.WornIn(profile, slot);
-            string state = worn is null ? "Empty" : "Worn: " + GearCatalog.PieceOf(worn).Name;
-            UiTheme.Text(new Vector2(x + columnWidth - UiTheme.TextWidth(state, 0.8f), origin.Y + font * 0.1f), state, worn is null ? UiTheme.Faint : UiTheme.Unique, 0.8f);
-
-            ImGui.SetCursorScreenPos(new Vector2(x, origin.Y + font * 1.4f));
-            ImGui.BeginChild($"##slot{c}", new Vector2(columnWidth, bodyHeight - font * 1.4f), ImGuiChildFlags.None, ImGuiWindowFlags.None);
-            var clicked = DrawColumn(profile, slot, worn, columnWidth - 14f * scale);
-            ImGui.EndChild();
-            if (clicked is not null)
+            var place = GearCatalog.Places[i];
+            if (DrawPlace(profile, place, place == _place, origin + new Vector2(i * (placeWidth + gap), 0f), new Vector2(placeWidth, placeHeight)))
             {
-                if (worn == clicked)
-                {
-                    GearCatalog.TakeOff(profile, slot);
-                }
-                else
-                {
-                    GearCatalog.Wear(profile, clicked);
-                }
-
-                Changed = true;
+                _place = place;
             }
         }
 
-        ImGui.SetCursorScreenPos(origin + new Vector2(0f, bodyHeight + 14f * scale));
+        // The copies for the picked place.
+        float top = origin.Y + placeHeight + 14f * scale;
+        string heading = $"{GearCatalog.SlotName(_place.Slot).ToUpperInvariant()}S" + (GearCatalog.PlacesFor(_place.Slot).Count > 1 ? $"  ·  a click wears one on the {_place.Name.ToLowerInvariant()}" : "");
+        UiTheme.Text(new Vector2(origin.X, top), heading, UiTheme.Muted, 0.8f);
+        top += font * 1.3f;
+        float bodyHeight = ImGui.GetContentRegionAvail().Y - (top - ImGui.GetCursorScreenPos().Y) - buttonHeight - 14f * scale;
+        ImGui.SetCursorScreenPos(new Vector2(origin.X, top));
+        ImGui.BeginChild("##copies", new Vector2(width, bodyHeight), ImGuiChildFlags.None, ImGuiWindowFlags.None);
+        var clicked = DrawCopies(profile, _place, width - 14f * scale);
+        ImGui.EndChild();
+        if (clicked is not null)
+        {
+            if (GearCatalog.WornAt(profile, _place) == clicked)
+            {
+                GearCatalog.TakeOff(profile, _place);
+            }
+            else
+            {
+                GearCatalog.Wear(profile, clicked, _place);
+            }
+
+            Changed = true;
+        }
+
+        ImGui.SetCursorScreenPos(new Vector2(origin.X, top + bodyHeight + 14f * scale));
         var start = ImGui.GetCursorScreenPos();
         float closeWidth = 150f * scale;
-        UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.3f),
-            $"Gear comes from the boss hunt at the departure gate: {BossHunt.GearChance * 100f:0}% a kill, any piece, every stat rolled in its range. Click a copy to wear it, or to take it off. Sell spare copies at the quartermaster.",
+        UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.2f),
+            $"Gear comes from the boss hunt at the departure gate: {BossHunt.GearChance * 100f:0}% a kill, any piece, every stat rolled in its range. Pick a place above, then click a copy to wear it there, or to take it off. Sell spare copies at the quartermaster.",
             UiTheme.Muted, 0.78f, width - closeWidth - 20f * scale);
         ImGui.SetCursorScreenPos(start + new Vector2(width - closeWidth, 0f));
         bool close = UiTheme.Button("Close  [E]", new Vector2(closeWidth, buttonHeight));
@@ -85,40 +97,78 @@ internal sealed class GearScreen : GameScreen
         return false;
     }
 
-    /// <summary>One slot's list: every copy owned, piece by piece and best roll first, then one card for the pieces not found yet. Returns the copy clicked, if any.</summary>
-    private static GearItem? DrawColumn(Profile profile, GearSlot slot, GearItem? worn, float width)
+    /// <summary>One place in the row across the top: its name, and what is worn there and how well it rolled. True if it was clicked.</summary>
+    private static bool DrawPlace(Profile profile, GearPlace place, bool picked, Vector2 min, Vector2 size)
     {
         float scale = UiTheme.Scale;
         float font = ImGui.GetFontSize();
-        float gap = 8f * scale;
-        var origin = ImGui.GetCursorScreenPos();
-        float y = origin.Y;
-        GearItem? clicked = null;
-        var pieces = GearCatalog.All.Where(p => p.Slot == slot).ToList();
-        foreach (var piece in pieces)
-        {
-            foreach (var item in profile.Gear.Items.Where(i => i.Piece == piece.Id).OrderByDescending(GearCatalog.Quality))
-            {
-                float height = CardHeight(piece);
-                var min = new Vector2(origin.X, y);
-                if (DrawCopy(item, worn == item, min, new Vector2(width, height)))
-                {
-                    clicked = item;
-                }
+        float pad = 10f * scale;
+        var max = min + size;
+        ImGui.SetCursorScreenPos(min);
+        ImGui.PushID(place.Key);
+        bool clicked = ImGui.InvisibleButton("##place", size);
+        bool hovered = ImGui.IsItemHovered();
+        ImGui.PopID();
 
-                y += height + gap;
+        var worn = GearCatalog.WornAt(profile, place);
+        var fill = picked ? UiTheme.UniqueDeep : hovered ? new Vector4(0.1f, 0.14f, 0.17f, 1f) : UiTheme.PanelRaised;
+        var border = picked ? UiTheme.Unique : worn is not null ? UiTheme.WithAlpha(UiTheme.Unique, 0.45f) : UiTheme.Line;
+        UiTheme.Card(min, max, fill, border, picked ? 2.5f : 1.5f);
+        UiTheme.Text(min + new Vector2(pad, pad * 0.7f), place.Name.ToUpperInvariant(), picked ? UiTheme.Ink : UiTheme.Muted, 0.68f);
+        if (worn is null)
+        {
+            UiTheme.Text(min + new Vector2(pad, pad * 0.7f + font * 1.1f), "Empty", UiTheme.Faint, 0.85f);
+            return clicked;
+        }
+
+        float quality = GearCatalog.Quality(worn);
+        UiTheme.Text(min + new Vector2(pad, pad * 0.7f + font * 1.0f), GearCatalog.PieceOf(worn).Name, UiTheme.Unique, 0.76f, size.X - 2f * pad);
+        string rolled = $"{quality * 100f:0}%";
+        UiTheme.Text(new Vector2(max.X - pad - UiTheme.TextWidth(rolled, 0.7f), min.Y + pad * 0.7f), rolled, QualityColour(quality), 0.7f);
+        return clicked;
+    }
+
+    /// <summary>
+    /// Every copy owned that can go at <paramref name="place"/>, piece by piece and best roll first, in a grid; then one card for its pieces not found yet. Returns the
+    /// copy clicked, if any.
+    /// </summary>
+    private static GearItem? DrawCopies(Profile profile, GearPlace place, float width)
+    {
+        float scale = UiTheme.Scale;
+        float font = ImGui.GetFontSize();
+        float gap = 10f * scale;
+        float cardWidth = (width - gap * (Columns - 1)) / Columns;
+        var pieces = GearCatalog.All.Where(p => p.Slot == place.Slot).ToList();
+        float cardHeight = pieces.Max(CardHeight);
+        var items = pieces.SelectMany(piece => profile.Gear.Items.Where(i => i.Piece == piece.Id).OrderByDescending(GearCatalog.Quality)).ToList();
+
+        var origin = ImGui.GetCursorScreenPos();
+        GearItem? clicked = null;
+        for (int i = 0; i < items.Count; i++)
+        {
+            var item = items[i];
+            var min = origin + new Vector2(i % Columns * (cardWidth + gap), i / Columns * (cardHeight + gap));
+            string tag = GearCatalog.PlaceOf(profile, item) is { } at ? (at == place || GearCatalog.PlacesFor(at.Slot).Count == 1 ? "WORN" : at.Name.ToUpperInvariant()) : "";
+            if (DrawCopy(item, tag, GearCatalog.WornAt(profile, place) == item, min, new Vector2(cardWidth, cardHeight)))
+            {
+                clicked = item;
             }
         }
 
+        int rows = (items.Count + Columns - 1) / Columns;
+        float y = origin.Y + rows * (cardHeight + gap);
         int missing = pieces.Count(p => !GearCatalog.Owns(profile, p));
+        if (items.Count == 0)
+        {
+            UiTheme.Text(new Vector2(origin.X, y + font * 0.4f), $"No {GearCatalog.SlotName(place.Slot).ToLowerInvariant()} found yet.", UiTheme.Muted, 0.9f);
+            y += font * 1.8f;
+        }
+
         if (missing > 0)
         {
-            var min = new Vector2(origin.X, y);
-            var max = min + new Vector2(width, font * 2.6f);
-            UiTheme.Card(min, max, UiTheme.Panel, UiTheme.Line);
-            string text = missing == 1 ? "1 piece not found yet" : $"{missing} pieces not found yet";
-            UiTheme.Text(min + new Vector2(12f * scale, font * 0.8f), text, UiTheme.Faint, 0.9f);
-            y = max.Y + gap;
+            string text = missing == 1 ? $"1 {GearCatalog.SlotName(place.Slot).ToLowerInvariant()} not found yet" : $"{missing} of {pieces.Count} not found yet";
+            UiTheme.Text(new Vector2(origin.X, y + font * 0.3f), text, UiTheme.Faint, 0.85f);
+            y += font * 1.6f;
         }
 
         ImGui.SetCursorScreenPos(new Vector2(origin.X, y));
@@ -127,10 +177,10 @@ internal sealed class GearScreen : GameScreen
     }
 
     /// <summary>How tall a copy's card is: its name, a line a stat, and its flavour.</summary>
-    public static float CardHeight(GearPiece piece) => ImGui.GetFontSize() * (3.3f + 1.05f * piece.Stats.Count) + 16f * UiTheme.Scale;
+    public static float CardHeight(GearPiece piece) => ImGui.GetFontSize() * (3.6f + 1.05f * piece.Stats.Count) + 16f * UiTheme.Scale;
 
-    /// <summary>A copy's card: name, how well it rolled, its stats and its flavour, lit if worn. True if it was clicked.</summary>
-    private static bool DrawCopy(GearItem item, bool worn, Vector2 min, Vector2 size)
+    /// <summary>A copy's card: name, how well it rolled, its stats and its flavour, lit if worn at the place picked. True if it was clicked.</summary>
+    private static bool DrawCopy(GearItem item, string tag, bool wornHere, Vector2 min, Vector2 size)
     {
         float scale = UiTheme.Scale;
         var max = min + size;
@@ -140,9 +190,10 @@ internal sealed class GearScreen : GameScreen
         bool hovered = ImGui.IsItemHovered();
         ImGui.PopID();
 
-        var fill = worn ? UiTheme.UniqueDeep : hovered ? new Vector4(0.1f, 0.14f, 0.17f, 1f) : UiTheme.PanelRaised;
-        UiTheme.Card(min, max, fill, worn ? UiTheme.Unique : UiTheme.WithAlpha(UiTheme.Unique, 0.45f), worn ? 2.5f : 1.5f);
-        float y = DrawHeading(item, min, size.X, worn ? "WORN" : "");
+        var fill = wornHere ? UiTheme.UniqueDeep : hovered ? new Vector4(0.1f, 0.14f, 0.17f, 1f) : UiTheme.PanelRaised;
+        var border = wornHere ? UiTheme.Unique : tag.Length > 0 ? UiTheme.WithAlpha(UiTheme.Unique, 0.75f) : UiTheme.WithAlpha(UiTheme.Unique, 0.4f);
+        UiTheme.Card(min, max, fill, border, wornHere ? 2.5f : 1.5f);
+        float y = DrawHeading(item, min, size.X, tag);
         y = DrawStats(item, new Vector2(min.X + 12f * scale, y), size.X - 24f * scale);
         var piece = GearCatalog.PieceOf(item);
         UiTheme.Text(new Vector2(min.X + 12f * scale, y + 2f * scale), $"\"{piece.Flavour}\"", UiTheme.WithAlpha(UiTheme.Unique, 0.6f), 0.72f, size.X - 24f * scale);
@@ -205,7 +256,7 @@ internal sealed class GearScreen : GameScreen
 
 /// <summary>
 /// The quartermaster buying gear: every copy owned and not worn, piece by piece, with how well it rolled, its stats and what he pays (more for a better roll). A
-/// sale takes two clicks - the button asks to be sure first - and can't be undone. Worn copies are listed at the top to compare against, and aren't for sale.
+/// sale takes two clicks - the button asks to be sure first - and can't be undone. Worn copies aren't for sale; a copy better than a worn one of its piece is marked.
 /// </summary>
 internal sealed class GearSaleScreen : GameScreen
 {
@@ -241,13 +292,11 @@ internal sealed class GearSaleScreen : GameScreen
         UiTheme.BeginScreen("##gearsale", 0.74f, 0.88f);
         UiTheme.Header("Camp · Quartermaster", "Sell gear", $"{profile.Silver:N0} silver");
 
-        // What is worn, to compare against.
         float width = ImGui.GetContentRegionAvail().X;
         var at = ImGui.GetCursorScreenPos();
-        var worn = GearCatalog.Worn(profile).ToList();
-        string wornLine = worn.Count == 0 ? "Nothing worn." : "Worn:  " + string.Join("   ·   ",
-            worn.Select(item => $"{GearCatalog.PieceOf(item).Name} ({GearCatalog.Quality(item) * 100f:0}%)"));
-        UiTheme.Text(at, wornLine, UiTheme.Unique, 0.8f, width);
+        int worn = GearCatalog.Worn(profile).Count();
+        UiTheme.Text(at, $"{worn} of {GearCatalog.Places.Count} places worn; worn copies aren't listed. A copy that rolled better than the one of the same piece you wear is marked.",
+            UiTheme.Muted, 0.78f);
         ImGui.SetCursorScreenPos(at + new Vector2(0f, font * 1.5f));
 
         float buttonHeight = 40f * scale;
@@ -268,9 +317,9 @@ internal sealed class GearSaleScreen : GameScreen
             var max = min + new Vector2(inner, height);
             UiTheme.Card(min, max, UiTheme.PanelRaised, UiTheme.WithAlpha(UiTheme.Unique, 0.4f));
 
-            // Better than the copy of the same piece worn?
-            var wornHere = GearCatalog.WornIn(profile, piece.Slot);
-            string tag = wornHere is not null && wornHere.Piece == item.Piece && GearCatalog.Quality(item) > GearCatalog.Quality(wornHere) ? "BETTER THAN WORN" : "";
+            // Better than a copy of the same piece worn?
+            var wornSame = GearCatalog.Worn(profile).Where(worn => worn.Piece == item.Piece).ToList();
+            string tag = wornSame.Count > 0 && GearCatalog.Quality(item) > wornSame.Min(GearCatalog.Quality) ? "BETTER THAN WORN" : "";
             float sellWidth = 210f * scale;
             float textWidth = inner - sellWidth - 24f * scale;
             float next = GearScreen.DrawHeading(item, min, textWidth, tag);

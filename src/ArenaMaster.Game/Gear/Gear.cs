@@ -3,13 +3,22 @@ using ArenaMaster.Game.Progression;
 
 namespace ArenaMaster.Game.Gear;
 
-/// <summary>Where a piece of gear is worn. One piece per slot.</summary>
+/// <summary>What kind of piece a piece of gear is, and so where it is worn: one piece per slot, but two rings (see <see cref="GearCatalog.Places"/>).</summary>
 internal enum GearSlot
 {
     BodyArmour,
     Weapon,
     Trinket,
+    Amulet,
+    Belt,
+    Ring,
 }
+
+/// <summary>
+/// One place on the body gear is worn: its key in the save (<see cref="GearSave.Worn"/>), the kind of piece that goes there, and its name. Every slot has one
+/// place but the ring, which has two.
+/// </summary>
+internal sealed record GearPlace(string Key, GearSlot Slot, string Name);
 
 /// <summary>How a gear stat's number is written: a whole number (armour, health), a percentage (move speed), or a multiplier with two decimals (x1.20).</summary>
 internal enum GearUnit
@@ -82,7 +91,7 @@ internal sealed class GearSave
     /// <summary>Every copy of gear owned, each with its own rolls.</summary>
     public List<GearItem> Items { get; set; } = new();
 
-    /// <summary>Slot name -> the id of the copy worn there.</summary>
+    /// <summary>Place key (<see cref="GearPlace.Key"/>: the slot's name, and "Ring2" for the second ring) -> the id of the copy worn there.</summary>
     public Dictionary<string, string> Worn { get; set; } = new();
 
     /// <summary>A save from before gear rolled: the ids of the pieces owned. Turned into copies by <see cref="GearCatalog.Migrate"/>, and empty after.</summary>
@@ -206,7 +215,123 @@ internal static class GearCatalog
         {
             new GearStat("Heal 1 health for every {0} damage you deal", GearUnit.Flat, 80, 40, (b, v) => b.LifePerDamage += 1f / v),
         }, "It is never empty. Best not to ask what fills it."),
+
+        // Amulets (added 2026-09-27 with the belt and ring slots)
+        new("amulet_of_the_unbroken", "Amulet of the Unbroken", GearSlot.Amulet, new[]
+        {
+            new GearStat("+{0}% block chance", GearUnit.Percent, 4, 10, (b, v) => b.BlockChance += v / 100f),
+            new GearStat("Heal {0} health for every blow you block", GearUnit.Flat, 1, 3, (b, v) => b.BlockHeal += v, Decimals: 1),
+        }, "Worn by a gate-warden who held for nine days. The gate did not."),
+        new("frostbound_pendant", "Frostbound Pendant", GearSlot.Amulet, new[]
+        {
+            new GearStat("Your hits chill enemies, slowing them {0}%", GearUnit.Percent, 5, 12, (b, v) => b.ChillOnHit += v / 100f),
+            new GearStat("x{0} damage to chilled enemies", GearUnit.Multiplier, 1.05f, 1.15f, (b, v) => b.ChilledDamage *= v),
+        }, "Cold to the touch, and colder to whatever it touches."),
+        new("executioners_locket", "Executioner's Locket", GearSlot.Amulet, new[]
+        {
+            new GearStat("Your hits kill enemies (not bosses) below {0}% health", GearUnit.Percent, 3, 7, (b, v) => b.ExecuteBelow += v / 100f),
+            new GearStat("x{0} damage to elites and bosses", GearUnit.Multiplier, 1.05f, 1.15f, (b, v) => b.EliteDamage *= v),
+        }, "Inside, a lock of hair from every one who begged."),
+        new("bloodoath_pendant", "Bloodoath Pendant", GearSlot.Amulet, new[]
+        {
+            new GearStat("Every kill adds {0}% damage for a while (up to 30%)", GearUnit.Percent, 0.4f, 1f, (b, v) => b.KillDamage += v / 100f, Decimals: 1),
+            new GearStat("Heal {0} health per kill", GearUnit.Flat, 0.5f, 1.5f, (b, v) => b.HealOnKill += v, Decimals: 1),
+        }, "Sworn in blood, and it keeps count."),
+        new("pendant_of_chains", "Pendant of Chains", GearSlot.Amulet, new[]
+        {
+            new GearStat("+{0} chain (a class with no chains: +10% damage)", GearUnit.Flat, 1, 1, (b, v) => b.Chains += (int)v),
+            new GearStat("+{0}% area", GearUnit.Percent, 4, 10, (b, v) => b.Area += v / 100f),
+        }, "Every link was a prisoner's. Every prisoner is still in there."),
+        new("soulbound_amulet", "Soulbound Amulet", GearSlot.Amulet, new[]
+        {
+            new GearStat("Once a run, a killing blow leaves you on 1 health instead", GearUnit.Flat, 1, 1, (b, v) => b.LastStands += (int)v),
+            MaxHealth(10, 30),
+        }, "Your soul is not yours to lose. It has been promised elsewhere."),
+
+        // Belts
+        new("girdle_of_the_giant", "Girdle of the Giant", GearSlot.Belt, new[]
+        {
+            MaxHealth(25, 60),
+            Armour(10, 25),
+        }, "Cut down from a giant's watch-strap. He wants it back."),
+        new("wayfarers_sash", "Wayfarer's Sash", GearSlot.Belt, new[]
+        {
+            new GearStat("+{0}% move speed", GearUnit.Percent, 5, 12, (b, v) => b.MoveSpeed += v / 100f),
+            new GearStat("+{0}% pickup range", GearUnit.Percent, 15, 35, (b, v) => b.Pickup += v / 100f),
+        }, "It has walked further than you ever will, and it's in no hurry to stop."),
+        new("studded_war_belt", "Studded War Belt", GearSlot.Belt, new[]
+        {
+            Armour(20, 50),
+            new GearStat("Enemy shots deal {0}% less damage", GearUnit.Percent, 10, 25, (b, v) => b.RangedDamageTaken *= 1f - v / 100f),
+        }, "Every stud turned a bolt once. Some of them turned two."),
+        new("cord_of_renewal", "Cord of Renewal", GearSlot.Belt, new[]
+        {
+            new GearStat("+{0} health per second", GearUnit.Flat, 0.5f, 1.5f, (b, v) => b.Regeneration += v, Decimals: 1),
+            new GearStat("Heal {0}% of your max health whenever a blow reaches you", GearUnit.Percent, 0.5f, 1.5f, (b, v) => b.HealPerBlow += v / 100f, Decimals: 1),
+        }, "Braided from roots that grew through a battlefield, and found it good."),
+        new("belt_of_plenty", "Belt of Plenty", GearSlot.Belt, new[]
+        {
+            new GearStat("+{0}% silver from every run", GearUnit.Percent, 10, 25, (b, v) => b.SilverGain += v / 100f),
+            new GearStat("+{0}% experience", GearUnit.Percent, 5, 12, (b, v) => b.ExperienceGain += v / 100f),
+        }, "More pouches than a merchant, and every one of them heavy."),
+        new("sash_of_lingering_rites", "Sash of Lingering Rites", GearSlot.Belt, new[]
+        {
+            new GearStat("Lingering effects last {0} s longer", GearUnit.Flat, 0.4f, 1f, (b, v) => b.Duration += v, Decimals: 1),
+            new GearStat("+{0}% area", GearUnit.Percent, 4, 10, (b, v) => b.Area += v / 100f),
+        }, "The rites were said long ago. They have not finished."),
+
+        // Rings: two can be worn
+        new("band_of_the_hollow_court", "Band of the Hollow Court", GearSlot.Ring, new[]
+        {
+            Damage(3, 8),
+            new GearStat("+{0}% attack speed", GearUnit.Percent, 2, 6, (b, v) => b.AttackSpeed += v / 100f),
+        }, "Every courtier of the Hollow King wore one. None of them wear anything now."),
+        new("signet_of_the_deep", "Signet of the Deep", GearSlot.Ring, new[]
+        {
+            new GearStat("+{0}% increased critical chance", GearUnit.Percent, 5, 15, (b, v) => b.CritChance += v / 100f),
+            new GearStat("Critical hits deal +{0}% more", GearUnit.Percent, 10, 30, (b, v) => b.CritDamage += v / 100f),
+        }, "Pressed into the wax of every order to go deeper."),
+        new("ring_of_embers", "Ring of Embers", GearSlot.Ring, new[]
+        {
+            new GearStat("Every 5 seconds, a ring of fire bursts around you for {0} damage", GearUnit.Flat, 10, 25, (b, v) =>
+            {
+                b.FireNova += v;
+                b.FireNovaInterval = 5f;
+            }),
+        }, "Warm as a hearth. Then warmer. Then much warmer."),
+        new("loop_of_iron_will", "Loop of Iron Will", GearSlot.Ring, new[]
+        {
+            MaxHealth(15, 35),
+            new GearStat("+{0} health per second", GearUnit.Flat, 0.2f, 0.5f, (b, v) => b.Regeneration += v, Decimals: 1),
+        }, "Plain iron. It has never once needed to be anything else."),
+        new("stormcallers_loop", "Stormcaller's Loop", GearSlot.Ring, new[]
+        {
+            new GearStat("Every 6 s lightning strikes the nearest enemy for {0} damage", GearUnit.Flat, 15, 40, (b, v) => b.SkyStrike += v),
+        }, "The sky listens to whoever wears it. It is not always kind about it."),
+        new("wardstone_ring", "Wardstone Ring", GearSlot.Ring, new[]
+        {
+            new GearStat("Every 15 s a {0}-point ward holds for 5 s (the Mage's Frost Shield grows instead)", GearUnit.Flat, 8, 20, (b, v) =>
+            {
+                b.Ward += v;
+                b.WardShield += v / 80f;   // as the Warding Crystal: 20 points, a quarter stronger
+            }),
+        }, "A pebble from the first wall ever raised against the dark."),
     };
+
+    /// <summary>Every place gear is worn, in the order the armour stand shows them: one per slot, and two for rings.</summary>
+    public static readonly IReadOnlyList<GearPlace> Places = new GearPlace[]
+    {
+        new(nameof(GearSlot.Weapon), GearSlot.Weapon, "Weapon"),
+        new(nameof(GearSlot.BodyArmour), GearSlot.BodyArmour, "Body Armour"),
+        new(nameof(GearSlot.Belt), GearSlot.Belt, "Belt"),
+        new(nameof(GearSlot.Amulet), GearSlot.Amulet, "Amulet"),
+        new(nameof(GearSlot.Ring), GearSlot.Ring, "Left Ring"),
+        new("Ring2", GearSlot.Ring, "Right Ring"),
+        new(nameof(GearSlot.Trinket), GearSlot.Trinket, "Trinket"),
+    };
+
+    /// <summary>The places a piece of <paramref name="slot"/> can be worn: one, or two for a ring.</summary>
+    public static IReadOnlyList<GearPlace> PlacesFor(GearSlot slot) => Places.Where(place => place.Slot == slot).ToList();
 
     /// <summary>What a copy sells for at the quartermaster: from <see cref="SellFloor"/> for the worst rolls up to <see cref="SellCeiling"/> for perfect ones.</summary>
     public const long SellFloor = 100;
@@ -220,6 +345,9 @@ internal static class GearCatalog
     {
         GearSlot.BodyArmour => "Body Armour",
         GearSlot.Weapon => "Weapon",
+        GearSlot.Amulet => "Amulet",
+        GearSlot.Belt => "Belt",
+        GearSlot.Ring => "Ring",
         _ => "Trinket",
     };
 
@@ -275,41 +403,70 @@ internal static class GearCatalog
         Rolls = piece.Stats.Select(stat => stat.Max).ToList(),
     };
 
-    /// <summary>The copy worn in <paramref name="slot"/>, or null.</summary>
-    public static GearItem? WornIn(Profile profile, GearSlot slot) =>
-        profile.Gear.Worn.TryGetValue(slot.ToString(), out var id) && profile.Gear.Items.FirstOrDefault(item => item.Id == id) is { } item
-        && Find(item.Piece) is { } piece && piece.Slot == slot ? item : null;
+    /// <summary>The copy worn at <paramref name="place"/>, or null.</summary>
+    public static GearItem? WornAt(Profile profile, GearPlace place) =>
+        profile.Gear.Worn.TryGetValue(place.Key, out var id) && profile.Gear.Items.FirstOrDefault(item => item.Id == id) is { } item
+        && Find(item.Piece) is { } piece && piece.Slot == place.Slot ? item : null;
 
-    /// <summary>Every copy worn, one per slot at most.</summary>
-    public static IEnumerable<GearItem> Worn(Profile profile) =>
-        Enum.GetValues<GearSlot>().Select(slot => WornIn(profile, slot)).OfType<GearItem>();
+    /// <summary>The copy worn in <paramref name="slot"/> (the first place of it, for rings), or null.</summary>
+    public static GearItem? WornIn(Profile profile, GearSlot slot) => PlacesFor(slot).Select(place => WornAt(profile, place)).FirstOrDefault(item => item is not null);
+
+    /// <summary>Every copy worn, one per place at most.</summary>
+    public static IEnumerable<GearItem> Worn(Profile profile) => Places.Select(place => WornAt(profile, place)).OfType<GearItem>();
 
     public static bool IsWorn(Profile profile, GearItem item) => Worn(profile).Any(worn => worn.Id == item.Id);
 
-    /// <summary>Wears <paramref name="item"/> in its piece's slot, taking off whatever was there. False if it isn't owned.</summary>
-    public static bool Wear(Profile profile, GearItem item)
+    /// <summary>Where <paramref name="item"/> is worn, or null.</summary>
+    public static GearPlace? PlaceOf(Profile profile, GearItem item) => Places.FirstOrDefault(place => WornAt(profile, place)?.Id == item.Id);
+
+    /// <summary>
+    /// Wears <paramref name="item"/> at <paramref name="place"/> (by default the first empty place its piece can go, or the first such place if all are taken),
+    /// taking off whatever was there, and moving it if it was worn at another place (the other ring). False if it isn't owned or can't go there.
+    /// </summary>
+    public static bool Wear(Profile profile, GearItem item, GearPlace? place = null)
     {
         if (!profile.Gear.Items.Contains(item) || Find(item.Piece) is not { } piece)
         {
             return false;
         }
 
-        profile.Gear.Worn[piece.Slot.ToString()] = item.Id;
+        var places = PlacesFor(piece.Slot);
+        place ??= places.FirstOrDefault(p => WornAt(profile, p) is null) ?? places[0];
+        if (place.Slot != piece.Slot)
+        {
+            return false;
+        }
+
+        if (PlaceOf(profile, item) is { } before)
+        {
+            profile.Gear.Worn.Remove(before.Key);
+        }
+
+        profile.Gear.Worn[place.Key] = item.Id;
         return true;
     }
 
-    public static void TakeOff(Profile profile, GearSlot slot) => profile.Gear.Worn.Remove(slot.ToString());
+    public static void TakeOff(Profile profile, GearPlace place) => profile.Gear.Worn.Remove(place.Key);
+
+    /// <summary>Takes off whatever is worn in <paramref name="slot"/> (both rings, for the ring).</summary>
+    public static void TakeOff(Profile profile, GearSlot slot)
+    {
+        foreach (var place in PlacesFor(slot))
+        {
+            TakeOff(profile, place);
+        }
+    }
 
     /// <summary>
     /// A piece found (a boss's gear roll that came up): any of the pieces at random, owned already or not, every stat rolled within its range - so the piece wanted,
-    /// and a good roll of it, stay a hunt. It goes into what the player owns, and on if its slot is empty.
+    /// and a good roll of it, stay a hunt. It goes into what the player owns, and on if a place it can go is empty.
     /// </summary>
     public static GearItem Grant(Profile profile, Random random)
     {
         var piece = All[random.Next(All.Count)];
         var item = RollCopy(piece, random);
         profile.Gear.Items.Add(item);
-        if (WornIn(profile, piece.Slot) is null)
+        if (PlacesFor(piece.Slot).Any(place => WornAt(profile, place) is null))
         {
             Wear(profile, item);
         }

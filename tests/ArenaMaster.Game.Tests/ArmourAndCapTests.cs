@@ -28,7 +28,7 @@ public class ArmourTests
     }
 
     [Fact]
-    public void EveryBodyArmour_GivesArmour_AndSaysSo()
+    public void EveryBodyArmour_GivesArmour_AndOnlyBeltsBesides()
     {
         foreach (var piece in GearCatalog.All.Where(p => p.Slot == GearSlot.BodyArmour))
         {
@@ -38,7 +38,7 @@ public class ArmourTests
             Assert.Contains(piece.Stats, stat => stat.Line(stat.Max) == $"+{bonuses.Armour:0} armour");
         }
 
-        Assert.All(GearCatalog.All.Where(p => p.Slot != GearSlot.BodyArmour), piece =>
+        Assert.All(GearCatalog.All.Where(p => p.Slot is not (GearSlot.BodyArmour or GearSlot.Belt)), piece =>
         {
             var bonuses = new ItemBonuses();
             GearCatalog.Apply(GearCatalog.Perfect(piece), bonuses);
