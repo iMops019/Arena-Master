@@ -1,5 +1,18 @@
 namespace ArenaMaster.Game.Combat;
 
+/// <summary>How an enemy moves when it isn't attacking.</summary>
+internal enum EnemyBehaviour
+{
+    /// <summary>Straight at the player (stopping at its <see cref="EnemyKind.StandOff"/>, for a shooter), attacking whenever one of its attacks is in range.</summary>
+    Chase,
+
+    /// <summary>
+    /// A stalker (the Ghoul Beast): it keeps its distance, circling the player and working round behind them, bolts when looked at or hurt, and only attacks
+    /// when it has an opening - the player's back turned, or a stun - running off again after. See <c>EnemyField</c>'s stalking.
+    /// </summary>
+    Stalk,
+}
+
 /// <summary>How an enemy counts in a run: fodder fills the field, elites and bosses are spawned on the director's schedule.</summary>
 internal enum EnemyTier
 {
@@ -112,6 +125,9 @@ internal sealed record EnemyKind(
     /// instead of experience when broken. It stands on the field so every class's attacks can break it the way they hit anything else.
     /// </summary>
     public bool IsProp { get; init; }
+
+    /// <summary>How it moves when it isn't attacking: straight at the player, or stalking them.</summary>
+    public EnemyBehaviour Behaviour { get; init; } = EnemyBehaviour.Chase;
 
     /// <summary>A ranged kind stops walking closer once the player is this near (0: it walks right up).</summary>
     public float StandOff { get; init; }
@@ -240,6 +256,32 @@ internal sealed record EnemyKind(
         {
             new AttackSpec(AttackType.Lob, MinRange: 5f, MaxRange: 16f, WindUp: 1.2f, Active: 0.15f, Recover: 0.8f,
                 Damage: 18f, Reach: 0f, HitWidth: 0.2f, Knockback: 7f, Splash: 2.5f, ProjectileModel: "ghoul_bomb.glb", Count: 2),
+        },
+    };
+
+    /// <summary>
+    /// A stalker: the rider's fiendish hound running wild, tough and quick. It doesn't rush in: it circles at a distance, working round behind the player,
+    /// bolting when they turn to face it or when it is hurt, and pounces - a short, quick lunge - only when it has an opening: their back turned, or a stun.
+    /// Then it runs off, and starts again. Keep turning to face them.
+    /// </summary>
+    public static readonly EnemyKind GhoulBeast = new(
+        Name: "Ghoul Beast",
+        Model: "ghoul_beast.glb",
+        Tier: EnemyTier.Fodder,
+        MaxHealth: 150f,
+        Speed: 6f,
+        Radius: 0.6f,
+        Height: 1.8f,
+        ContactDamage: 8f,
+        ContactInterval: 0.8f,
+        Experience: 5)
+    {
+        Behaviour = EnemyBehaviour.Stalk,
+        AttackCooldown = 2.5f,
+        Attacks = new[]
+        {
+            new AttackSpec(AttackType.Lunge, MinRange: 2f, MaxRange: 7.5f, WindUp: 0.55f, Active: 0.4f, Recover: 0.5f,
+                Damage: 18f, Reach: 7f, HitWidth: 0.45f, Knockback: 9f, Tracking: 0.3f),
         },
     };
 

@@ -389,12 +389,14 @@ def _leg(prefix, side, x, z):
     return [(upper, "hips", (sx * x, BEAST_LEG_TOP, z)), (lower, upper, (sx * x, BEAST_KNEE, z)), (f"{prefix}foot_{side}", lower, (sx * x, BEAST_ANKLE, z))]
 
 
+BEAST_JOINTS = ([("root", None, (0.0, 0.0, 0.0)), ("hips", "root", (0.0, BEAST_HIP, 0.0))]
+                + _leg("", "l", HIND_X, HIND_Z) + _leg("", "r", HIND_X, HIND_Z) + _leg("fore_", "l", FORE_X, FORE_Z) + _leg("fore_", "r", FORE_X, FORE_Z)
+                + [("neck", "hips", (0.0, 1.22, 0.72)), ("beast_head", "neck", (0.0, 1.42, 1.02)), ("jaw", "beast_head", (0.0, 1.34, 1.08)),
+                   ("tail", "hips", (0.0, 1.16, -0.8))])
+
 RIDER_RIG = Skeleton(
-    [("root", None, (0.0, 0.0, 0.0)), ("hips", "root", (0.0, BEAST_HIP, 0.0))]
-    + _leg("", "l", HIND_X, HIND_Z) + _leg("", "r", HIND_X, HIND_Z) + _leg("fore_", "l", FORE_X, FORE_Z) + _leg("fore_", "r", FORE_X, FORE_Z)
-    + [("neck", "hips", (0.0, 1.22, 0.72)), ("beast_head", "neck", (0.0, 1.42, 1.02)), ("jaw", "beast_head", (0.0, 1.34, 1.08)),
-       ("tail", "hips", (0.0, 1.16, -0.8)),
-       ("spine", "hips", RIDER_SEAT), ("chest", "spine", (0.0, 1.52, -0.08)), ("head", "chest", (0.0, 2.02, -0.06)),
+    BEAST_JOINTS
+    + [("spine", "hips", RIDER_SEAT), ("chest", "spine", (0.0, 1.52, -0.08)), ("head", "chest", (0.0, 2.02, -0.06)),
        ("upper_arm_l", "chest", (-0.26, 1.94, -0.08)), ("forearm_l", "upper_arm_l", (-0.26, 1.66, -0.08)), ("hand_l", "forearm_l", (-0.26, 1.4, -0.08)),
        ("upper_arm_r", "chest", (0.26, 1.94, -0.08)), ("forearm_r", "upper_arm_r", (0.26, 1.66, -0.08)), ("hand_r", "forearm_r", (0.26, 1.4, -0.08))],
     hip_y=BEAST_HIP, ankle_y=BEAST_ANKLE, toe=0.16, heel=0.08)
@@ -411,10 +413,8 @@ BEAST_GAIT = r.Gait(cycle=1.4, stance=0.62, lift=0.14, bob=0.015, hip_drop=0.14,
 BEAST_STEPS = (0.0, 0.5, 0.25, 0.75)
 
 
-def build_beast_rider_rigged(rig):
-    m = Mesh()
-    j = rig.index
-    # The beast: a deep chest and a hump of shoulders, lean haunches, bone spikes along its back before and behind the saddle
+def _beast_body(m, j, saddled):
+    """The beast: a deep chest and a hump of shoulders, lean haunches, bone spikes along its back (before and behind the saddle, if <saddled>)."""
     m.joint = j["hips"]
     m.box(-0.28, 0.86, -0.82, 0.28, 1.28, 0.3, "brute_hide")
     m.box(-0.34, 0.8, 0.2, 0.34, 1.38, 0.82, "brute_hide")
@@ -423,10 +423,15 @@ def build_beast_rider_rigged(rig):
     for z, height in ((0.66, 0.34), (0.46, 0.26), (-0.42, 0.22), (-0.62, 0.28)):
         top = 1.46 if z > 0.3 else 1.28
         m.pyramid(-0.05, top, z - 0.06, 0.05, top, z + 0.06, (0.0, top + height, z - 0.1), "bone")
-    m.box(-0.27, 1.27, -0.32, 0.27, 1.36, 0.18, "leather")                      # the saddle
-    m.box(-0.06, 1.36, 0.1, 0.06, 1.46, 0.18, "leather")
-    m.box(-0.29, 0.98, -0.2, -0.27, 1.28, 0.08, "leather")                      # its flaps
-    m.box(0.27, 0.98, -0.2, 0.29, 1.28, 0.08, "leather")
+    if saddled:
+        m.box(-0.27, 1.27, -0.32, 0.27, 1.36, 0.18, "leather")                  # the saddle
+        m.box(-0.06, 1.36, 0.1, 0.06, 1.46, 0.18, "leather")
+        m.box(-0.29, 0.98, -0.2, -0.27, 1.28, 0.08, "leather")                  # its flaps
+        m.box(0.27, 0.98, -0.2, 0.29, 1.28, 0.08, "leather")
+    else:
+        m.box(-0.12, 1.28, -0.3, 0.12, 1.36, 0.3, "hood_dark")                  # the mane running on down its back, and more spikes along it
+        for z, height in ((0.22, 0.3), (0.0, 0.34), (-0.22, 0.28)):
+            m.pyramid(-0.05, 1.36, z - 0.06, 0.05, 1.36, z + 0.06, (0.0, 1.36 + height, z - 0.1), "bone")
     for side in ("l", "r"):
         sx = -1.0 if side == "l" else 1.0
         for prefix, x, z in (("", HIND_X, HIND_Z), ("fore_", FORE_X, FORE_Z)):
@@ -466,6 +471,12 @@ def build_beast_rider_rigged(rig):
     m.joint = j["tail"]
     m.box(-0.06, 1.09, -1.42, 0.06, 1.2, -0.78, "brute_hide")
     m.pyramid(-0.05, 1.1, -1.42, 0.05, 1.2, -1.4, (0.0, 1.15, -1.62), "bone")
+
+
+def build_beast_rider_rigged(rig):
+    m = Mesh()
+    j = rig.index
+    _beast_body(m, j, saddled=True)
     # The rider: its legs astride the saddle, feet in the stirrups, all on its seat
     m.joint = j["spine"]
     m.box(-0.19, 1.3, -0.2, 0.19, 1.52, 0.06, "ghoul_rags")
@@ -631,6 +642,82 @@ def rider_die(pose, u):
 BEAST_RIDER = EnemyModel("beast_rider.glb", RIDER_RIG, BEAST_GAIT, build_beast_rider_rigged,
                          {"Idle": (IDLE_SECONDS, rider_idle), "Walk": (BEAST_GAIT.cycle, rider_walk), "Die": (DIE_SECONDS, rider_die),
                           "Lunge": (1.0, rider_lunge)})
+
+
+# =========================================================================================================================================================
+# Ghoul Beast: the rider's fiendish hound running wild, with no one on its back - it stalks, circling low with its head down, bolts when it is looked at
+# or hurt, and pounces when it has you from behind.
+
+BEAST_RIG = Skeleton(BEAST_JOINTS, hip_y=BEAST_HIP, ankle_y=BEAST_ANKLE, toe=0.16, heel=0.08)
+
+
+def build_ghoul_beast_rigged(rig):
+    m = Mesh()
+    _beast_body(m, rig.index, saddled=False)
+    return m
+
+
+PROWL = 0.2      # how much lower than standing it carries its body, stalking
+
+
+def beast_idle(pose, u):
+    """Crouched low, head down and sniffing, swinging to look about; the tail low and twitching."""
+    t = u * IDLE_SECONDS
+    breath = math.sin(2 * math.pi * t / 1.5)
+    sniff = max(0.0, math.sin(2 * math.pi * t / 0.75))
+    beast_legs(pose, BEAST_HIP - PROWL + 0.01 * breath, BEAST_REST, pitch=2.0 + 0.6 * breath)
+    beast_head(pose, 24.0 + 4.0 * sniff, 4.0 + 8.0 * max(0.0, math.sin(2 * math.pi * t / 1.5 + 1.0)), -4.0,
+               turn=22.0 * math.sin(2 * math.pi * t / IDLE_SECONDS), tail_turn=10.0 * math.sin(2 * math.pi * t / 0.75))
+
+
+def beast_walk(pose, u):
+    """Prowling: low, head down and level, the tail out straight behind."""
+    bob = math.cos(8 * math.pi * u)
+    beast_legs(pose, BEAST_HIP - PROWL - 0.02 + BEAST_GAIT.bob * bob, walk_feet(u), pitch=2.0 + 1.5 * math.sin(4 * math.pi * u),
+               roll=2.0 * math.sin(2 * math.pi * u))
+    beast_head(pose, 22.0 + 3.0 * math.sin(4 * math.pi * u), 6.0, 0.0, tail_turn=12.0 * math.sin(2 * math.pi * u))
+
+
+BEAST_COIL = (BEAST_HIP - 0.4, -6.0, ((-HIND_X, BEAST_ANKLE, HIND_Z + 0.22), (HIND_X, BEAST_ANKLE, HIND_Z + 0.22),
+                                      (-FORE_X, BEAST_ANKLE, FORE_Z - 0.06), (FORE_X, BEAST_ANKLE, FORE_Z - 0.06)))
+
+
+def beast_pounce(pose, u):
+    """Coiling down on its haunches, jaws opening; the spring - up off the ground, forelegs reaching, hind legs thrown back; landing and gathering itself."""
+    name, k = stage(u)
+    prowl = (BEAST_HIP - PROWL, 2.0, BEAST_REST)
+    if name == "windup":
+        e = r.ease(k)
+        beast_legs(pose, prowl[0] + (BEAST_COIL[0] - prowl[0]) * e, _blend_feet(BEAST_REST, BEAST_COIL[2], e), prowl[1] + (BEAST_COIL[1] - prowl[1]) * e)
+        beast_head(pose, 24.0 - 6.0 * e, 6.0 + 26.0 * e, -4.0 + 10.0 * e, tail_turn=6.0 * math.sin(2 * math.pi * 5.0 * k))
+    elif name == "active":
+        arc = math.sin(math.pi * k)                                        # up and down again over the leap
+        stretch = r.ease(min(1.0, k / 0.35)) * (1.0 - r.ease(max(0.0, (k - 0.7) / 0.3)))
+        hips_y = BEAST_COIL[0] + (BEAST_HIP - 0.1 - BEAST_COIL[0]) * r.ease(min(1.0, k / 0.25)) + 0.45 * arc
+        feet = []
+        for (x, y, z), fore in zip(BEAST_REST, (False, False, True, True)):
+            reach = (0.5 if fore else -0.45) * stretch
+            feet.append((x, y + 0.45 * arc + (0.1 if fore else 0.05) * stretch, z + reach))
+        beast_legs(pose, hips_y, feet, -8.0 * stretch + 10.0 * r.ease(max(0.0, (k - 0.6) / 0.4)))
+        beast_head(pose, 6.0, 40.0, 4.0)
+    else:
+        e = r.ease(k)
+        land = (BEAST_HIP - 0.34, 6.0, ((-HIND_X, BEAST_ANKLE, HIND_Z - 0.1), (HIND_X, BEAST_ANKLE, HIND_Z - 0.1),
+                                        (-FORE_X, BEAST_ANKLE, FORE_Z + 0.2), (FORE_X, BEAST_ANKLE, FORE_Z + 0.2)))
+        beast_legs(pose, land[0] + (prowl[0] - land[0]) * e, _blend_feet(land[2], BEAST_REST, e), land[1] + (prowl[1] - land[1]) * e)
+        beast_head(pose, 6.0 + 18.0 * e, 40.0 - 34.0 * e, 4.0 - 8.0 * e)
+
+
+def beast_die(pose, u):
+    k = r.ease(min(1.0, u / 0.7))
+    splay = tuple((x * (1.0 + 0.5 * k), y, z + (0.3 if z > 0 else -0.25) * k) for x, y, z in BEAST_REST)
+    beast_legs(pose, BEAST_HIP - PROWL - 0.45 * k, splay, pitch=10.0 * k, roll=14.0 * k)
+    beast_head(pose, 24.0 + 10.0 * k, 4.0 + 24.0 * k, -4.0 - 20.0 * k)
+
+
+GHOUL_BEAST = EnemyModel("ghoul_beast.glb", BEAST_RIG, BEAST_GAIT, build_ghoul_beast_rigged,
+                         {"Idle": (IDLE_SECONDS, beast_idle), "Walk": (BEAST_GAIT.cycle, beast_walk), "Die": (DIE_SECONDS, beast_die),
+                          "Lunge": (1.0, beast_pounce)})
 
 
 # =========================================================================================================================================================
@@ -1025,5 +1112,5 @@ HOLLOW_KING = EnemyModel("hollow_king.glb", KING_RIG, KING_GAIT, lambda rig: bui
 HOLLOW_KING_UNBOUND = EnemyModel("hollow_king_unbound.glb", UNBOUND_RIG, UNBOUND_GAIT, lambda rig: build_king(rig, UNBOUND_SCALE, True),
                                  king_poses(UNBOUND_SCALE, UNBOUND_GAIT))
 
-ENEMIES = {"ghoul": GHOUL, "crossbow_ghoul": CROSSBOW_GHOUL, "ghoul_mage": GHOUL_MAGE, "beast_rider": BEAST_RIDER, "ghoul_tactician": GHOUL_TACTICIAN,
+ENEMIES = {"ghoul": GHOUL, "crossbow_ghoul": CROSSBOW_GHOUL, "ghoul_mage": GHOUL_MAGE, "beast_rider": BEAST_RIDER, "ghoul_beast": GHOUL_BEAST, "ghoul_tactician": GHOUL_TACTICIAN,
            "brute": BRUTE, "hollow_king": HOLLOW_KING, "hollow_king_unbound": HOLLOW_KING_UNBOUND}

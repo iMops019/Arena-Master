@@ -133,8 +133,9 @@ internal sealed class ShamanClass : IHeroClass
 
         ObstacleProbe obstacles = (Vector3D<float> centre, float radius, out Vector3D<float> pushOut, out float depth) =>
             window.TouchesObstacle(centre, radius, out pushOut, out depth);
-        Fight(frame.DeltaSeconds, hand, feet, target, !frame.StandingStill, frame.Condition.IsStunned, frame.Enemies, frame.GroundAt, obstacles, frame.Health, frame.Numbers);
-        _view.Sync(window, _storm, frame.DeltaSeconds);
+        Fight(frame.DeltaSeconds, hand, feet, target, !frame.StandingStill, frame.Condition.IsStunned, frame.Enemies, frame.GroundAt, obstacles, frame.Health, frame.Numbers,
+            AimLift(window));
+        _view.Sync(window, _storm, frame.DeltaSeconds, frame.GroundAt);
     }
 
     public void Answer(RunFrame frame) => AnswerStrikes(frame.Enemies.Strikes, frame.Window.PlayerFeet, frame.Enemies, frame.Health, frame.Numbers);
@@ -144,11 +145,11 @@ internal sealed class ShamanClass : IHeroClass
     /// rods, the Eye of the Storm while <paramref name="moving"/>, and Call Lightning. Each lightning kill heals with Galvanic Recovery.
     /// </summary>
     internal void Fight(float deltaSeconds, Vector3D<float> hand, Vector3D<float> feet, Vector3D<float> target, bool moving, bool stunned, EnemyField enemies,
-        Func<float, float, float?> groundAt, ObstacleProbe obstacles, PlayerHealth health, DamageNumbers numbers)
+        Func<float, float, float?> groundAt, ObstacleProbe obstacles, PlayerHealth health, DamageNumbers numbers, float aimLift = 0f)
     {
         _reflexesIn = MathF.Max(0f, _reflexesIn - deltaSeconds);
         _hits.Clear();
-        _storm.Update(deltaSeconds, hand, feet, target, moving, Stats, enemies, groundAt, obstacles, canCast: !stunned, _hits);
+        _storm.Update(deltaSeconds, hand, feet, target, moving, Stats, enemies, groundAt, obstacles, canCast: !stunned, _hits, aimLift);
         Report(numbers, health);
     }
 
@@ -242,6 +243,10 @@ internal sealed class ShamanClass : IHeroClass
     /// What the crosshair is on - the nearest enemy or ground along the camera's line of sight, within throwing range - or, with it on the sky, a spot on the ground
     /// a way ahead.
     /// </summary>
+    /// <summary>How far up the camera is pitched, for a higher lob: 0 looking a little down at the ground or lower, 1 pitched well up.</summary>
+    private static float AimLift(EngineWindow window) =>
+        window.Camera is { } camera ? Math.Clamp((camera.Front.Y + 0.1f) / ShamanStats.AimLiftPitch, 0f, 1f) : 0f;
+
     private Vector3D<float> Crosshair(EngineWindow window, EnemyField enemies, Func<float, float, float?> groundAt, Vector3D<float> feet, Vector3D<float> aim)
     {
         if (window.Camera is not { } camera || window.Terrain is not { } terrain)

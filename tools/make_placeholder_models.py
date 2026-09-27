@@ -5,7 +5,9 @@
   holy_circle.glb         a flat holy circle of radius 1: a gold ring with an inner ring and a cross, the ground a nova leaves
   cleave_wave.glb         one piece of a Cleave's wave front: a flat glowing band 1 m long along X, its bright edge at +Z (outward), laid along the
                           wave's arc and scaled to each piece's length
-  lightning_ball.glb      a ball of lightning: a spiky pale-blue orb with a white core, radius 0.35, centred on its middle
+  lightning_ball.glb      a ball of lightning: a round orb of pale-blue plasma mottled white, radius 0.35, centred on its middle
+  lightning_static.glb    the static round a ball: short jagged sparks lying over a sphere of radius about 0.5, spun and swelled every frame
+  lightning_spark.glb     one piece of a spark: a bright bar 1 m long along Z, centred on its middle (scaled to each piece's length)
   lightning_arc.glb       one piece of a lightning bolt: a thin bright bar 1 m long along Z, centred on its middle (scaled to each piece's length)
   lightning_zap.glb       a flat pale-blue ring of radius 1, scaled as a zap spreads over the ground
   frost_bolt.glb          a Frost Barrage bolt: a pale ice crystal, centred on its middle, pointing +Z
@@ -295,10 +297,61 @@ def build_cleave_wave():
     return m
 
 
+def sphere(m, cx, cy, cz, r, colour_of, stacks=8, slices=12):
+    """A round ball of radius <r> about (cx, cy, cz), <stacks> bands from top to bottom and <slices> round; colour_of(stack, slice) colours each face."""
+    import math
+    ring = [[(cx + r * math.sin(math.pi * i / stacks) * math.cos(2 * math.pi * k / slices), cy + r * math.cos(math.pi * i / stacks),
+              cz + r * math.sin(math.pi * i / stacks) * math.sin(2 * math.pi * k / slices)) for k in range(slices)] for i in range(stacks + 1)]
+    for i in range(stacks):
+        for k in range(slices):
+            a, b, c, d = ring[i][k], ring[i][(k + 1) % slices], ring[i + 1][(k + 1) % slices], ring[i + 1][k]
+            mid = tuple((a[n] + b[n] + c[n] + d[n]) / 4 - (cx, cy, cz)[n] for n in range(3))
+            colour = colour_of(i, k)
+            if i == 0:
+                m.facing([a, c, d], mid, colour)
+            elif i == stacks - 1:
+                m.facing([a, b, c], mid, colour)
+            else:
+                m.facing([a, b, c, d], mid, colour)
+
+
 def build_lightning_ball():
-    """A ball of lightning, radius 0.35: a spiky pale-blue orb with the white core poking through."""
+    """A ball of lightning, radius 0.35: a round orb of pale-blue plasma, streaked with white-hot swirls."""
+    import math
+
+    def swirl(i, k):
+        theta, phi = math.pi * (i + 0.5) / 10, 2 * math.pi * (k + 0.5) / 16
+        return "spark_light" if math.sin(3 * theta + 2 * phi) + math.sin(5 * phi - 2 * theta) > 0.7 else "spark"
+
     m = Mesh()
-    _orb(m, 0.0, 0.0, 0.0, 0.35, "spark", "spark_light")
+    sphere(m, 0.0, 0.0, 0.0, 0.35, swirl, stacks=10, slices=16)
+    return m
+
+
+def build_lightning_static():
+    """The static round a ball of lightning, radius about 0.5: short jagged sparks lying over a sphere, each three thin kinked pieces. The game spins and
+    swells it every frame, so it crackles."""
+    import math
+    m = Mesh()
+    for n in range(18):
+        u, v, w = _unit_noise(n, 0.7), _unit_noise(n, 1.9), _unit_noise(n, 4.3)
+        theta, phi = math.acos(1.0 - 2.0 * u), 2 * math.pi * v                  # where on the sphere it starts
+        radius = 0.44 + 0.12 * w
+        points = []
+        for step in range(4):
+            t = theta + (step * 0.22 + (0.06 if step % 2 else -0.06)) * (1.0 if n % 2 else -1.0)
+            p = phi + step * 0.25 + (0.12 if step % 2 else 0.0)
+            rr = radius + (0.05 if step % 2 else 0.0)
+            points.append((rr * math.sin(t) * math.cos(p), rr * math.cos(t), rr * math.sin(t) * math.sin(p)))
+        for a, b in zip(points, points[1:]):
+            m.beam(a, b, 0.012, "spark_light", 0, 0)
+    return m
+
+
+def build_lightning_spark():
+    """One piece of a spark: a bright bar 1 m long along Z, centred on its middle, drawn much shorter (and so finer) than a fork's pieces."""
+    m = Mesh()
+    m.box(-0.06, -0.06, -0.5, 0.06, 0.06, 0.5, "spark_light")
     return m
 
 
@@ -1312,7 +1365,8 @@ def write_skinned_glb(mesh, path, joints, clips):
 if __name__ == "__main__":
     for name, build in (("holy_nova.glb", lambda: build_ring(0.88, 1.0, "holy")), ("holy_circle.glb", build_holy_circle),
                         ("frost_bolt.glb", build_frost_bolt), ("cleave_wave.glb", build_cleave_wave), ("lightning_ball.glb", build_lightning_ball),
-                        ("lightning_arc.glb", build_lightning_arc), ("lightning_zap.glb", lambda: build_ring(0.85, 1.0, "spark")),
+                        ("lightning_arc.glb", build_lightning_arc), ("lightning_static.glb", build_lightning_static),
+                        ("lightning_spark.glb", build_lightning_spark), ("lightning_zap.glb", lambda: build_ring(0.85, 1.0, "spark")),
                         ("frost_blast.glb", lambda: build_ring(0.86, 1.0, "ice_light")), ("frost_shard.glb", build_frost_shard),
                         ("aegis_burst.glb", lambda: build_ring(0.9, 1.0, "holy_light")), ("thunderstone_bolt.glb", build_lightning_arc),
                         ("arrow_placeholder.glb", build_arrow), ("ghoul_bolt.glb", build_ghoul_bolt),

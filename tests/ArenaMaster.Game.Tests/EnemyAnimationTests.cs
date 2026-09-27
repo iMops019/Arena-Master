@@ -10,13 +10,13 @@ public class EnemyModelTests
 {
     public static readonly TheoryData<string> Kinds = new()
     {
-        EnemyKind.Ghoul.Name, EnemyKind.CrossbowGhoul.Name, EnemyKind.GhoulMage.Name, EnemyKind.BeastRider.Name, EnemyKind.GhoulTactician.Name,
+        EnemyKind.Ghoul.Name, EnemyKind.CrossbowGhoul.Name, EnemyKind.GhoulMage.Name, EnemyKind.BeastRider.Name, EnemyKind.GhoulBeast.Name, EnemyKind.GhoulTactician.Name,
         EnemyKind.Brute.Name, EnemyKind.HollowKing.Name, DelveBosses.HollowKingUnbound.Name,
     };
 
     private static readonly EnemyKind[] All =
     {
-        EnemyKind.Ghoul, EnemyKind.CrossbowGhoul, EnemyKind.GhoulMage, EnemyKind.BeastRider, EnemyKind.GhoulTactician, EnemyKind.Brute, EnemyKind.HollowKing,
+        EnemyKind.Ghoul, EnemyKind.CrossbowGhoul, EnemyKind.GhoulMage, EnemyKind.BeastRider, EnemyKind.GhoulBeast, EnemyKind.GhoulTactician, EnemyKind.Brute, EnemyKind.HollowKing,
         DelveBosses.HollowKingUnbound,
     };
 
@@ -105,10 +105,12 @@ public class EnemyModelTests
         Assert.Equal(Size(0f), Size(0.99f), 1);
     }
 
-    [Fact]
-    public void TheBeast_AlwaysHasAPawOnTheGround_FrontAndBack()
+    [Theory]
+    [InlineData("beast_rider.glb")]
+    [InlineData("ghoul_beast.glb")]
+    public void TheBeast_AlwaysHasAPawOnTheGround_FrontAndBack(string file)
     {
-        var model = Load(EnemyKind.BeastRider.Model);
+        var model = Load(file);
         var walk = model.Clips[EnemyMotion.WalkClip];
         int foreLeft = model.JointIndex("fore_foot_l"), foreRight = model.JointIndex("fore_foot_r");
         for (float t = 0f; t < walk.Duration; t += 0.02f)

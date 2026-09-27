@@ -153,7 +153,7 @@ public sealed partial class ArenaMasterContent
         _itemHits.Clear();
         _itemEffects.Update(deltaSeconds, window.PlayerFeet, _items.Carried.Bonuses, _enemies, _health, _hero.KeepsOwnBarrier, _itemHits);
         _health.DamageTaken = _hero.DamageTaken;
-        var player = new PlayerTarget(window.PlayerFeet, window.PlayerGrounded, _health, _condition, _hero.BlockChance);
+        var player = new PlayerTarget(window.PlayerFeet, window.PlayerGrounded, _health, _condition, _hero.BlockChance, LookingWay(window));
         var gone = _enemies.Update(deltaSeconds, player, groundAt);
         foreach (var legendary in _enemies.TakeLegendarySpawns())
         {
@@ -391,6 +391,18 @@ public sealed partial class ArenaMasterContent
     }
 
     /// <summary>Spawns what the director asked for: a wave of elites, a boss.</summary>
+    /// <summary>The flat way the player is looking: the camera's (every hero faces its aim), or zero if there is no camera.</summary>
+    private static Vector3D<float> LookingWay(EngineWindow window)
+    {
+        if (window.Camera is not { } camera)
+        {
+            return Vector3D<float>.Zero;
+        }
+
+        var flat = new Vector3D<float>(camera.Front.X, 0f, camera.Front.Z);
+        return flat.LengthSquared > 1e-6f ? Vector3D.Normalize(flat) : Vector3D<float>.Zero;
+    }
+
     private void FollowOrders(DirectorOrders orders, Vector3D<float> playerFeet, Func<float, float, float?> groundAt)
     {
         for (int i = 0; i < orders.Elites; i++)

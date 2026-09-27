@@ -63,11 +63,18 @@ internal sealed class RunDirector
         return minutes < 7f ? 0f : MathF.Min(0.06f, 0.02f + (0.04f / 15f) * (minutes - 7f));
     }
 
+    /// <summary>The share of fodder that spawns as Ghoul Beasts at <paramref name="seconds"/>: none before 6:00, then 1.5%, growing to 4% by 21:00.</summary>
+    public static float BeastShareAt(float seconds)
+    {
+        float minutes = seconds / 60f;
+        return minutes < 6f ? 0f : MathF.Min(0.04f, 0.015f + (0.025f / 15f) * (minutes - 6f));
+    }
+
     /// <summary>The kinds that some of the fodder spawns as at <paramref name="seconds"/>, and each one's share (see <see cref="EnemyField.Mix"/>).</summary>
     public static (EnemyKind Kind, float Share)[] MixAt(float seconds) => new[]
     {
         (EnemyKind.CrossbowGhoul, CrossbowShareAt(seconds)), (EnemyKind.GhoulMage, MageShareAt(seconds)),
-        (EnemyKind.BeastRider, RiderShareAt(seconds)), (EnemyKind.GhoulTactician, TacticianShareAt(seconds)),
+        (EnemyKind.BeastRider, RiderShareAt(seconds)), (EnemyKind.GhoulTactician, TacticianShareAt(seconds)), (EnemyKind.GhoulBeast, BeastShareAt(seconds)),
     };
 
     /// <summary>How much tougher than base everything spawns at <paramref name="seconds"/>: health climbs steeply, damage and speed gently.</summary>

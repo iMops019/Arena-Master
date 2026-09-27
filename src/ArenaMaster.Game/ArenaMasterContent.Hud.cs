@@ -79,6 +79,7 @@ public sealed partial class ArenaMasterContent
         if (_window?.Camera is { } camera)
         {
             DrawRarityTags(hud, camera);
+            DrawPounceWarnings(hud, camera);
             _numbers.Draw(hud, camera);
         }
 
@@ -209,6 +210,41 @@ public sealed partial class ArenaMasterContent
             var size = hud.MeasureText(enemy.Name, scale);
             hud.Text(HudAnchor.TopLeft, new Vector2D<float>(x - size.X / 2f, y - size.Y - 8f), enemy.Name, colour, scale);
             hud.Bar(HudAnchor.TopLeft, new Vector2D<float>(x - 40f, y - 4f), new Vector2D<float>(80f, 5f), enemy.Health / enemy.MaxHealth, colour, Shade);
+        }
+    }
+
+    /// <summary>
+    /// A red warning round the crosshair, on the side a stalker is winding up a pounce from - most often behind, where the player can't see it - so there is
+    /// a moment to turn and face it or get out of the way.
+    /// </summary>
+    private void DrawPounceWarnings(IHud hud, CEngine.Core.Camera camera)
+    {
+        if (_window is not { } window)
+        {
+            return;
+        }
+
+        var front = new Vector3D<float>(camera.Front.X, 0f, camera.Front.Z);
+        if (front.LengthSquared < 1e-6f)
+        {
+            return;
+        }
+
+        front = Vector3D.Normalize(front);
+        var right = new Vector3D<float>(-front.Z, 0f, front.X);
+        foreach (var enemy in _enemies.Enemies)
+        {
+            if (!enemy.IsAlive || enemy.Kind.Behaviour != EnemyBehaviour.Stalk || enemy.Attack is null || enemy.AttackPhase != AttackPhase.WindUp)
+            {
+                continue;
+            }
+
+            var toward = enemy.Position - window.PlayerFeet;
+            float angle = MathF.Atan2(Vector3D.Dot(toward, right), Vector3D.Dot(toward, front));   // 0 ahead, +/- pi behind, positive to the right
+            float pulse = 0.6f + 0.4f * MathF.Abs(MathF.Sin(enemy.PhaseTime * 18f));
+            var at = new Vector2D<float>(MathF.Sin(angle) * 150f, -MathF.Cos(angle) * 150f);
+            var size = hud.MeasureText("!", 2f);
+            hud.Text(HudAnchor.Center, at - size / 2f, "!", new Vector4D<float>(1f, 0.2f, 0.15f, pulse), 2f);
         }
     }
 

@@ -20,6 +20,7 @@ internal sealed class Enemy
         Position = position;
         MaxHealth = kind.MaxHealth * scaling.Health * Rarity.Health;
         Health = MaxHealth;
+        SeenHealth = MaxHealth;
         Speed = kind.Speed * scaling.Speed * Rarity.Speed;
         DamageScale = scaling.Damage * Rarity.Damage;
     }
@@ -126,6 +127,14 @@ internal sealed class Enemy
     /// <summary>Where the attack is aimed: the lunge's end, the leap's landing spot.</summary>
     public Vector3D<float> AttackTarget { get; set; }
 
+    /// <summary>A stalker's mood: stalking (circling, waiting for an opening) or fleeing, and how long a flight lasts yet.</summary>
+    public StalkMood Mood { get; set; }
+
+    public float MoodLeft { get; set; }
+
+    /// <summary>A stalker's health when it last looked, so a hit (from anything) spooks it.</summary>
+    public float SeenHealth { get; set; }
+
     /// <summary>Whether the attack has already hit (each attack hits at most once).</summary>
     public bool AttackLanded { get; set; }
 
@@ -138,11 +147,20 @@ internal sealed class Enemy
         : 0f;
 }
 
+/// <summary>A stalker's mood (see <see cref="EnemyBehaviour.Stalk"/>).</summary>
+internal enum StalkMood
+{
+    Stalk,
+    Flee,
+}
+
 /// <summary>
 /// Where the player is and what enemies can do to them this frame. <paramref name="BlockChance"/> (0 to 1) is the chance a blow is turned aside completely: no
-/// damage, no shove, no stun. It's 0 for a class without a shield.
+/// damage, no shove, no stun. It's 0 for a class without a shield. <paramref name="Facing"/> is the flat way the player is looking (zero if not known): a
+/// stalker watches it for its opening.
 /// </summary>
-internal readonly record struct PlayerTarget(Vector3D<float> Feet, bool Grounded, PlayerHealth Health, PlayerCondition Condition, float BlockChance = 0f);
+internal readonly record struct PlayerTarget(Vector3D<float> Feet, bool Grounded, PlayerHealth Health, PlayerCondition Condition, float BlockChance = 0f,
+    Vector3D<float> Facing = default);
 
 /// <summary>A blow that reached the player this frame, landed or blocked: who struck, and how hard (before any cut to damage taken).</summary>
 internal readonly record struct Strike(Enemy Attacker, float Damage, bool Blocked);
@@ -700,19 +718,32 @@ internal sealed class EnemyField
             return;
         }
 
-        if (distance > 1e-3f)
+        Vector3D<float> step;
+        if (kind.Behaviour == EnemyBehaviour.Stalk)
         {
-            enemy.Yaw = MathF.Atan2(toPlayer.X, toPlayer.Z);
+            if (Stalk(enemy, deltaSeconds, toPlayer, distance, player, groundAt, out step))
+            {
+                return;   // it pounced
+            }
+        }
+        else
+        {
+            if (distance > 1e-3f)
+            {
+                enemy.Yaw = MathF.Atan2(toPlayer.X, toPlayer.Z);
+            }
+
+            if (enemy.AttackCooldown <= 0f && TryStartAttack(enemy, distance, player, groundAt))
+            {
+                return;
+            }
+
+            // Walk at the player (a ranged kind stops once it is close enough to shoot).
+            step = kind.StandOff > 0f && distance <= kind.StandOff ? Vector3D<float>.Zero : toPlayer * enemy.WalkSpeed;
         }
 
-        if (enemy.AttackCooldown <= 0f && TryStartAttack(enemy, distance, player, groundAt))
-        {
-            return;
-        }
-
-        // Walk at the player (a ranged kind stops once it is close enough to shoot), eased off by any other enemy close enough to crowd it, so a pack spreads around
-        // the player instead of stacking into one. The bigger of two enemies gives way less.
-        var step = kind.StandOff > 0f && distance <= kind.StandOff ? Vector3D<float>.Zero : toPlayer * enemy.WalkSpeed;
+        // Eased off by any other enemy close enough to crowd it, so a pack spreads around the player instead of stacking into one. The bigger of two enemies
+        // gives way less.
         foreach (var other in _grid.Near(enemy.Position.X, enemy.Position.Z, kind.Radius + MaxEnemyRadius + 0.15f))
         {
             if (other == enemy || !other.IsAlive)
@@ -752,6 +783,120 @@ internal sealed class EnemyField
             enemy.Position = new Vector3D<float>(position.X, ground, position.Z);
         }
     }
+
+    // A stalker's ways (the Ghoul Beast's; see EnemyBehaviour.Stalk). Distances in metres, times in seconds, speeds as shares of its walking speed.
+
+    /// <summary>It circles this far from the player, and creeps in to this once it is behind them.</summary>
+    public const float StalkRadius = 10f;
+    public const float CreepRadius = 5.5f;
+
+    /// <summary>Further off than this it just comes on at full speed.</summary>
+    public const float StalkApproach = 16f;
+
+    /// <summary>The player looking at it (their facing within about 30 degrees of it) from nearer than this spooks it.</summary>
+    public const float SpookDistance = 9f;
+    public const float SpookFacing = 0.85f;
+
+    /// <summary>It has an opening when the player's facing points this far away from it (about 110 degrees and more): their back is turned.</summary>
+    public const float BackTurned = -0.35f;
+
+    /// <summary>How long it runs when spooked (between the two), and after each pounce.</summary>
+    public const float FleeMin = 1.1f;
+    public const float FleeMax = 1.9f;
+    public const float StalkAfterPounce = 1.6f;
+
+    /// <summary>Its pace prowling round the player, bolting away, and rushing in on an opening.</summary>
+    public const float ProwlPace = 0.7f;
+    public const float FleePace = 1.3f;
+    public const float RushPace = 1.2f;
+
+    /// <summary>
+    /// A stalker's move for this frame (into <paramref name="step"/>), or its pounce: true if it pounced. Spooked (looked at from close by, or hurt), it bolts
+    /// for a moment. With an opening - the player's back turned, or a stun - it rushes in and pounces once in range. Otherwise it circles, working round toward
+    /// the player's back and creeping closer once it is there. It faces the way it goes.
+    /// </summary>
+    private bool Stalk(Enemy enemy, float deltaSeconds, Vector3D<float> toPlayer, float distance, PlayerTarget player, Func<float, float, float?> groundAt,
+        out Vector3D<float> step)
+    {
+        var fromPlayer = -toPlayer;
+        var facing = new Vector3D<float>(player.Facing.X, 0f, player.Facing.Z);
+        bool knowsFacing = facing.LengthSquared > 1e-6f;
+        if (knowsFacing)
+        {
+            facing = Vector3D.Normalize(facing);
+        }
+
+        float watched = knowsFacing ? Vector3D.Dot(facing, fromPlayer) : 0f;   // 1: the player looks right at it; -1: its back is to it
+        bool opening = player.Condition.IsStunned || (knowsFacing && watched < BackTurned);
+        bool hurt = enemy.Health < enemy.SeenHealth;
+        enemy.SeenHealth = enemy.Health;
+        enemy.MoodLeft -= deltaSeconds;
+
+        if (enemy.Mood == StalkMood.Flee && enemy.MoodLeft <= 0f)
+        {
+            enemy.Mood = StalkMood.Stalk;
+        }
+
+        if (enemy.Mood == StalkMood.Stalk && !opening && (hurt || (watched > SpookFacing && distance < SpookDistance)))
+        {
+            Spook(enemy, FleeMin + (FleeMax - FleeMin) * (float)_random.NextDouble());
+        }
+
+        if (enemy.Mood == StalkMood.Flee)
+        {
+            // Away from the player, veering off to its circling side rather than straight back.
+            step = Vector3D.Normalize(fromPlayer + Side(fromPlayer, enemy.Phase < MathF.PI) * 0.35f) * enemy.WalkSpeed * FleePace;
+        }
+        else if (opening)
+        {
+            var pounce = enemy.AttacksNow.FirstOrDefault(a => distance >= a.MinRange && distance <= a.MaxRange);
+            if (pounce is not null && enemy.AttackCooldown <= 0f)
+            {
+                enemy.Yaw = MathF.Atan2(toPlayer.X, toPlayer.Z);
+                StartAttack(enemy, pounce, player, groundAt);
+                enemy.ChainLeft = pounce.Chain;
+                step = Vector3D<float>.Zero;
+                return true;
+            }
+
+            step = toPlayer * enemy.WalkSpeed * RushPace;   // closing in while it can
+        }
+        else if (distance > StalkApproach)
+        {
+            step = toPlayer * enemy.WalkSpeed;
+        }
+        else
+        {
+            // Round the player toward their back (or its own way, not knowing where they look), holding its distance - closer once it is behind them.
+            var around = knowsFacing
+                ? Side(fromPlayer, Vector3D.Dot(Side(fromPlayer, true), -facing) >= 0f)
+                : Side(fromPlayer, enemy.Phase < MathF.PI);
+            float behind = knowsFacing ? -watched : 0f;
+            float want = behind > 0.5f ? CreepRadius : StalkRadius;
+            float along = knowsFacing && behind > 0.9f ? 0.2f : 1f;   // nearly there: mostly closing in
+            var way = around * along + fromPlayer * Math.Clamp((want - distance) * 0.5f, -1f, 1f);
+            step = way.LengthSquared > 1e-6f ? Vector3D.Normalize(way) * enemy.WalkSpeed * ProwlPace : Vector3D<float>.Zero;
+        }
+
+        var heading = step.LengthSquared > 0.09f ? step : toPlayer;
+        if (heading.LengthSquared > 1e-6f)
+        {
+            enemy.Yaw = MathF.Atan2(heading.X, heading.Z);
+        }
+
+        return false;
+    }
+
+    /// <summary>A stalker bolts for <paramref name="seconds"/>.</summary>
+    private static void Spook(Enemy enemy, float seconds)
+    {
+        enemy.Mood = StalkMood.Flee;
+        enemy.MoodLeft = seconds;
+    }
+
+    /// <summary>The flat way a quarter turn round from <paramref name="from"/>, one way or the other.</summary>
+    private static Vector3D<float> Side(Vector3D<float> from, bool left) =>
+        left ? new Vector3D<float>(from.Z, 0f, -from.X) : new Vector3D<float>(-from.Z, 0f, from.X);
 
     /// <summary>A boss whose health has fallen past its next stage's mark goes into it (and on past any it skipped), and the change is noted.</summary>
     private void UpdatePhase(Enemy enemy)
@@ -877,6 +1022,10 @@ internal sealed class EnemyField
                 {
                     enemy.Attack = null;
                     enemy.AttackCooldown = enemy.AttackCooldownNow;
+                    if (enemy.Kind.Behaviour == EnemyBehaviour.Stalk)
+                    {
+                        Spook(enemy, StalkAfterPounce);   // hit and run
+                    }
                 }
 
                 break;

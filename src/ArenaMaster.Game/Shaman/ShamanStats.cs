@@ -21,7 +21,24 @@ internal sealed class ShamanStats
     public const int BaseBounces = 4;
     public const float BaseLifetime = 4f;
 
-    /// <summary>The lob: how fast the ball travels across the ground, how hard it falls, how much of its bounce it keeps, and the least bounce it ever has.</summary>
+    /// <summary>
+    /// The lob's arc: it tops out this high above the higher of the hand and the landing, and this much higher for each metre it is thrown, so a near throw is
+    /// a low toss and a far one a gentle lob. Aiming up from level adds up to <see cref="MaxAimLift"/> more (a camera pitched up by <see cref="AimLiftPitch"/>
+    /// of its front's height gives it all). Projectile speed flattens the arc, so the ball gets there sooner.
+    /// </summary>
+    public const float LobArc = 0.6f;
+    public const float LobArcPerMetre = 0.1f;
+    public const float MaxAimLift = 2.5f;
+    public const float AimLiftPitch = 0.6f;
+
+    /// <summary>
+    /// How high the lob's arc tops out above the higher of its two ends for a throw of <paramref name="distance"/> with <paramref name="aimLift"/> (0 to 1: how
+    /// far up the camera is pitched).
+    /// </summary>
+    public float LobHeight(float distance, float aimLift) =>
+        (LobArc + LobArcPerMetre * distance + MaxAimLift * Math.Clamp(aimLift, 0f, 1f)) / ((1f + Items.ProjectileSpeed) * (1f + Items.ProjectileSpeed));
+
+    /// <summary>The lob: how fast a surge's ball rolls off across the ground, how hard a ball falls, how much of its bounce it keeps, and the least bounce it ever has.</summary>
     public const float ThrowSpeed = 12f;
     public const float Gravity = 22f;
     public const float Restitution = 0.62f;
