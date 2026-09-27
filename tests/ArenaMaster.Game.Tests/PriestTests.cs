@@ -182,6 +182,38 @@ public class PlagueSkullTests
     }
 
     [Fact]
+    public void ACrate_IsTargetedAndStruck_LikeAnEnemy()
+    {
+        var field = PriestTesting.QuietField();
+        var crate = field.Spawn(new Vector3D<float>(3f, 0f, 6f), EnemyKind.Crate);
+        crate.Health = 10_000f;
+        var skulls = new PlagueSkulls(new Random(1));
+        var stats = PriestTesting.With();
+
+        var hits = PriestTesting.Run(skulls, stats, field, 1f, canCast: true);   // a crate alone is enough to cast at
+        hits.AddRange(PriestTesting.Run(skulls, stats, field, 1.5f));
+
+        Assert.Equal(1, skulls.Casts);
+        Assert.Contains(hits, h => h.Enemy == crate && h.Source == PriestSource.Skull);
+    }
+
+    [Fact]
+    public void ACrateInTheWay_IsStruck_NotFlownThrough()
+    {
+        var field = PriestTesting.QuietField();
+        var crate = field.Spawn(new Vector3D<float>(0f, 0f, 4f), EnemyKind.Crate);
+        crate.Health = 10_000f;
+        PriestTesting.Sturdy(field, 0f, 8f);
+        var skulls = new PlagueSkulls(new Random(1));
+        var stats = PriestTesting.With();
+
+        var hits = PriestTesting.Loose(skulls, stats, field);
+        hits.AddRange(PriestTesting.Run(skulls, stats, field, 1.5f));
+
+        Assert.Contains(hits, h => h.Enemy == crate && h.Source == PriestSource.Skull);
+    }
+
+    [Fact]
     public void AnUnspentSkull_FadesAfterThreeAndAHalfSeconds()
     {
         var field = PriestTesting.QuietField();

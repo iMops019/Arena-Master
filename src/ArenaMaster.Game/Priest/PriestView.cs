@@ -18,6 +18,9 @@ internal sealed class PriestView
     public const string AshModel = "rot_ash.glb";
     public const string PoolModel = "rot_pool.glb";
 
+    /// <summary>How big a skull (and its wisps) is drawn, against the model's 0.34 m.</summary>
+    private const float SkullSize = 0.75f;
+
     /// <summary>At most this many motes at once, however much is rotting.</summary>
     private const int MaxMotes = 1400;
 
@@ -78,11 +81,11 @@ internal sealed class PriestView
                 float bob = MathF.Sin(skull.Age * 9f) * 0.08f;
                 var at = skull.Position + new Vector3D<float>(0f, bob, 0f);
                 float flash = 0.35f + 0.25f * MathF.Abs(MathF.Sin(skull.Age * 7f));
-                _skulls.Add(new CrowdInstance(at, yaw + 0.25f * MathF.Sin(skull.Age * 5f), 1f, 0.15f * MathF.Sin(skull.Age * 6f), Flash: flash));
-                _wisps.Add(new CrowdInstance(at, _time * 3f + skull.Age, 1f + 0.12f * MathF.Sin(_time * 8f), _time * 1.7f, Flash: 0.5f));
-                _wisps.Add(new CrowdInstance(at, -_time * 2.3f, 0.8f, -_time * 2.1f + 1f, Flash: 0.4f));
-                var behind = at - skull.Heading * 0.25f;
-                Emit(SkullMotes * deltaSeconds, () => behind + Jitter(0.18f), 0.12f, rise: 0.35f, ashShare: 0.4f);
+                _skulls.Add(new CrowdInstance(at, yaw + 0.25f * MathF.Sin(skull.Age * 5f), SkullSize, 0.15f * MathF.Sin(skull.Age * 6f), Flash: flash));
+                _wisps.Add(new CrowdInstance(at, _time * 3f + skull.Age, SkullSize * (1f + 0.12f * MathF.Sin(_time * 8f)), _time * 1.7f, Flash: 0.5f));
+                _wisps.Add(new CrowdInstance(at, -_time * 2.3f, SkullSize * 0.8f, -_time * 2.1f + 1f, Flash: 0.4f));
+                var behind = at - skull.Heading * 0.2f;
+                Emit(SkullMotes * deltaSeconds, () => behind + Jitter(0.14f), 0.1f, rise: 0.35f, ashShare: 0.4f);
             }
 
             foreach (var (enemy, infection) in skulls.Infections)

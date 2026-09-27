@@ -4,8 +4,8 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Priest;
 
 /// <summary>
-/// A Plague Skull: loosed from the wand, it flies at about chest height over the ground, turning onto the nearest enemy it hasn't struck yet, striking and
-/// piercing on through, until its pierces or its life run out.
+/// A Plague Skull: loosed from the wand, it flies low over the ground, turning onto the nearest enemy (or crate) it hasn't struck yet, striking and piercing on
+/// through, until its pierces or its life run out.
 /// </summary>
 internal sealed class PlagueSkull
 {
@@ -127,9 +127,12 @@ internal readonly record struct PriestHit(Enemy Enemy, Vector3D<float> Position,
 /// </summary>
 internal sealed class PlagueSkulls
 {
-    /// <summary>How fat a skull is for hitting, and how high over the ground it flies.</summary>
-    public const float SkullRadius = 0.3f;
-    public const float Hover = 1.05f;
+    /// <summary>
+    /// How fat a skull is for hitting, and how high over the ground it flies: low enough to strike a crate (0.9 m tall) squarely, not just graze its top, and
+    /// still a ghoul's middle.
+    /// </summary>
+    public const float SkullRadius = 0.24f;
+    public const float Hover = 0.8f;
 
     /// <summary>How hard a skull turns onto its target: gently at first, harder the longer it flies; and within this distance, straight at it.</summary>
     public const float TurnRate = 5f;
@@ -197,7 +200,7 @@ internal sealed class PlagueSkulls
             CastIn -= deltaSeconds;
             if (CastIn <= 0f && _launches.Count == 0)
             {
-                if (enemies.Within(feet, PriestStats.CastRange).Any(e => !e.Kind.IsProp))
+                if (enemies.Within(feet, PriestStats.CastRange).Count > 0)
                 {
                     Cast(stats);
                 }
@@ -349,7 +352,7 @@ internal sealed class PlagueSkulls
     /// <summary>Skull <paramref name="index"/> of <paramref name="count"/> leaves the wand: toward the best enemy in range (in front first, nearest first), each after the first turned a little further off it.</summary>
     private void Launch(int index, int count, Vector3D<float> hand, Vector3D<float> aimFlat, PriestStats stats, EnemyField enemies)
     {
-        var target = enemies.Within(hand, PriestStats.CastRange).Where(e => !e.Kind.IsProp).OrderBy(e => Rank(e, hand, aimFlat)).FirstOrDefault();
+        var target = enemies.Within(hand, PriestStats.CastRange).OrderBy(e => Rank(e, hand, aimFlat)).FirstOrDefault();
         var toward = target is null ? aimFlat : Geometry.FlatDirection(hand, target.Position, out _);
         if (toward == Vector3D<float>.Zero)
         {
@@ -377,14 +380,14 @@ internal sealed class PlagueSkulls
         return Vector3D.Dot(toward, aimFlat) >= 0f ? distance : distance * 1.5f;
     }
 
-    /// <summary>The nearest live enemy (not a crate) within <paramref name="range"/> of <paramref name="from"/> that isn't in <paramref name="skip"/>.</summary>
+    /// <summary>The nearest live enemy (or crate) within <paramref name="range"/> of <paramref name="from"/> that isn't in <paramref name="skip"/>.</summary>
     private static Enemy? Nearest(EnemyField enemies, Vector3D<float> from, float range, IReadOnlySet<Enemy> skip)
     {
         Enemy? best = null;
         float bestDistance = float.MaxValue;
         foreach (var enemy in enemies.Within(from, range))
         {
-            if (enemy.Kind.IsProp || skip.Contains(enemy))
+            if (skip.Contains(enemy))
             {
                 continue;
             }
@@ -435,7 +438,7 @@ internal sealed class PlagueSkulls
             var from = skull.Position;
             var to = from + skull.Heading * skull.Speed * deltaSeconds;
             float ground = groundAt(to.X, to.Z) ?? to.Y - Hover;
-            to.Y += (ground + Hover - to.Y) * MathF.Min(1f, 10f * deltaSeconds);   // gliding over the ground at chest height
+            to.Y += (ground + Hover - to.Y) * MathF.Min(1f, 16f * deltaSeconds);   // gliding low over the ground, up and down with it
 
             bool gone = false;
             while (enemies.FirstHit(from, to, SkullRadius, out float along, skull.AlreadyHit) is { } enemy)
