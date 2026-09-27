@@ -82,7 +82,7 @@ internal static class UnholyTree
             "Every block has a 25% chance to spew Death and Decay from the Skull Shield: a wide cone of rot in front of you that lies on the ground for 3 s, and everything in it rots (15 damage a second)."),
         Minor("lingering", "Lingering Sickness", 3, 400, P, 3, new[] { VirulentStrain, "festering" }, "Plague lasts {Plague duration} s longer.", (PlagueDuration, 0.4f)),
         Minor("fever", "Fever", 3, 510, P, 5, new[] { "festering" }, "+{Plague damage}% Plague damage and +{Crit chance}% increased critical chance.", (PlagueDamage, 10), (CritChance, 8)),
-        Major(TwinSkulls, "Twin Skulls", 3, 640, S, new[] { "grinning", "hollowchant" }, "Every cast looses a second skull a moment after the first."),
+        Major(TwinSkulls, "Twin Skulls", 3, 640, S, new[] { "grinning", "hollowchant" }, "Every cast fires a second skull a moment after the first."),
         Minor("splinters", "Bone Splinters", 3, 760, S, 3, new[] { "grinning", "hollowchant" }, "Skulls pierce {Pierce} more enemies.", (Pierce, 1)),
         Minor("festerground", "Festering Ground", 3, 880, R, 5, new[] { "rotwalker" }, "+{Rot damage}% rot damage.", (DecayDamage, 12)),
 
@@ -115,7 +115,7 @@ internal static class UnholyTree
         Major(MouthOfTheGrave, "Mouth of the Grave", 7, 185, G, new[] { SoulHarvest, "deathless" },
             "+8% block chance. Every block spews Death and Decay (if you have it), and its cone reaches 50% further."),
         Major(BlackDeath, "Black Death", 7, 450, P, new[] { Epidemic, "plaguelord" }, "Plague's ticks can be critical hits, and Plague lasts 1 s longer."),
-        Major(Legion, "Legion", 7, 640, S, new[] { "ossuary" }, "Every cast looses one more skull, and skulls last 1 s longer."),
+        Major(Legion, "Legion", 7, 640, S, new[] { "ossuary" }, "Every cast fires one more skull, and skulls last 1 s longer."),
         Major(Necropolis, "Necropolis", 7, 860, R, new[] { AuraOfDecay }, "Rot on the ground lasts twice as long, and every enemy it touches catches a stack of Plague each second."),
     }, new[] { 1, 3, 6, 10, 15, 21, 28 },
         new[] { (G, 165f), (P, 430f), (S, 650f), (R, 865f) },

@@ -4,7 +4,7 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Priest;
 
 /// <summary>
-/// A Plague Skull: loosed from the wand, it flies low over the ground, turning onto the nearest enemy (or crate) it hasn't struck yet, striking and piercing on
+/// A Plague Skull: fired from the wand, it flies low over the ground, turning onto the nearest enemy (or crate) it hasn't struck yet, striking and piercing on
 /// through, until its pierces or its life run out.
 /// </summary>
 internal sealed class PlagueSkull

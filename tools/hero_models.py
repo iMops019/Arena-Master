@@ -949,7 +949,7 @@ def priest_air(pose, u):
 
 
 def priest_hex(pose, u):
-    """A skull loosed: the wand drawn back beside the hood, then thrust out ahead, its skull first, as the skull leaves it; the shield braced before."""
+    """A skull fired: the wand drawn back beside the hood, then thrust out ahead, its skull first, as the skull leaves it; the shield braced before."""
     r.stand_legs(pose, 0.0, 0.0, width=0.14)
     at = attack_moment(u, 0.2, 0.62, 0.95)
     spine_upright(pose, lean=attack_value(at, 6.0, 0.0, 12.0))

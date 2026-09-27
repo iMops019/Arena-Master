@@ -9,7 +9,7 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Priest;
 
 /// <summary>
-/// The Priest as the content runs it (see <see cref="IHeroClass"/>): a skull wand and a Skull Shield. The wand looses Plague Skulls that hunt through the crowd,
+/// The Priest as the content runs it (see <see cref="IHeroClass"/>): a skull wand and a Skull Shield. The wand fires Plague Skulls that hunt through the crowd,
 /// piercing and Plaguing what they pass (<see cref="PlagueSkulls"/>). Here too is what answers the enemies' blows - the Skull Shield's block, and with the tree,
 /// Death and Decay spewing from it and Bone Armour - and Rotting Step's rot, Soul Harvest and the Leech Jar's healing.
 /// </summary>
@@ -57,7 +57,7 @@ internal sealed class PriestClass : IHeroClass
     public string Name => "Priest";
 
     public string Summary =>
-        "A skull wand and a Skull Shield. The wand looses Plague Skulls that hunt through the crowd, piercing one enemy after another and leaving each Plagued, rotting from within. The Unholy tree spreads the rot.";
+        "A skull wand and a Skull Shield. The wand fires Plague Skulls that hunt through the crowd, piercing one enemy after another and leaving each Plagued, rotting from within. The Unholy tree spreads the rot.";
 
     public TreeDefinition Tree => UnholyTree.Tree;
 

@@ -20,14 +20,14 @@ internal sealed class PriestStats
     /// </summary>
     public const float BaseCastInterval = 1.3f;
     public const float CastRange = 22f;
-    public const float BaseSkullDamage = 18f;
+    public const float BaseSkullDamage = 12f;
     public const float BaseSkullSpeed = 12f;
-    public const float BaseSkullLife = 3.5f;
+    public const float BaseSkullLife = 1.8f;
     public const int BasePierce = 4;
     public const float BaseSeekRange = 9f;
 
     /// <summary>Plague: every stack deals this much over its time, up to this many stacks on one enemy (Virulent Strain: <see cref="VirulentStacks"/>).</summary>
-    public const float BasePlagueDamage = 40f;
+    public const float BasePlagueDamage = 26f;
     public const float BasePlagueDuration = 2f;
     public const int BasePlagueStacks = 3;
     public const int VirulentStacks = 5;
@@ -143,7 +143,7 @@ internal sealed class PriestStats
     public float CastInterval =>
         BaseCastInterval / (MathF.Max(0.2f, 1f + 0.12f * LevelOf(PriestUpgrade.HollowChant) + Items.AttackSpeedNow + Tree.CastSpeed) * Items.AttackSpeedMultiplier);
 
-    /// <summary>Skulls a cast looses: one, one more with Twin Skulls and Legion, and one more for each extra projectile.</summary>
+    /// <summary>Skulls a cast fires: one, one more with Twin Skulls and Legion, and one more for each extra projectile.</summary>
     public int Skulls => 1 + (Tree.TwinSkulls ? 1 : 0) + (Tree.Legion ? 1 : 0) + Items.Projectiles;
 
     public float SkullSpeed => BaseSkullSpeed * (1f + 0.15f * LevelOf(PriestUpgrade.SwiftBones) + Tree.ProjectileSpeed + Items.ProjectileSpeed);

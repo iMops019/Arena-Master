@@ -42,7 +42,7 @@ internal static class PriestTesting
     }
 
     /// <summary>A cast now: its skulls leave the wand (over half a second, for more than one), and then no more casts.</summary>
-    public static List<PriestHit> Loose(PlagueSkulls skulls, PriestStats stats, EnemyField field)
+    public static List<PriestHit> Fire(PlagueSkulls skulls, PriestStats stats, EnemyField field)
     {
         skulls.Cast(stats);
         return Run(skulls, stats, field, 0.5f, canCast: true);
@@ -130,7 +130,7 @@ public class PriestStatsTests
         Assert.Equal(3, new PriestStats().PlagueStacks);
         Assert.Equal(5, PriestTesting.With((UnholyTree.VirulentStrain, 1)).PlagueStacks);
         Assert.Equal(2f, new PriestStats().PlagueDuration);
-        Assert.Equal(3.5f, new PriestStats().SkullLife);
+        Assert.Equal(1.8f, new PriestStats().SkullLife);
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public class PlagueSkullTests
         var skulls = new PlagueSkulls(new Random(1));
         var stats = PriestTesting.With();
 
-        var hits = PriestTesting.Loose(skulls, stats, field);
+        var hits = PriestTesting.Fire(skulls, stats, field);
         hits.AddRange(PriestTesting.Run(skulls, stats, field, 3f));
 
         var struck = hits.Where(h => h.Source == PriestSource.Skull).Select(h => h.Enemy).ToList();
@@ -207,20 +207,20 @@ public class PlagueSkullTests
         var skulls = new PlagueSkulls(new Random(1));
         var stats = PriestTesting.With();
 
-        var hits = PriestTesting.Loose(skulls, stats, field);
+        var hits = PriestTesting.Fire(skulls, stats, field);
         hits.AddRange(PriestTesting.Run(skulls, stats, field, 1.5f));
 
         Assert.Contains(hits, h => h.Enemy == crate && h.Source == PriestSource.Skull);
     }
 
     [Fact]
-    public void AnUnspentSkull_FadesAfterThreeAndAHalfSeconds()
+    public void AnUnspentSkull_FadesAfterItsLife()
     {
         var field = PriestTesting.QuietField();
         PriestTesting.Sturdy(field, 0f, 18f);
         var skulls = new PlagueSkulls(new Random(1));
         var stats = PriestTesting.With();
-        PriestTesting.Loose(skulls, stats, field);
+        PriestTesting.Fire(skulls, stats, field);
 
         PriestTesting.Run(skulls, stats, field, stats.SkullLife - 0.6f);
         Assert.Single(skulls.Skulls);
@@ -236,7 +236,7 @@ public class PlagueSkullTests
         var skulls = new PlagueSkulls(new Random(1));
         var stats = PriestTesting.With();
 
-        var hits = PriestTesting.Loose(skulls, stats, field);
+        var hits = PriestTesting.Fire(skulls, stats, field);
         hits.AddRange(PriestTesting.Run(skulls, stats, field, 3f));
 
         Assert.Equal(1, hits.Count(h => h.Source == PriestSource.Skull));
@@ -325,7 +325,7 @@ public class PlagueSkullTests
         var stats = PriestTesting.With((UnholyTree.Epidemic, 1));
         stats.Items.Chains = -PriestStats.BasePierce;   // it stops in the first it strikes
 
-        PriestTesting.Loose(skulls, stats, field);
+        PriestTesting.Fire(skulls, stats, field);
 
         Assert.True(skulls.StacksOn(struck) > 0);
         Assert.True(skulls.StacksOn(beside) > 0);
@@ -333,13 +333,13 @@ public class PlagueSkullTests
     }
 
     [Fact]
-    public void TwinSkullsAndLegion_LooseMoreSkulls()
+    public void TwinSkullsAndLegion_FireMoreSkulls()
     {
         var field = PriestTesting.QuietField();
         PriestTesting.Sturdy(field, 0f, 18f);
         var skulls = new PlagueSkulls(new Random(1));
 
-        PriestTesting.Loose(skulls, PriestTesting.With((UnholyTree.TwinSkulls, 1), (UnholyTree.Legion, 1)), field);
+        PriestTesting.Fire(skulls, PriestTesting.With((UnholyTree.TwinSkulls, 1), (UnholyTree.Legion, 1)), field);
 
         Assert.Equal(3, skulls.Skulls.Count);
     }
@@ -354,7 +354,7 @@ public class PlagueSkullTests
         var skulls = new PlagueSkulls(new Random(1));
         var stats = PriestTesting.With((UnholyTree.GnashingSkulls, 1));
 
-        PriestTesting.Loose(skulls, stats, field);
+        PriestTesting.Fire(skulls, stats, field);
 
         var skull = Assert.Single(skulls.Skulls);
         Assert.False(weak.IsAlive);
