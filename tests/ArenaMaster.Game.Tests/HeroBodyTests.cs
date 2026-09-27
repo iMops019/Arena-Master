@@ -2,6 +2,7 @@ using System.Numerics;
 using ArenaMaster.Game.Classes;
 using ArenaMaster.Game.Mage;
 using ArenaMaster.Game.Paladin;
+using ArenaMaster.Game.Priest;
 using ArenaMaster.Game.Ranger;
 using ArenaMaster.Game.Shaman;
 using ArenaMaster.Game.Warrior;
@@ -16,6 +17,7 @@ public class HeroModelTests
     public static readonly TheoryData<string> Models = new()
     {
         RangerController.BodyModel, PaladinController.BodyModel, MageController.BodyModel, ShamanController.BodyModel, WarriorController.BodyModel,
+        PriestController.BodyModel,
     };
 
     public static readonly TheoryData<string, string> Attacks = new()
@@ -24,6 +26,7 @@ public class HeroModelTests
         { MageController.BodyModel, MageController.AttackClip },
         { ShamanController.BodyModel, ShamanController.AttackClip },
         { WarriorController.BodyModel, WarriorController.AttackClip },
+        { PriestController.BodyModel, PriestController.AttackClip },
     };
 
     private static SkinnedModel Load(string file) => SkinnedModel.Load(Path.Combine(EngineAssets.RepoRoot, "assets", "models", file));

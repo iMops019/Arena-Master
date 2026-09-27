@@ -189,6 +189,30 @@ internal sealed class ItemBonuses
 
     /// <summary>Attack speed for a class without rage; the Warrior gets rage instead (Berserker's Torc). Counted in <see cref="AttackSpeedNow"/>.</summary>
     public float RageFallback;
+
+    // Only the Priest reads these: they speak of Plague, rot and the Skull Shield.
+
+    /// <summary>More damage over time: Plague and rot. And what it is multiplied by.</summary>
+    public float DotDamage;
+    public float DotMultiplier = 1f;
+
+    /// <summary>More stacks of Plague one enemy can carry.</summary>
+    public int PlagueStacks;
+
+    /// <summary>Seconds longer that rot lies on the ground.</summary>
+    public float DecayDuration;
+
+    /// <summary>A better chance for a block to spew Death and Decay.</summary>
+    public float DecayChance;
+
+    /// <summary>How much wider Rotting Step's rot is.</summary>
+    public float StepRot;
+
+    /// <summary>Health back for every Plagued enemy that dies.</summary>
+    public float PlagueKillHeal;
+
+    /// <summary>A bone barrier of this many points raised by every block.</summary>
+    public float BlockBarrier;
 }
 
 /// <summary>
@@ -332,6 +356,39 @@ internal static class ItemCatalog
             b.AttackSpeed -= 0.05f;
         }),
 
+        // Priest-leaning: Plague, rot, the Skull Shield. Every class gets something from each.
+        new("grave_dust", "Grave Dust", ItemRarity.Common, "+4% damage (the Priest: +10% Plague and rot damage too)", b =>
+        {
+            b.Damage += 0.04f;
+            b.DotDamage += 0.10f;
+        }),
+        new("bone_charm", "Bone Charm", ItemRarity.Common, "+3% block chance (the Priest: +4% Death and Decay chance too)", b =>
+        {
+            b.BlockChance += 0.03f;
+            b.DecayChance += 0.04f;
+        }),
+        new("rotting_sandals", "Rotting Sandals", ItemRarity.Common, "+5% move speed, Shift move recharges 10% faster (the Priest: Rotting Step's rot 30% wider)", b =>
+        {
+            b.MoveSpeed += 0.05f;
+            b.DashRecharge += 0.10f;
+            b.StepRot += 0.30f;
+        }),
+        new("plague_doctors_mask", "Plague Doctor's Mask", ItemRarity.Rare, "Take 8% less damage (the Priest: Plague stacks 1 higher)", b =>
+        {
+            b.DamageTaken *= 0.92f;
+            b.PlagueStacks += 1;
+        }),
+        new("leech_jar", "Leech Jar", ItemRarity.Rare, "Heal 1 health per kill (the Priest: 2 more for every Plagued enemy that dies)", b =>
+        {
+            b.HealOnKill += 1f;
+            b.PlagueKillHeal += 2f;
+        }),
+        new("whispering_skull", "Whispering Skull", ItemRarity.Rare, "+1 chain (the Priest: +1 pierce), +10% projectile speed", b =>
+        {
+            b.Chains += 1;
+            b.ProjectileSpeed += 0.10f;
+        }),
+
         // Epic: multipliers.
         new("rune_of_might", "Rune of Might", ItemRarity.Epic, "x1.2 damage", b => b.DamageMultiplier *= 1.2f),
         new("swiftwind_sigil", "Swiftwind Sigil", ItemRarity.Epic, "x1.15 attack speed", b => b.AttackSpeedMultiplier *= 1.15f),
@@ -365,6 +422,18 @@ internal static class ItemCatalog
         {
             b.AttackSpeedMultiplier *= 1.12f;
             b.RageDrains += 1;
+        }),
+
+        new("tome_of_pestilence", "Tome of Pestilence", ItemRarity.Epic, "x1.12 damage (the Priest: and x1.25 Plague and rot damage)", b =>
+        {
+            b.DamageMultiplier *= 1.12f;
+            b.DotMultiplier *= 1.25f;
+        }),
+        new("bonebound_aegis", "Bonebound Aegis", ItemRarity.Epic, "x1.25 block chance, every block heals 3 (the Priest: and raises a 10-point bone barrier)", b =>
+        {
+            b.BlockMultiplier *= 1.25f;
+            b.BlockHeal += 3f;
+            b.BlockBarrier += 10f;
         }),
 
         // Legendary: big multipliers.
@@ -408,6 +477,12 @@ internal static class ItemCatalog
         {
             b.KillDamage += 0.01f;
             b.RageOnKill += 1;
+        }),
+        new("sepulchre_bell", "Sepulchre Bell", ItemRarity.Legendary, "x1.2 damage, +8% block chance (the Priest: rot on the ground lasts 2 s longer)", b =>
+        {
+            b.DamageMultiplier *= 1.2f;
+            b.BlockChance += 0.08f;
+            b.DecayDuration += 2f;
         }),
         new("crown_of_plenty", "Crown of Plenty", ItemRarity.Legendary, "x1.2 damage, experience and silver", b =>
         {

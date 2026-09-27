@@ -1,6 +1,6 @@
 """Writes blocky stand-in models to assets/models/ until real ones are made. Plain Python, no dependencies:
-  ranger_hero.glb, paladin_hero.glb, mage_hero.glb, shaman_hero.glb, warrior_hero.glb
-                          the five heroes, skinned and animated (run, idle, air and an attack each): see tools/hero_models.py
+  ranger_hero.glb, paladin_hero.glb, mage_hero.glb, shaman_hero.glb, warrior_hero.glb, priest_hero.glb
+                          the six heroes, skinned and animated (run, idle, air and an attack each): see tools/hero_models.py
   holy_nova.glb           a flat gold ring of radius 1, scaled as a Holy Nova spreads out over the ground
   holy_circle.glb         a flat holy circle of radius 1: a gold ring with an inner ring and a cross, the ground a nova leaves
   cleave_wave.glb         one piece of a Cleave's wave front: a flat glowing band 1 m long along X, its bright edge at +Z (outward), laid along the
@@ -30,6 +30,11 @@
   rarity_magic.glb, rarity_rare.glb, rarity_legendary.glb
                           the ring of radius 1 under a Magic (blue), Rare (yellow, with little points) or Legendary (orange, with taller points and
                           an inner ring) enemy
+  plague_skull.glb        a Priest's Plague Skull: a bone skull about 0.34 m with green-glowing eyes, facing +Z, centred on its middle
+  plague_wisp.glb         the wisps swirling round a Plague Skull: thin curling ribbons of green and shadow on a sphere of radius about 0.4
+  plague_mote.glb, rot_ash.glb
+                          the Priest's particles, radius 1 (drawn tiny): a glowing green mote of plague and a dark fleck of ash
+  rot_pool.glb            a pool of rot on the ground, radius about 1: a ragged black blotch, a purple middle, glowing green bubbles
   xp_gem_placeholder.glb  an experience gem: a small glowing-blue crystal, centred on its middle
   telegraph_ring.glb      a flat red ring of radius 1 on y = 0, scaled to an attack's radius (outline of where it lands)
   telegraph_disc.glb      a flat dark-red disc of radius 1, scaled up inside the ring as an attack winds up
@@ -387,7 +392,8 @@ def build_frost_shard():
 
 
 def build_rack():
-    """The weapon rack, the class station: a wooden frame 2 m wide holding a bow on one side and a crusader shield with a flail on the other. Its front faces +Z."""
+    """The weapon rack, the class station: a wooden frame 2 m wide holding every class's weapons (a bow, an ice staff, a totem, a shield with a flail, two axes, and a
+    skull wand with its Skull Shield). Its front faces +Z."""
     m = Mesh()
     m.box(-1.0, 0.0, -0.12, -0.9, 1.8, 0.0, "wood")
     m.box(0.9, 0.0, -0.12, 1.0, 1.8, 0.0, "wood")
@@ -412,6 +418,13 @@ def build_rack():
     m.box(-0.84, 0.0, 0.02, -0.79, 1.55, 0.07, "wood")
     m.box(-0.86, 1.30, 0.0, -0.77, 1.38, 0.09, "fur")
     m.pyramid(-0.88, 1.55, -0.01, -0.75, 1.55, 0.10, (-0.815, 1.75, 0.045), "spark")
+    # The Priest's skull wand, leaning on the right post, and its Skull Shield resting on the ground in front
+    import hero_models
+    m.box(1.03, 0.0, 0.04, 1.07, 0.95, 0.08, "chest_dark")
+    hero_models.skull(m, 1.05, 1.02, 0.06, 0.15)
+    m.box(-0.28, 0.0, 0.08, 0.18, 0.44, 0.12, "iron")
+    m.box(-0.25, 0.03, 0.12, 0.15, 0.41, 0.14, "bomb_black")
+    hero_models.skull(m, -0.05, 0.23, 0.2, 0.2)
     # The Warrior's two axes, hung between the staff and the shield
     m.box(0.02, 0.95, 0.05, 0.05, 1.72, 0.08, "wood")
     m.box(-0.07, 1.42, 0.08, 0.02, 1.66, 0.10, "steel")
@@ -537,6 +550,64 @@ def build_rarity_ring(outer, light, spikes, height, inner=None):
         a = 2 * math.pi * i / spikes
         x, z = math.cos(a) * 0.93, math.sin(a) * 0.93
         m.pyramid(x - 0.04, 0.0, z - 0.04, x + 0.04, 0.0, z + 0.04, (x, height, z), light)
+    return m
+
+
+def build_plague_skull():
+    """A Plague Skull, about 0.34 m, facing +Z, centred on its middle: bone, with green fire in its eyes."""
+    import hero_models
+    m = Mesh()
+    hero_models.skull(m, 0.0, 0.0, 0.0, 0.34)
+    return m
+
+
+def build_plague_wisp():
+    """The wisps swirling round a Plague Skull: six thin ribbons of ghostly green and shadow curling round a sphere of radius about 0.4."""
+    import math
+    m = Mesh()
+    for n in range(6):
+        tilt, start = n * math.pi / 3 + 0.4, n * 1.1
+        colour = "ghost_eye" if n % 2 == 0 else "hood_dark"
+        points = []
+        for k in range(7):
+            a = start + k * 0.45
+            radius = 0.34 + 0.08 * math.sin(k * 1.3 + n)
+            x, z = math.cos(a) * radius, math.sin(a) * radius
+            points.append((x, z * math.sin(tilt) + 0.08 * math.sin(k + n), z * math.cos(tilt)))
+        for a, b in zip(points, points[1:]):
+            m.beam(a, b, 0.018 if n % 2 == 0 else 0.026, colour, 0, 0)
+    return m
+
+
+def build_plague_mote():
+    """A mote of plague, radius 1 (the game draws it tiny): a glowing green orb."""
+    m = Mesh()
+    _orb(m, 0.0, 0.0, 0.0, 1.0, "ghost_eye", "ghost_eye")
+    return m
+
+
+def build_rot_ash():
+    """A fleck of ash and rot, radius 1 (the game draws it tiny): a dark orb."""
+    m = Mesh()
+    _orb(m, 0.0, 0.0, 0.0, 1.0, "bomb_black", "hood_dark")
+    return m
+
+
+def build_rot_pool():
+    """A pool of rot on the ground, radius about 1: a ragged black blotch, a darker purple middle, and a few green bubbles glowing in it."""
+    import math
+    m = Mesh()
+    sides = 16
+    edge = [(math.cos(2 * math.pi * i / sides) * (0.78 + 0.22 * _unit_noise(i, 5.3)), math.sin(2 * math.pi * i / sides) * (0.78 + 0.22 * _unit_noise(i, 5.3)))
+            for i in range(sides)]
+    for i in range(sides):
+        (xa, za), (xb, zb) = edge[i], edge[(i + 1) % sides]
+        m.facing([(0.0, 0.0, 0.0), (xa, 0.0, za), (xb, 0.0, zb)], (0.0, 1.0, 0.0), "bomb_black")
+        m.facing([(0.0, 0.01, 0.0), (xa * 0.55, 0.01, za * 0.55), (xb * 0.55, 0.01, zb * 0.55)], (0.0, 1.0, 0.0), "hood_dark")
+    for n in range(5):
+        a, d = 2 * math.pi * _unit_noise(n, 7.7), 0.2 + 0.5 * _unit_noise(n, 9.1)
+        x, z, s = math.cos(a) * d, math.sin(a) * d, 0.05 + 0.05 * _unit_noise(n, 2.2)
+        m.pyramid(x - s, 0.015, z - s, x + s, 0.015, z + s, (x, 0.05, z), "ghost_eye")
     return m
 
 
@@ -1376,6 +1447,8 @@ if __name__ == "__main__":
                         ("rarity_magic.glb", lambda: build_rarity_ring("rare", "rare_light", 0, 0.0)),
                         ("rarity_rare.glb", lambda: build_rarity_ring("holy", "holy_light", 6, 0.15)),
                         ("rarity_legendary.glb", lambda: build_rarity_ring("legendary", "legendary_light", 10, 0.3, inner="legendary_light")),
+                        ("plague_skull.glb", build_plague_skull), ("plague_wisp.glb", build_plague_wisp), ("plague_mote.glb", build_plague_mote),
+                        ("rot_ash.glb", build_rot_ash), ("rot_pool.glb", build_rot_pool),
                         ("xp_gem_placeholder.glb", build_xp_gem),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
                         ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),

@@ -65,6 +65,15 @@ internal static class GearCatalog
                 b.DashRecharge += 0.30f;
             }),
 
+        new("shroud_of_the_ninth_grave", "Shroud of the Ninth Grave", GearSlot.BodyArmour,
+            "+30 max health. Thorns: 6 damage to every enemy touching you every 0.5 s.",
+            "Stitched from the burial cloths of nine kings. None of them are resting.",
+            b =>
+            {
+                b.MaxHealth += 30f;
+                b.Thorns += 6f;
+            }),
+
         new("berserkers_hide", "Berserker's Hide", GearSlot.BodyArmour,
             "+40 max health. Up to +30% damage as your health drops.",
             "Tanned from something that didn't know when to stop. Neither will you.",
@@ -100,6 +109,15 @@ internal static class GearCatalog
                 b.HealOnKill += 2f;
             }),
 
+        new("ossified_wand", "Ossified Wand", GearSlot.Weapon,
+            "+1 projectile. +10% damage.",
+            "It was a finger once. It still points at whoever is next.",
+            b =>
+            {
+                b.Projectiles += 1;
+                b.Damage += 0.10f;
+            }),
+
         new("worldsplitter", "Worldsplitter", GearSlot.Weapon,
             "x1.3 area. +10% damage.",
             "Swung once in anger, it left a valley. The valley is still angry.",
@@ -110,6 +128,15 @@ internal static class GearCatalog
             }),
 
         // Trinkets
+        new("reliquary_of_rot", "Reliquary of Rot", GearSlot.Trinket,
+            "x1.2 damage to enemies below half health. +10% area.",
+            "What is inside is not a saint. It is, however, still hungry.",
+            b =>
+            {
+                b.WoundedDamage *= 1.2f;
+                b.Area += 0.10f;
+            }),
+
         new("lantern_of_the_deep", "Lantern of the Deep", GearSlot.Trinket,
             "+50% pickup range. +15% experience.",
             "Its light finds what the dark would rather keep.",

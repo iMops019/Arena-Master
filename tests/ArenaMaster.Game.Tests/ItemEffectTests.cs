@@ -26,8 +26,8 @@ public class ItemCatalogTests
     [Fact]
     public void ThereAreFiftyFiveItems_EachUnique()
     {
-        Assert.Equal(55, ItemCatalog.All.Count);
-        Assert.Equal(55, ItemCatalog.All.Select(i => i.Id).Distinct().Count());
+        Assert.Equal(64, ItemCatalog.All.Count);
+        Assert.Equal(64, ItemCatalog.All.Select(i => i.Id).Distinct().Count());
     }
 
     [Fact]

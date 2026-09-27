@@ -818,3 +818,148 @@ def warrior_cleave(pose, u):
 WARRIOR = Hero("warrior", "warrior_hero.glb", WARRIOR_RIG, build_warrior_hero, WARRIOR_GAIT, warrior_idle, warrior_run, warrior_air,
                {"Cleave": (1.0, warrior_cleave)})
 HEROES["warrior"] = WARRIOR
+
+
+# =========================================================================================================================================================
+# The Priest: a long, ragged robe of grave-grey split front and back, a deep hood over a face lost in shadow but for two green eyes, a stole the colour of old
+# blood, a collar of little skulls, a skull wand in the right hand and a Skull Shield on the left arm, both glowing green where the eyes should be
+
+PRIEST_RIG = r.HeroRig(hip_y=0.86, spine_y=0.94, chest_y=1.0, neck_y=1.44, shoulder=(0.29, 1.38), elbow_y=1.12, wrist_y=0.88, leg_x=0.1, knee_y=0.47,
+                       ankle_y=0.09, toe=0.14, heel=0.07,
+                       extra=(("robe_front", "hips", (0.0, 0.9, 0.17)),
+                              ("robe_back", "hips", (0.0, 0.9, -0.17))))
+PRIEST_GAIT = r.Gait(cycle=2.4, stance=0.36, lift=0.15, bob=0.03, hip_drop=0.1, width=0.09, lean=9.0)
+PRIEST_SHIELD_AT = (-0.29, 0.83, 0.0)     # the left fist on the shield's grip
+WAND_X = 0.29                              # the wand's shaft, up from the right fist
+
+
+def skull(m, cx, cy, cz, s, eyes="ghost_eye"):
+    """A skull facing +Z, <s> across, its middle at (cx, cy, cz): the cranium, the eye sockets (glowing), the nose, the jaw and its teeth."""
+    h = s / 2
+    m.box(cx - h, cy - h * 0.35, cz - h, cx + h, cy + h, cz + h * 0.9, "bone")                               # cranium
+    m.box(cx - h * 0.72, cy - h * 0.95, cz - h * 0.5, cx + h * 0.72, cy - h * 0.3, cz + h * 0.8, "bone")     # the jaw
+    for side in (-1.0, 1.0):
+        x0, x1 = sorted((cx + side * h * 0.12, cx + side * h * 0.62))
+        m.box(x0, cy - h * 0.05, cz + h * 0.9, x1, cy + h * 0.42, cz + h * 0.93, "visor")                    # the sockets
+        m.box(x0 + h * 0.08, cy + h * 0.03, cz + h * 0.93, x1 - h * 0.08, cy + h * 0.34, cz + h * 0.95, eyes)
+    m.box(cx - h * 0.1, cy - h * 0.3, cz + h * 0.9, cx + h * 0.1, cy - h * 0.08, cz + h * 0.93, "visor")    # the nose
+    for k in range(4):
+        x = cx - h * 0.45 + k * h * 0.3
+        m.box(x - h * 0.1, cy - h * 0.62, cz + h * 0.8, x + h * 0.1, cy - h * 0.38, cz + h * 0.84, "bone")  # teeth
+
+
+def build_priest_hero(rig):
+    m = Mesh()
+    j = rig.index
+    for side in ("l", "r"):
+        limbs(m, j, side, [("foot", 0.04, 0.16, 0.0, -0.07, 0.11, 0.14, "chest_dark"),
+                           ("shin", 0.045, 0.155, 0.1, -0.065, 0.5, 0.065, "visor"),
+                           ("thigh", 0.04, 0.16, 0.45, -0.07, 0.88, 0.07, "visor")])
+    m.joint = j["hips"]
+    m.box(-0.25, 0.7, -0.17, 0.25, 0.95, 0.17, "hood_dark")
+    m.box(-0.26, 0.85, -0.18, 0.26, 0.92, 0.18, "bone")                                  # a cord of knucklebones
+    m.joint = j["robe_front"]
+    m.box(-0.26, 0.12, 0.15, 0.26, 0.9, 0.2, "hood_dark")
+    m.box(-0.07, 0.2, 0.2, 0.07, 0.9, 0.21, "ghoul_robe")                                # the stole hanging down the front
+    for k, x in enumerate((-0.2, -0.08, 0.05, 0.18)):                                    # a ragged hem
+        m.box(x - 0.05, 0.04 + 0.03 * (k % 2), 0.15, x + 0.05, 0.12, 0.2, "hood_dark")
+    m.joint = j["robe_back"]
+    m.box(-0.26, 0.12, -0.2, 0.26, 0.9, -0.15, "hood_dark")
+    for k, x in enumerate((-0.19, -0.06, 0.07, 0.2)):
+        m.box(x - 0.05, 0.03 + 0.03 * (k % 2), -0.2, x + 0.05, 0.12, -0.15, "hood_dark")
+    m.joint = j["chest"]
+    m.box(-0.23, 0.9, -0.15, 0.23, 1.42, 0.15, "hood_dark")
+    m.box(-0.07, 0.92, 0.15, 0.07, 1.4, 0.16, "ghoul_robe")                              # the stole
+    for k in range(5):                                                                   # a collar of little skulls
+        x = -0.2 + k * 0.1
+        m.box(x - 0.035, 1.33, 0.13, x + 0.035, 1.4, 0.19, "bone")
+        m.box(x - 0.02, 1.36, 0.19, x + 0.02, 1.38, 0.195, "visor")
+    for side in ("l", "r"):
+        limbs(m, j, side, [("upper_arm", 0.22, 0.36, 1.1, -0.08, 1.42, 0.08, "hood_dark"),
+                           ("upper_arm", 0.2, 0.38, 1.32, -0.1, 1.46, 0.1, "bone"),                  # bone pauldrons
+                           ("forearm", 0.22, 0.37, 0.86, -0.09, 1.14, 0.09, "hood_dark"),
+                           ("forearm", 0.215, 0.375, 0.84, -0.1, 0.92, 0.1, "ghoul_robe"),           # a ragged cuff
+                           ("hand", 0.25, 0.35, 0.78, -0.05, 0.88, 0.05, "ghoul_skin")])
+    # The hood, deep and peaked, the face inside it shadow but for two green eyes
+    m.joint = j["head"]
+    m.box(-0.11, 1.44, -0.1, 0.11, 1.66, 0.12, "visor")
+    m.box(-0.08, 1.56, 0.12, -0.025, 1.6, 0.125, "ghost_eye")
+    m.box(0.025, 1.56, 0.12, 0.08, 1.6, 0.125, "ghost_eye")
+    m.box(-0.17, 1.42, -0.18, 0.17, 1.74, -0.1, "hood_dark")
+    m.box(-0.17, 1.66, -0.18, 0.17, 1.76, 0.18, "hood_dark")
+    m.box(-0.175, 1.42, -0.1, -0.12, 1.7, 0.18, "hood_dark")
+    m.box(0.12, 1.42, -0.1, 0.175, 1.7, 0.18, "hood_dark")
+    m.pyramid(-0.17, 1.76, -0.18, 0.17, 1.76, 0.1, (0.0, 1.98, -0.2), "hood_dark")
+    # The skull wand, up from the right fist: a dark shaft bound in bone, and a skull with green eyes on top
+    m.joint = j["hand_r"]
+    m.box(WAND_X - 0.022, 0.74, -0.022, WAND_X + 0.022, 1.24, 0.022, "chest_dark")
+    m.box(WAND_X - 0.03, 1.04, -0.03, WAND_X + 0.03, 1.08, 0.03, "bone")
+    m.box(WAND_X - 0.03, 1.19, -0.03, WAND_X + 0.03, 1.24, 0.03, "bone")
+    skull(m, WAND_X, 1.33, 0.0, 0.16)
+    # The Skull Shield, gripped at its middle and faced forward from the fist: a rim of dark iron, a field of bone plates, a great skull in the middle
+    m.joint = j["hand_l"]
+    cx, cy, cz = PRIEST_SHIELD_AT
+    m.box(cx - 0.28, cy - 0.34, cz + 0.08, cx + 0.28, cy + 0.34, cz + 0.12, "iron")
+    m.box(cx - 0.34, cy - 0.22, cz + 0.08, cx + 0.34, cy + 0.22, cz + 0.12, "iron")
+    m.box(cx - 0.25, cy - 0.3, cz + 0.12, cx + 0.25, cy + 0.3, cz + 0.14, "bomb_black")
+    m.box(cx - 0.31, cy - 0.19, cz + 0.12, cx + 0.31, cy + 0.19, cz + 0.14, "bomb_black")
+    for dx, dy in ((-0.2, 0.2), (0.2, 0.2), (-0.2, -0.2), (0.2, -0.2)):
+        m.box(cx + dx - 0.04, cy + dy - 0.04, cz + 0.14, cx + dx + 0.04, cy + dy + 0.04, cz + 0.16, "bone")   # bone studs
+    skull(m, cx, cy + 0.02, cz + 0.28, 0.3)
+    m.box(cx - 0.05, cy - 0.03, cz + 0.02, cx + 0.05, cy + 0.03, cz + 0.08, "leather")    # the strap the fist holds
+    return m
+
+
+def _priest_arms(pose, shield_at, wand_at, wand_tilt, shield_tilt=-4.0, wand_roll=10.0):
+    """The Skull Shield held out in front on the left arm, faced ahead; the wand in the right hand, its skull tipped forward <wand_tilt> degrees."""
+    r.arm_ik(pose, "l", shield_at, elbow_pole=(-1.0, -0.6, -0.2))
+    face(pose, "hand_l", (0.12, 0.0, 1.0), tilt=shield_tilt, roll=-4.0)
+    r.arm_ik(pose, "r", wand_at, elbow_pole=(1.0, -0.5, -0.4))
+    face(pose, "hand_r", (0.15, 0.0, 1.0), tilt=wand_tilt, roll=wand_roll)
+
+
+def priest_idle(pose, u):
+    t = u * IDLE_SECONDS
+    breath = math.sin(2 * math.pi * t / 2.0)
+    shift = math.sin(2 * math.pi * t / IDLE_SECONDS)
+    r.stand_legs(pose, breath, 0.5 * shift, width=0.12)
+    spine_upright(pose, lean=6.0 + breath, turn=-3.0 * shift)
+    pose.set("chest", r.q_euler(x=2.0 - 1.0 * breath))
+    pose.set_world("head", r.q_euler(x=8.0, y=12.0 * math.sin(2 * math.pi * t / IDLE_SECONDS + 0.9)))
+    skirt_flaps(pose, "robe_front", "robe_back", margin=1.0)
+    _priest_arms(pose, (-0.2, 1.0 + 0.008 * breath, 0.42), (0.33, 1.0 + 0.01 * breath, 0.3), 14.0 + 3.0 * math.sin(2 * math.pi * t / 2.0))
+
+
+def priest_run(pose, phase, heading):
+    turn, swing = r.run_legs(pose, PRIEST_GAIT, phase, heading)
+    bounce = math.cos(4 * math.pi * phase)
+    spine_upright(pose, lean=9.0, turn=-3.0 * swing)
+    pose.set("chest", r.q_euler(x=1.0 * bounce))
+    pose.set_world("head", r.q_euler(x=2.0))
+    skirt_flaps(pose, "robe_front", "robe_back", margin=3.0, give=0.6)
+    # The shield stays up in front, bobbing with the stride; the wand carried forward at a slant
+    _priest_arms(pose, (-0.2, 1.02 + 0.02 * bounce, 0.42), (0.32, 1.0 + 0.02 * bounce, 0.32 + 0.06 * swing), 36.0 + 4.0 * swing, wand_roll=18.0)
+
+
+def priest_air(pose, u):
+    r.airborne_legs(pose)
+    spine_upright(pose, lean=4.0)
+    skirt_flaps(pose, "robe_front", "robe_back", margin=3.0, give=0.6)
+    _priest_arms(pose, (-0.22, 1.1, 0.4), (0.42, 1.15, 0.25), 20.0, wand_roll=25.0)
+
+
+def priest_hex(pose, u):
+    """A skull loosed: the wand drawn back beside the hood, then thrust out ahead, its skull first, as the skull leaves it; the shield braced before."""
+    r.stand_legs(pose, 0.0, 0.0, width=0.14)
+    at = attack_moment(u, 0.2, 0.62, 0.95)
+    spine_upright(pose, lean=attack_value(at, 6.0, 0.0, 12.0))
+    pose.set("chest", r.q_euler(y=attack_value(at, 0.0, 18.0, -10.0)))
+    pose.set_world("head", r.q_euler(x=attack_value(at, 8.0, 0.0, 10.0)))
+    skirt_flaps(pose, "robe_front", "robe_back", margin=1.0)
+    _priest_arms(pose, attack_value(at, (-0.2, 1.0, 0.42), (-0.22, 1.04, 0.38), (-0.2, 0.98, 0.46)),
+                 attack_value(at, (0.33, 1.0, 0.3), (0.34, 1.45, -0.02), (0.2, 1.25, 0.62)), attack_value(at, 14.0, -18.0, 80.0),
+                 wand_roll=attack_value(at, 10.0, 14.0, 4.0))
+
+
+PRIEST = Hero("priest", "priest_hero.glb", PRIEST_RIG, build_priest_hero, PRIEST_GAIT, priest_idle, priest_run, priest_air, {"Hex": (1.0, priest_hex)})
+HEROES["priest"] = PRIEST
