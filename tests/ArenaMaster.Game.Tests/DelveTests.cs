@@ -137,10 +137,11 @@ public class DelveRulesTests
     public void TheBossHunt_GearIsPureLuck_AboutOneKillInFive()
     {
         var random = new Random(11);
-        int drops = Enumerable.Range(0, 4000).Count(_ => BossHunt.RollsGear(random));
-        Assert.InRange(drops / 4000f, BossHunt.GearChance - 0.03f, BossHunt.GearChance + 0.03f);
-        Assert.Equal(0.25f, BossHunt.GearChance);
-        Assert.True(BossHunt.BossHealth > DelveBosses.HollowKingUnbound.MaxHealth);
+        var king = BossHunt.HollowKing;
+        int drops = Enumerable.Range(0, 4000).Count(_ => king.RollsGear(random));
+        Assert.InRange(drops / 4000f, king.GearChance - 0.03f, king.GearChance + 0.03f);
+        Assert.Equal(0.25f, king.GearChance);
+        Assert.True(king.Health > DelveBosses.HollowKingUnbound.MaxHealth);
     }
 
     [Fact]
@@ -157,10 +158,11 @@ public class DelveRulesTests
     {
         var run = DelveMap.Floor(5)[0];
         Assert.Equal(RunKind.Delve, RunPlan.For(run).Kind);
-        Assert.Equal(RunKind.Arena, RunPlan.Boss.Kind);
-        Assert.True(RunPlan.Boss.IsDelve);   // it ends in a cache
-        Assert.Equal(0, RunPlan.Boss.Depth);
-        Assert.Null(RunPlan.Boss.Node);
+        var hunt = RunPlan.Hunt(BossHunt.HollowKing);
+        Assert.Equal(RunKind.Arena, hunt.Kind);
+        Assert.True(hunt.IsDelve);   // it ends in a cache
+        Assert.Equal(0, hunt.Depth);
+        Assert.Null(hunt.Node);
         Assert.Equal(5, RunPlan.For(run).Depth);
         Assert.False(RunPlan.Classic.IsDelve);
         Assert.Equal(0, RunPlan.Classic.Depth);

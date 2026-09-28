@@ -26,12 +26,22 @@ internal sealed class DelveChartScreen : GameScreen
     private const int FloorsAhead = 2;
 
     private DelveNode? _selected;
+
+    /// <summary>A boss hunt picked along the bottom instead of a node: its details show on the right.</summary>
+    private HuntBoss? _hunt;
     private bool _scrollToDeepest;
+
+    /// <summary>The boss hunt the player set out on, when <see cref="Draw"/> answers <see cref="Choice.Boss"/>.</summary>
+    public HuntBoss? ChosenBoss { get; private set; }
+
+    /// <summary>A boss hunt's colour on the chart: the unique orange.</summary>
+    private static readonly Vector4 HuntColour = UiTheme.Unique;
 
     public new void Open()
     {
         base.Open();
         _selected = null;
+        _hunt = null;
         _scrollToDeepest = true;
     }
 
@@ -73,7 +83,15 @@ internal sealed class DelveChartScreen : GameScreen
         var choice = Choice.None;
         ImGui.BeginChild("##details", new Vector2(width - chartWidth - 18f * scale, bodyHeight), ImGuiChildFlags.None, ImGuiWindowFlags.NoScrollbar);
         ImGui.SetWindowFontScale(1.25f);
-        if (_selected is { } node && DrawDetails(save, node))
+        if (_hunt is { } hunt)
+        {
+            if (DrawHuntDetails(save, hunt))
+            {
+                choice = Choice.Boss;
+                ChosenBoss = hunt;
+            }
+        }
+        else if (_selected is { } node && DrawDetails(save, node))
         {
             choice = Choice.Delve;
         }
@@ -82,26 +100,30 @@ internal sealed class DelveChartScreen : GameScreen
 
         var start = ImGui.GetCursorScreenPos();
         float classicWidth = 250f * scale;
-        float huntWidth = 300f * scale;
+        float huntWidth = 290f * scale;
+        float gap = 12f * scale;
         float closeWidth = 150f * scale;
         if (UiTheme.Button("Classic run  ·  30 minutes", new Vector2(classicWidth, buttonHeight)))
         {
             choice = Choice.Classic;
         }
 
-        ImGui.SetCursorScreenPos(start + new Vector2(classicWidth + 12f * scale, 0f));
-        if (UiTheme.Button("Boss hunt  ·  the Hollow King Unbound", new Vector2(huntWidth, buttonHeight)))
+        // A button for each boss hunt: picking one shows it on the right, where it is set out on.
+        for (int i = 0; i < BossHunt.All.Count; i++)
         {
-            choice = Choice.Boss;
+            var boss = BossHunt.All[i];
+            ImGui.SetCursorScreenPos(start + new Vector2(classicWidth + gap + i * (huntWidth + gap), 0f));
+            string label = (BossHunt.IsOpen(save, boss) ? "Boss hunt  ·  " : "Locked  ·  ") + boss.Name.Replace("The ", "");
+            ImGui.PushID(boss.Id);
+            if (UiTheme.Button(label, new Vector2(huntWidth, buttonHeight), primary: _hunt == boss))
+            {
+                _hunt = boss;
+                _selected = null;
+            }
+
+            ImGui.PopID();
         }
 
-        float noteX = classicWidth + huntWidth + 28f * scale;
-        UiTheme.Text(start + new Vector2(noteX, buttonHeight * 0.05f),
-            $"Him alone: {BossHunt.BossHealth:N0} health, four stages, you start at level {BossHunt.StartLevel}.",
-            UiTheme.Muted, 0.72f, width - noteX - closeWidth - 16f * scale);
-        UiTheme.Text(start + new Vector2(noteX, buttonHeight * 0.05f + ImGui.GetFontSize() * 1.5f),
-            $"A kill: {BossHunt.Silver} silver, 1 Mark, {BossHunt.GearChance * 100f:0}% gear, {BossHunt.ItemChance * 100f:0}% item.",
-            UiTheme.Unique, 0.72f, width - noteX - closeWidth - 16f * scale);
         ImGui.SetCursorScreenPos(start + new Vector2(width - closeWidth, 0f));
         if (UiTheme.Button("Close  [E]", new Vector2(closeWidth, buttonHeight)) || (choice == Choice.None && ClosedByKey(ImGuiKey.E)))
         {
@@ -208,6 +230,7 @@ internal sealed class DelveChartScreen : GameScreen
                 if (ImGui.InvisibleButton("##node", new Vector2(r * 2f, r * 2f)))
                 {
                     _selected = node;
+                    _hunt = null;
                 }
 
                 ImGui.PopID();
@@ -221,6 +244,55 @@ internal sealed class DelveChartScreen : GameScreen
             _scrollToDeepest = false;
             ImGui.SetScrollY(MathF.Max(0f, (save.Deepest - 2) * rowHeight));
         }
+    }
+
+    /// <summary>What the picked boss hunt is, pays and asks, and whether it is open yet. True when the player sets out on it.</summary>
+    private static bool DrawHuntDetails(DelveSave save, HuntBoss boss)
+    {
+        float scale = UiTheme.Scale;
+        float font = ImGui.GetFontSize();
+        var origin = ImGui.GetCursorScreenPos();
+        float width = ImGui.GetContentRegionAvail().X;
+        float height = ImGui.GetContentRegionAvail().Y;
+        UiTheme.Card(origin, origin + new Vector2(width, height), UiTheme.PanelRaised, UiTheme.WithAlpha(HuntColour, 0.6f));
+        float pad = 18f * scale;
+        float y = origin.Y + pad;
+        float x = origin.X + pad;
+        float inner = width - 2f * pad;
+
+        UiTheme.Text(new Vector2(x, y), "THE BOSS HUNT  ·  THE ARENA", UiTheme.Muted, 0.7f);
+        y += font * 1.1f;
+        UiTheme.Text(new Vector2(x, y), boss.Name, HuntColour, 1.4f, inner);
+        y += font * 2.1f;
+
+        string? locked = BossHunt.WhyLocked(save, boss);
+        int slain = BossHunt.Slain(save, boss);
+        string status = locked ?? (slain > 0 ? $"Open.  Slain {slain} {(slain == 1 ? "time" : "times")}." : "Open.  As often as you like.");
+        UiTheme.Text(new Vector2(x, y), status, locked is null ? UiTheme.Teal : UiTheme.Warn, 0.85f, inner);
+        y += font * 1.6f;
+
+        UiTheme.Text(new Vector2(x, y), "A KILL PAYS", UiTheme.Muted, 0.65f);
+        y += font * 0.95f;
+        foreach (string line in new[]
+                 {
+                     $"{boss.GearChance * 100f:0}% chance of a piece of gear (any piece, rolled)", $"{boss.Silver:N0} silver",
+                     boss.Marks == 1 ? "1 Delve Mark" : $"{boss.Marks} Delve Marks", $"{boss.ItemChance * 100f:0}% chance of an item",
+                 })
+        {
+            UiTheme.Text(new Vector2(x, y), "·  " + line, UiTheme.BrassHi, 0.85f);
+            y += font * 1.1f;
+        }
+
+        y += font * 0.6f;
+        UiTheme.Text(new Vector2(x, y), "THE FIGHT", UiTheme.Muted, 0.65f);
+        y += font * 0.95f;
+        UiTheme.Text(new Vector2(x, y), $"{boss.Health:N0} health. You start at level {boss.StartLevel} and pick your upgrades first.", UiTheme.Ink, 0.8f, inner);
+        y += font * 2.2f;
+        UiTheme.Text(new Vector2(x, y), boss.Fight, UiTheme.Muted, 0.78f, inner);
+
+        float buttonHeight = 46f * scale;
+        ImGui.SetCursorScreenPos(new Vector2(x, origin.Y + height - pad - buttonHeight));
+        return UiTheme.Button(locked is null ? "Choose loadout and hunt" : "Locked", new Vector2(inner, buttonHeight), primary: locked is null, enabled: locked is null);
     }
 
     /// <summary>What the picked node is, pays and asks. True when the player sets out on it.</summary>

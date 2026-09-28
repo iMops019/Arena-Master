@@ -72,6 +72,28 @@ internal enum AttackType
     /// on the way. A ring on the ground under it shows what its blast will catch.
     /// </summary>
     Lob,
+
+    /// <summary>
+    /// A weapon swung round in front: a wedge <see cref="AttackSpec.Reach"/> long and <see cref="AttackSpec.HitWidth"/> radians either side of where it is aimed,
+    /// shown on the ground through the wind-up. With <see cref="AttackSpec.Tracking"/> the wedge turns after the player for the first part of it, then locks.
+    /// </summary>
+    Swing,
+
+    /// <summary>A Swing that is big, wide and quick to come: the one to dash out of. Its own clip and the same wedge.</summary>
+    Cleave,
+
+    /// <summary>
+    /// The weapon slammed down to send the ground erupting in a line: a lane <see cref="AttackSpec.Reach"/> long and 2 x <see cref="AttackSpec.HitWidth"/> wide,
+    /// the eruption running out along it through the blow and hitting whoever it reaches on the ground. Step out of the lane (or jump it).
+    /// </summary>
+    LineSlam,
+
+    /// <summary>
+    /// Spinning with the weapon out, it chases the player round for the whole blow, faster than it walks (its walking speed times
+    /// <see cref="AttackSpec.ProjectileSpeed"/>), hitting everything within <see cref="AttackSpec.Reach"/> every <see cref="AttackSpec.Tick"/> seconds; dizzy
+    /// after. Keep running.
+    /// </summary>
+    Whirlwind,
 }
 
 /// <summary>
@@ -83,13 +105,16 @@ internal enum AttackType
 /// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls. Shoot: how far the bolt flies. Barrage: how far from the player the fireballs spread. Lob: unused.</param>
 /// <param name="HitWidth">Lunge: how close to the charging body counts as hit. Shockwave: half the ring's width. Shoot, Lob: the shot's radius. Unused otherwise.</param>
 /// <param name="LeapHeight">LeapSlam: the top of the arc, above the straight line from take-off to landing.</param>
-/// <param name="ProjectileSpeed">Shoot: how fast the shot flies - slow enough to sidestep once it is loosed.</param>
+/// <param name="ProjectileSpeed">Shoot: how fast the shot flies - slow enough to sidestep once it is loosed. Whirlwind: its speed as a share of its walk.</param>
 /// <param name="Splash">Shoot: 0 for a bolt that has to hit the player; more for a fireball that bursts where it lands, hurting anyone within this far. Lob: the bomb's blast.</param>
 /// <param name="ProjectileModel">Shoot, Barrage, Lob: the model the shot is drawn with.</param>
-/// <param name="Count">Barrage: how many fireballs fall. Lob: how many times the bomb bounces before it rolls.</param>
+/// <param name="Count">Barrage: how many fireballs fall. Lob: how many times the bomb bounces before it rolls. LineSlam: how many rifts at once (1 if 0).</param>
 /// <param name="Chain">How many times more it goes straight into the same attack once one ends (a double or triple leap, rolling shockwaves), each with half the wind-up.</param>
 /// <param name="Tracking">Lunge: for this many seconds of the wind-up the lane keeps turning to follow the player; then it locks, and stepping out of it is the answer.</param>
 /// <param name="Pattern">Barrage: where the fireballs fall (see <see cref="BarragePattern"/>).</param>
+/// <param name="Tick">Whirlwind: seconds between its hits while it spins.</param>
+/// <param name="Spread">LineSlam: the angle between its rifts (radians), fanned either side of the one aimed at the player.</param>
+/// <param name="FollowUp">An attack it goes straight into as this one's blow ends (no recovery in between): the Marauder's rifts off his jump slam.</param>
 internal sealed record AttackSpec(
     AttackType Type,
     float MinRange,
@@ -109,13 +134,31 @@ internal sealed record AttackSpec(
     int Count = 0,
     int Chain = 0,
     float Tracking = 0f,
-    BarragePattern Pattern = BarragePattern.Scatter);
+    BarragePattern Pattern = BarragePattern.Scatter,
+    float Tick = 0f,
+    float Spread = 0f,
+    AttackSpec? FollowUp = null);
 
 /// <summary>
 /// A boss's next stage, once its health falls to <paramref name="Below"/> of its most (0 to 1): a new set of attacks, a shorter breather between them, a faster walk,
 /// and a line to announce it.
 /// </summary>
-internal sealed record BossPhase(float Below, IReadOnlyList<AttackSpec> Attacks, float AttackCooldown, float SpeedMultiplier, string Announcement);
+internal sealed record BossPhase(float Below, IReadOnlyList<AttackSpec> Attacks, float AttackCooldown, float SpeedMultiplier, string Announcement)
+{
+    /// <summary>
+    /// Seconds it stops for as the stage begins - the attack under way dropped, no attacking, no walking, and nothing hurts it - roaring, before the stage's
+    /// boosts take hold. 0 for none.
+    /// </summary>
+    public float Roar { get; init; }
+
+    /// <summary>What its damage and its attack speed are multiplied by from this stage on (after any roar): the Marauder's rage and frenzy.</summary>
+    public float DamageBoost { get; init; } = 1f;
+
+    public float AttackSpeedBoost { get; init; } = 1f;
+
+    /// <summary>The rage it gains, for the HUD to show (the damage it gives is <see cref="DamageBoost"/>).</summary>
+    public int Rage { get; init; }
+}
 
 /// <summary>
 /// What one kind of enemy is: its model and its numbers. Distances are metres, speeds metres per second, times seconds. The body is a standing cylinder of
@@ -370,11 +413,11 @@ internal sealed record EnemyKind(
     /// <summary>Every creature the player can meet (not the crate), fodder first, then elites and bosses: the stats page's bestiary. After them all, so they are set.</summary>
     public static readonly IReadOnlyList<EnemyKind> Foes = new[]
     {
-        Ghoul, CrossbowGhoul, GhoulMage, BeastRider, GhoulTactician, GhoulBeast, Brute, HollowKing, DelveBosses.HollowKingUnbound,
+        Ghoul, CrossbowGhoul, GhoulMage, BeastRider, GhoulTactician, GhoulBeast, Brute, HollowKing, DelveBosses.HollowKingUnbound, DelveBosses.MarauderUnbound,
     };
 }
 
-/// <summary>The boss hunt's boss: the Hollow King unbound, fought alone in his arena. Long, and in four stages.</summary>
+/// <summary>The boss hunts' bosses, each fought alone in the arena: the Hollow King Unbound, and a tier up from him, the Marauder Unbound.</summary>
 internal static class DelveBosses
 {
     private const string Fireball = "ghoul_fireball.glb";
@@ -429,6 +472,77 @@ internal static class DelveBosses
                 "The Hollow King Unbound is enraged!"),
             new BossPhase(0.15f, new[] { Leap(2), Wave(2), Charge(2), Rain(18, 12f), Line(2), Crown(2) }, AttackCooldown: 0.75f, SpeedMultiplier: 1.35f,
                 "The Hollow King Unbound makes his last stand!"),
+        },
+    };
+
+    // The Marauder's axe work (the user's, 2026-09-28): quicker than the King's in every wind-up, and hitting harder.
+
+    /// <summary>A two-handed swing round in front, following the player a moment before it locks.</summary>
+    private static AttackSpec Chop(int chain) => new(AttackType.Swing, MinRange: 0f, MaxRange: 6.5f, WindUp: 0.55f, Active: 0.2f, Recover: 0.45f,
+        Damage: 24f, Reach: 5.6f, HitWidth: 0.95f, Knockback: 6f, Chain: chain, Tracking: 0.3f);
+
+    /// <summary>The cleave: a huge, near-flat arc that comes fast and locks almost at once. Time it, and dash out.</summary>
+    private static AttackSpec Cleave() => new(AttackType.Cleave, MinRange: 0f, MaxRange: 8.5f, WindUp: 0.42f, Active: 0.18f, Recover: 1f,
+        Damage: 40f, Reach: 8f, HitWidth: 1.45f, Knockback: 11f, Tracking: 0.1f);
+
+    /// <summary>
+    /// The jump slam: he leaps high and brings the axe down where the player stood when the circle appeared - a 9 m circle (the user's call, 2026-09-28: it was a
+    /// 7 m slam where he stood) - and the moment he lands, three rifts at once, fanned at the player (see <see cref="Aftershock"/>). Quicker than at first
+    /// (0.7 s wind-up and 0.9 s in the air): the circle alone was too easy to read.
+    /// </summary>
+    private static AttackSpec Slam() => new(AttackType.LeapSlam, MinRange: 3f, MaxRange: 22f, WindUp: 0.55f, Active: 0.7f, Recover: 0.9f,
+        Damage: 42f, Reach: 9f, Knockback: 14f, Stun: 0.7f, LeapHeight: 6f, FollowUp: Aftershock());
+
+    /// <summary>
+    /// The jump slam's follow-up (the user's, 2026-09-28): straight off the landing, three rifts at once fanned 20 degrees apart, the middle one at the player, on
+    /// a quick 0.35 s wind-up. Stepping aside from the middle one can put you in the next: dash, or read the slam and be clear of it before he lands.
+    /// </summary>
+    private static AttackSpec Aftershock() => new(AttackType.LineSlam, MinRange: 0f, MaxRange: 40f, WindUp: 0.35f, Active: 0.35f, Recover: 0.9f,
+        Damage: 26f, Reach: 16f, HitWidth: 1.1f, Knockback: 9f, Count: 3, Spread: 0.35f);
+
+    /// <summary>The axe slammed down to split the ground in a line across the arena.</summary>
+    private static AttackSpec Rift(int chain) => new(AttackType.LineSlam, MinRange: 4f, MaxRange: 24f, WindUp: 0.75f, Active: 0.55f, Recover: 0.9f,
+        Damage: 34f, Reach: 20f, HitWidth: 1.3f, Knockback: 10f, Chain: chain, Tracking: 0.25f);
+
+    /// <summary>
+    /// The whirlwind: four seconds spinning after the player 35% faster than he walks (the user's call: 8% at first, then more), the axe out, then dizzy.
+    /// Enraged, it is near a run: dash.
+    /// </summary>
+    private static AttackSpec Spin() => new(AttackType.Whirlwind, MinRange: 0f, MaxRange: 26f, WindUp: 0.8f, Active: 4f, Recover: 1.5f,
+        Damage: 11f, Reach: 3.6f, Knockback: 4f, ProjectileSpeed: 1.35f, Tick: 0.35f);
+
+    /// <summary>
+    /// The Marauder Unbound (the user's, 2026-09-28): a tier up from the Hollow King Unbound, and unlocked by slaying him. A Ghoul Brute grown huge (4 m), with a
+    /// great two-handed axe: swings, a cleave that must be dashed out of, a jump slam onto the player, a slam that splits the ground in a line, and from 70% a whirlwind
+    /// that chases the player round the arena. At 35% he stops, roars (nothing hurts him) and flies into a Frenzied Rage for the rest of the fight: 20 rage, +20%
+    /// damage, attacks 30% quicker, and faster on his feet. Quicker than the King in every wind-up, and harder to avoid: some blows will land.
+    /// </summary>
+    public static readonly EnemyKind MarauderUnbound = new(
+        Name: "The Marauder Unbound",
+        Model: "marauder_unbound.glb",
+        Tier: EnemyTier.Boss,
+        MaxHealth: 30000f,
+        Speed: 4f,
+        Radius: 1.4f,
+        Height: 4f,
+        ContactDamage: 30f,
+        ContactInterval: 0.9f,
+        Experience: 250)
+    {
+        AttackCooldown = 1.1f,
+        Attacks = new[] { Chop(1), Cleave(), Slam(), Rift(0) },
+        Phases = new[]
+        {
+            new BossPhase(0.7f, new[] { Chop(2), Cleave(), Slam(), Rift(1), Spin() }, AttackCooldown: 0.95f, SpeedMultiplier: 1.1f,
+                "The Marauder Unbound starts to spin!"),
+            new BossPhase(0.35f, new[] { Chop(2), Cleave(), Slam(), Rift(1), Spin() }, AttackCooldown: 0.8f, SpeedMultiplier: 1.25f,
+                "The Marauder Unbound roars, and flies into a Frenzied Rage!")
+            {
+                Roar = 3f,
+                DamageBoost = 1.2f,
+                AttackSpeedBoost = 1.3f,
+                Rage = 20,
+            },
         },
     };
 }

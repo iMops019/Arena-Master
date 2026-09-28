@@ -9,18 +9,21 @@ internal enum RunKind
     /// <summary>A Delve node: about 10 minutes, one King, his cache the prize.</summary>
     Delve,
 
-    /// <summary>The boss hunt: the Hollow King Unbound, alone, in the arena.</summary>
+    /// <summary>A boss hunt: one boss (<see cref="RunPlan.Boss"/>), alone, in the arena.</summary>
     Arena,
 }
 
-/// <summary>The run the player set out on: its kind, and for a Delve node, which node.</summary>
-internal sealed record RunPlan(RunKind Kind, DelveNode? Node)
+/// <summary>The run the player set out on: its kind, and for a Delve node, which node; for a boss hunt, which boss.</summary>
+internal sealed record RunPlan(RunKind Kind, DelveNode? Node, HuntBoss? Boss = null)
 {
     public static readonly RunPlan Classic = new(RunKind.Classic, null);
 
-    public static readonly RunPlan Boss = new(RunKind.Arena, null);
-
     public static RunPlan For(DelveNode node) => new(RunKind.Delve, node);
+
+    public static RunPlan Hunt(HuntBoss boss) => new(RunKind.Arena, null, boss);
+
+    /// <summary>The boss of a hunt (the Hollow King Unbound if a hunt somehow has none).</summary>
+    public HuntBoss HuntBoss => Boss ?? BossHunt.HollowKing;
 
     /// <summary>The floor's depth, 0 for a classic run or the boss hunt.</summary>
     public int Depth => Node?.Depth ?? 0;
@@ -31,7 +34,7 @@ internal sealed record RunPlan(RunKind Kind, DelveNode? Node)
     /// <summary>What the fade into the run shows.</summary>
     public string Title => Kind switch
     {
-        RunKind.Arena => "The Hollow King's Arena",
+        RunKind.Arena => $"The Arena  ·  {HuntBoss.Name}",
         _ when Node is { } node => $"Depth {node.Depth}  ·  {DelveBands.For(node.Depth).Name}",
         _ => "Into the Wilds",
     };
@@ -39,7 +42,7 @@ internal sealed record RunPlan(RunKind Kind, DelveNode? Node)
     /// <summary>Where the loadout screen says the run is going.</summary>
     public string Destination => Kind switch
     {
-        RunKind.Arena => "The boss hunt: the Hollow King Unbound",
+        RunKind.Arena => $"The boss hunt: {HuntBoss.Name}",
         _ when Node is { } node => $"Depth {node.Depth} {node.Name}",
         _ => "A classic run",
     };

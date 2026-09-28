@@ -233,8 +233,8 @@ public sealed partial class ArenaMasterContent
                     Loadout.Sanitize(_profile);
                     _loadoutScreen.Open();
                     break;
-                case DelveChartScreen.Choice.Boss:
-                    _nextPlan = Delve.RunPlan.Boss;
+                case DelveChartScreen.Choice.Boss when _delveScreen.ChosenBoss is { } boss:
+                    _nextPlan = Delve.RunPlan.Hunt(boss);
                     Loadout.Sanitize(_profile);
                     _loadoutScreen.Open();
                     break;

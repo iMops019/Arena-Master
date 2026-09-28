@@ -90,20 +90,21 @@ public sealed partial class ArenaMasterContent
         Announce(node.HasKing ? $"Depth {node.Depth}: the Hollow King comes at 10:00" : $"Depth {node.Depth}: hold out until 10:00");
     }
 
-    /// <summary>The boss hunt's arena: the player at its edge, the Hollow King Unbound in the middle, no swarm, and the player's levels to pick before the fight.</summary>
+    /// <summary>A boss hunt's arena: the player at its edge, the hunt's boss in the middle, no swarm, and the player's levels to pick before the fight.</summary>
     private void BeginHunt(EngineWindow window, Terrain terrain)
     {
-        ApplyLook(window, DelveBands.For(BossHunt.LookDepth));
+        var hunt = _plan.HuntBoss;
+        ApplyLook(window, DelveBands.For(hunt.LookDepth));
         window.TeleportPlayer(BossArena.Ground(terrain, BossArena.Start));
         _enemies.TargetCount = 0;
         _enemies.Mix = Array.Empty<(EnemyKind, float)>();
-        _enemies.Scaling = BossHunt.Scaling;
-        var king = _enemies.Spawn(BossArena.Ground(terrain, BossArena.BossStart), DelveBosses.HollowKingUnbound);
-        king.Yaw = MathF.PI;   // facing the way in
-        king.AttackCooldown = ArenaGrace;
+        _enemies.Scaling = hunt.Scaling;
+        var boss = _enemies.Spawn(BossArena.Ground(terrain, BossArena.BossStart), hunt.Kind);
+        boss.Yaw = MathF.PI;   // facing the way in
+        boss.AttackCooldown = ArenaGrace;
 
         // The fight starts at a set level: every level's upgrade is picked first, one screen at a time.
-        int level = BossHunt.StartLevel;
+        int level = hunt.StartLevel;
         int experience = 0;
         for (int l = 1; l < level; l++)
         {
@@ -111,7 +112,7 @@ public sealed partial class ArenaMasterContent
         }
 
         _pendingLevels += _experience.Add(experience);
-        Announce("The Hollow King Unbound awaits");
+        Announce($"{hunt.Name} awaits");
     }
 
     /// <summary>A Delve run's own frame: its director (the boss hunt has none), the boss's stages, and the cache.</summary>
@@ -134,7 +135,7 @@ public sealed partial class ArenaMasterContent
         foreach (var (boss, phase) in _enemies.TakePhaseChanges())
         {
             Announce(phase.Announcement);
-            int brutes = _plan.Kind == RunKind.Arena ? (phase == DelveBosses.HollowKingUnbound.Phases[^1] ? 2 : 1) : 0;
+            int brutes = _plan.Kind == RunKind.Arena && boss.Kind == DelveBosses.HollowKingUnbound ? (phase == DelveBosses.HollowKingUnbound.Phases[^1] ? 2 : 1) : 0;   // the Marauder fights alone
             for (int i = 0; i < brutes; i++)
             {
                 float angle = boss.Yaw + (i == 0 ? 1.6f : -1.6f);
@@ -259,20 +260,21 @@ public sealed partial class ArenaMasterContent
     /// </summary>
     private DelveOutcome SettleHunt(RunEnding ending)
     {
-        const string Name = "Boss hunt";
+        var hunt = _plan.HuntBoss;
+        string name = $"Boss hunt  ·  {hunt.Name}";
         if (ending != RunEnding.DelveCleared)
         {
-            return new DelveOutcome(0, Name, Cleared: false);
+            return new DelveOutcome(0, name, Cleared: false);
         }
 
-        long silver = CacheSilver(BossHunt.Silver);
-        var items = BossHunt.RollsItem(_random) ? new List<RunItem> { CacheItem(RarityWeights.Boss) } : new List<RunItem>();
-        bool gearRolled = BossHunt.RollsGear(_random);
+        long silver = CacheSilver(hunt.Silver);
+        var items = hunt.RollsItem(_random) ? new List<RunItem> { CacheItem(RarityWeights.Boss) } : new List<RunItem>();
+        bool gearRolled = hunt.RollsGear(_random);
         var gear = gearRolled ? GearCatalog.Grant(_profile, _random) : null;
         _profile.Silver += silver;
-        _profile.Delve.Marks += BossHunt.Marks;
-        _profile.Delve.BossesSlain++;
-        return new DelveOutcome(0, Name, Cleared: true, silver, 0, BossHunt.Marks, gear, items, GearMissed: !gearRolled,
+        _profile.Delve.Marks += hunt.Marks;
+        BossHunt.CountKill(_profile.Delve, hunt);
+        return new DelveOutcome(0, name, Cleared: true, silver, 0, hunt.Marks, gear, items, GearMissed: !gearRolled,
             GearCopies: gear is null ? 0 : GearCatalog.CopiesOf(_profile, GearCatalog.PieceOf(gear)));
     }
 

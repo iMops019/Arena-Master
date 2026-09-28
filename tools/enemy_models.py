@@ -5,7 +5,8 @@ Every enemy has
     Idle      standing, looping (IDLE_SECONDS)
     Walk      one stride, as many seconds long as it is metres, so the game moves it on by the ground the enemy covers and a planted foot stays put
     Die       falling, 1 s, held at the end
-and a clip for each attack it has, named after its AttackType (Shoot, Lob, Lunge, LeapSlam, Shockwave, Summon, Barrage), one second long: the wind-up over the
+and a clip for each attack it has, named after its AttackType (Shoot, Lob, Lunge, LeapSlam, Shockwave, Summon, Barrage, Swing, Cleave,
+LineSlam, Whirlwind), one second long (and a boss that roars into a stage, the Marauder, a Roar played over the roar): the wind-up over the
 first WINDUP_END of it, the blow (the attack's active time) up to ACTIVE_END, the recovery after. The game maps each phase's progress onto its stretch.
 A held model (the Crossbow Ghoul's crossbow, the Ghoul Mage's flame, the Ghoul Tactician's bomb) is a model of its own on the same skeleton with the same clips, drawn in the same pose.
 """
@@ -1112,5 +1113,227 @@ HOLLOW_KING = EnemyModel("hollow_king.glb", KING_RIG, KING_GAIT, lambda rig: bui
 HOLLOW_KING_UNBOUND = EnemyModel("hollow_king_unbound.glb", UNBOUND_RIG, UNBOUND_GAIT, lambda rig: build_king(rig, UNBOUND_SCALE, True),
                                  king_poses(UNBOUND_SCALE, UNBOUND_GAIT))
 
+# =========================================================================================================================================================
+# The Marauder Unbound (the user's, 2026-09-28): a Ghoul Brute grown by MARAUDER_SCALE (about 4 m), in an iron war belt, pauldrons and bracers, great horns and
+# burning eyes, with a two-handed axe. The axe is a joint of its own under the root, posed in every clip (where the lower grip is, which way the haft points and
+# which way the blade faces), and both hands are reached to the haft by IK. Its clips: the swing, the cleave, the jump slam, the line slam (a rift), the whirlwind
+# (held out to the side: the game spins the whole body), and the roar into his frenzy.
+
+MARAUDER_SCALE = 1.55
+AXE_REST = (0.35, 1.2, 0.42)    # the axe's origin (its lower grip) at rest, before scaling
+
+
+def brute_rig(s, extra=()):
+    return r.HeroRig(hip_y=1.0 * s, spine_y=1.12 * s, chest_y=1.3 * s, neck_y=1.96 * s, shoulder=(0.74 * s, 1.9 * s), elbow_y=1.46 * s, wrist_y=1.0 * s,
+                     leg_x=0.27 * s, knee_y=0.56 * s, ankle_y=0.14 * s, toe=0.26 * s, heel=0.18 * s, extra=extra)
+
+
+MARAUDER_RIG = brute_rig(MARAUDER_SCALE, extra=(("axe", "root", tuple(c * MARAUDER_SCALE for c in AXE_REST)),))
+MARAUDER_GAIT = r.Gait(cycle=2.0 * MARAUDER_SCALE, stance=0.5, lift=0.2 * MARAUDER_SCALE, bob=0.05, hip_drop=0.2 * MARAUDER_SCALE,
+                       width=0.26 * MARAUDER_SCALE, lean=12.0)
+
+
+def build_marauder(rig, s):
+    m = Mesh()
+    j = rig.index
+
+    def box(x0, y0, z0, x1, y1, z1, colour):
+        m.box(x0 * s, y0 * s, z0 * s, x1 * s, y1 * s, z1 * s, colour)
+
+    def spike(x0, y0, z0, x1, z1, tip, colour):
+        m.pyramid(x0 * s, y0 * s, z0 * s, x1 * s, y0 * s, z1 * s, tuple(c * s for c in tip), colour)
+
+    for side in ("l", "r"):
+        sx = -1.0 if side == "l" else 1.0
+        for prefix, a, b, y0, z0, y1, z1, colour in (("foot", 0.12, 0.42, 0.0, -0.18, 0.18, 0.26, "brute_hide"),
+                                                     ("shin", 0.14, 0.40, 0.14, -0.15, 0.6, 0.15, "brute_skin"),
+                                                     ("thigh", 0.13, 0.41, 0.52, -0.17, 1.02, 0.17, "brute_skin"),
+                                                     ("upper_arm", 0.62, 0.88, 1.42, -0.15, 1.98, 0.15, "brute_skin"),
+                                                     ("forearm", 0.63, 0.87, 0.98, -0.14, 1.5, 0.14, "brute_skin"),
+                                                     ("hand", 0.61, 0.89, 0.8, -0.15, 1.02, 0.15, "brute_hide")):
+            x0, x1 = sorted((sx * a, sx * b))
+            m.joint = j[f"{prefix}_{side}"]
+            box(x0, y0, z0, x1, y1, z1, colour)
+        # Iron on the shins, the forearms and the shoulders, a spike on each pauldron
+        m.joint = j[f"shin_{side}"]
+        x0, x1 = sorted((sx * 0.12, sx * 0.42))
+        box(x0, 0.25, 0.14, x1, 0.52, 0.19, "iron")
+        m.joint = j[f"forearm_{side}"]
+        x0, x1 = sorted((sx * 0.6, sx * 0.9))
+        box(x0, 1.05, -0.17, x1, 1.35, 0.17, "iron")
+        m.joint = j[f"upper_arm_{side}"]
+        x0, x1 = sorted((sx * 0.56, sx * 0.98))
+        box(x0, 1.76, -0.26, x1, 2.1, 0.26, "iron")
+        spike(sx * 0.72 - 0.08, 2.1, -0.08, sx * 0.72 + 0.08, 0.08, (sx * 0.86, 2.42, 0.0), "bone")
+    m.joint = j["hips"]
+    box(-0.48, 0.8, -0.26, 0.48, 1.12, 0.26, "brute_hide")
+    box(-0.52, 0.96, -0.3, 0.52, 1.1, 0.3, "iron")                    # the war belt
+    box(-0.12, 0.93, 0.3, 0.12, 1.13, 0.34, "fire")                    # its burning buckle
+    box(-0.3, 0.45, 0.26, 0.3, 0.97, 0.3, "leather")                   # a loincloth
+    m.joint = j["chest"]
+    box(-0.52, 1.05, -0.28, 0.52, 1.6, 0.32, "brute_skin")
+    box(-0.66, 1.55, -0.26, 0.66, 2.05, 0.32, "brute_skin")
+    box(-0.2, 1.4, -0.36, 0.2, 2.0, -0.26, "bone")
+    for x in (-0.3, 0.3):                                              # a harness over the chest
+        box(x - 0.06, 1.1, 0.32, x + 0.06, 2.0, 0.36, "leather")
+    box(-0.36, 1.62, 0.32, 0.36, 1.7, 0.37, "iron")
+    for y in (1.5, 1.7, 1.9):                                          # spines down the back
+        spike(-0.07, y, -0.36, 0.07, -0.3, (0.0, y + 0.08, -0.62), "bone")
+    m.joint = j["head"]
+    box(-0.24, 1.9, -0.16, 0.24, 2.32, 0.26, "brute_skin")
+    box(-0.26, 2.22, -0.18, 0.26, 2.36, 0.28, "iron")                  # a brow band
+    box(-0.17, 2.12, 0.26, -0.06, 2.19, 0.27, "fire")                  # burning eyes
+    box(0.06, 2.12, 0.26, 0.17, 2.19, 0.27, "fire")
+    box(-0.17, 1.9, 0.22, -0.1, 2.04, 0.3, "bone")                     # tusks
+    box(0.1, 1.9, 0.22, 0.17, 2.04, 0.3, "bone")
+    spike(-0.36, 2.26, -0.08, -0.2, 0.08, (-0.72, 2.85, -0.2), "horn")   # great horns
+    spike(0.2, 2.26, -0.08, 0.36, 0.08, (0.72, 2.85, -0.2), "horn")
+
+    # The axe: its origin is the lower grip; the haft runs up +Y, the blade faces +Z.
+    m.joint = j["axe"]
+    gx, gy, gz = AXE_REST
+
+    def part(x0, y0, z0, x1, y1, z1, colour):
+        box(gx + x0, gy + y0, gz + z0, gx + x1, gy + y1, gz + z1, colour)
+
+    part(-0.05, -0.4, -0.05, 0.05, 1.8, 0.05, "wood")                 # the haft
+    part(-0.07, -0.48, -0.07, 0.07, -0.36, 0.07, "iron")              # the pommel
+    for y in (0.3, 0.9):
+        part(-0.065, y, -0.065, 0.065, y + 0.08, 0.065, "iron")        # bands where the hands go
+    part(-0.08, 1.2, -0.12, 0.08, 1.85, 0.12, "iron")                 # the head's socket
+    part(-0.035, 1.12, 0.12, 0.035, 1.92, 0.58, "steel")              # the great blade
+    part(-0.03, 1.02, 0.52, 0.03, 2.02, 0.66, "plate")                # its edge, flaring past the blade
+    part(-0.037, 1.4, 0.2, 0.037, 1.6, 0.4, "fire")                   # a burning rune
+    spike(gx - 0.06, gy + 1.42, gz - 0.12, gx + 0.06, gz - 0.02, (gx, gy + 1.52, gz - 0.55), "iron")   # the back spike
+    spike(gx - 0.06, gy + 1.85, gz - 0.06, gx + 0.06, gz + 0.06, (gx, gy + 2.15, gz), "iron")          # and the top one
+    return m
+
+
+def marauder_poses(s, gait):
+    """The Marauder's clips at size <s>. Every clip poses the axe (so every frame gives it a translation) and reaches both hands to its haft."""
+    def p(v):
+        return (v[0] * s, v[1] * s, v[2] * s)
+
+    def hold(pose, grip, up, blade, left=0.62, right=0.0):
+        """The axe with its origin at <grip>, the haft along <up>, the blade toward <blade>; the left hand <left> and the right <right> up the haft (in unscaled
+        metres from the origin)."""
+        up = r.v_norm(up)
+        pose.set("axe", r.q_aim(r.v_scale(up, -1.0), r.v_norm(blade)), p(grip))
+        origin = p(grip)
+        r.arm_ik(pose, "r", r.v_add(origin, r.v_scale(up, right * s)), elbow_pole=(1.0, -0.4, -0.6))
+        r.arm_ik(pose, "l", r.v_add(origin, r.v_scale(up, left * s)), elbow_pole=(-1.0, -0.4, -0.6))
+
+    ready = ((0.35, 1.2, 0.42), (-0.8, 0.6, 0.1), (0.0, 0.3, 1.0))
+
+    def legs(pose, crouch, width=0.36):
+        r.stand_legs(pose, 0.0, 0.0, width=width * s, crouch=crouch * s)
+
+    def idle(pose, u):
+        t = u * IDLE_SECONDS
+        breath = math.sin(2 * math.pi * t / 1.5)
+        r.stand_legs(pose, breath, 0.5 * math.sin(2 * math.pi * t / IDLE_SECONDS), width=0.36 * s, crouch=0.08 * s)
+        hunch(pose, 22.0 + 3.0 * breath, head=-14.0, head_turn=10.0 * math.sin(2 * math.pi * t / IDLE_SECONDS))
+        grip, up, blade = ready
+        hold(pose, (grip[0], grip[1] + 0.02 * breath, grip[2]), up, blade)
+
+    def walk(pose, u):
+        _, swing = r.run_legs(pose, gait, u, 0.0)
+        hunch(pose, 24.0 + 3.0 * math.cos(4 * math.pi * u), head=-16.0, turn=-6.0 * swing)
+        grip, up, blade = ready
+        hold(pose, (grip[0] + 0.05 * swing, grip[1] + 0.04 * swing, grip[2]), up, blade)
+
+    def swing(pose, u):
+        """The axe drawn back round to the right, then swept round in front to the left, the body turning with it."""
+        legs(pose, keyed(u, 0.08, 0.2, 0.14))
+        hunch(pose, keyed(u, 22.0, 18.0, 30.0), head=-14.0, turn=keyed(u, 0.0, 40.0, -40.0))
+        grip = keyed(u, ready[0], (0.55, 1.35, -0.1), (-0.15, 1.2, 0.6))
+        up = keyed(u, ready[1], (0.7, 0.3, -0.65), (-0.75, 0.15, 0.65))
+        blade = keyed(u, ready[2], (-0.3, 0.0, 1.0), (-1.0, 0.0, -0.2))
+        hold(pose, grip, up, blade)
+
+    def cleave(pose, u):
+        """Heaved up over the right shoulder, then brought down across the whole front and on round to the left, low."""
+        legs(pose, keyed(u, 0.08, 0.14, 0.3, settle=0.22), width=0.42)
+        hunch(pose, keyed(u, 22.0, 5.0, 45.0, settle=35.0), head=keyed(u, -14.0, -24.0, -30.0), turn=keyed(u, 0.0, 50.0, -50.0, settle=-35.0))
+        grip = keyed(u, ready[0], (0.4, 1.9, -0.1), (-0.25, 1.2, 0.65), settle=(-0.1, 1.1, 0.6))
+        up = keyed(u, ready[1], (0.25, 0.7, -0.65), (-0.6, -0.2, 0.75), settle=(-0.55, -0.1, 0.8))
+        blade = keyed(u, ready[2], (0.0, 0.3, 1.0), (-0.3, -0.9, 0.2))
+        hold(pose, grip, up, blade)
+
+    def leap(pose, u):
+        """The jump slam: crouched with the axe hoisted over the head, up into the air with it held high behind, and brought down as he lands, crouched into
+        the blow after."""
+        name, k = stage(u)
+        overhead = ((0.1, 2.15, -0.05), (0.0, 0.55, -0.83), (0.0, 0.8, 0.6))
+        struck = ((0.05, 1.25, 0.8), (0.0, -0.3, 0.95), (0.0, -1.0, 0.1))
+        if name == "active":
+            r.airborne_legs(pose, tuck=1.3)
+            smash = r.ease(max(0.0, (k - 0.7) / 0.3))   # held high through the flight, brought down as he lands
+            hunch(pose, -6.0 + 60.0 * smash, head=-28.0 + 10.0 * smash)
+            hold(pose, *(r.v_lerp(a, b, smash) for a, b in zip(overhead, struck)), left=0.5)
+            return
+        if name == "windup":
+            legs(pose, 0.08 + 0.34 * r.ease(k), width=0.44)
+            hunch(pose, 22.0 - 30.0 * r.ease(k), head=-14.0 - 14.0 * r.ease(k))
+            hold(pose, *(r.v_lerp(a, b, r.ease(k)) for a, b in zip(ready, overhead)), left=0.62 - 0.12 * r.ease(k))
+            return
+        legs(pose, 0.42 - 0.34 * r.ease(k), width=0.44)
+        hunch(pose, 54.0 - 32.0 * r.ease(k), head=-18.0 + 4.0 * r.ease(k))
+        hold(pose, *(r.v_lerp(a, b, r.ease(k)) for a, b in zip(struck, ready)), left=0.5 + 0.12 * r.ease(k))
+
+    def line_slam(pose, u):
+        """Reared right back with the axe behind the head, then thrown forward and down flat, reaching far out along the rift."""
+        legs(pose, keyed(u, 0.08, 0.1, 0.46, settle=0.34), width=0.46)
+        hunch(pose, keyed(u, 22.0, -14.0, 62.0, settle=45.0), head=keyed(u, -14.0, -34.0, -46.0))
+        grip = keyed(u, ready[0], (0.1, 2.2, -0.3), (0.0, 1.15, 1.0))
+        up = keyed(u, ready[1], (0.0, 0.4, -0.9), (0.0, -0.22, 1.0))
+        blade = keyed(u, ready[2], (0.0, 1.0, 0.3), (0.0, -1.0, 0.05))
+        hold(pose, grip, up, blade, left=0.5)
+
+    def whirlwind(pose, u):
+        """The axe swung out level to the right, arms out, crouched to spin (the game turns the whole body); dizzy after, the axe dragging."""
+        name, k = stage(u)
+        out_grip, out_up, out_blade = (-0.05, 1.3, 0.45), (1.0, 0.06, 0.1), (0.0, 0.0, 1.0)
+        if name == "recover":
+            legs(pose, 0.2 - 0.12 * r.ease(k))
+            hunch(pose, 40.0 - 18.0 * r.ease(k), head=-5.0, turn=8.0 * math.sin(k * 12.0))
+            hold(pose, r.v_lerp((0.3, 1.05, 0.55), ready[0], r.ease(k)), r.v_lerp((0.25, -0.3, 0.92), ready[1], r.ease(k)),
+                 r.v_lerp((1.0, 0.0, 0.0), ready[2], r.ease(k)))
+            return
+        wound = r.ease(k) if name == "windup" else 1.0
+        legs(pose, 0.2 * wound, width=0.44)
+        hunch(pose, 15.0, head=-10.0, turn=-25.0 * wound)
+        if name == "windup":
+            hold(pose, r.v_lerp(ready[0], out_grip, wound), r.v_lerp(ready[1], out_up, wound), r.v_lerp(ready[2], out_blade, wound),
+                 left=0.62 * (1.0 - wound), right=0.55 * wound)
+        else:
+            hold(pose, (out_grip[0], out_grip[1] + 0.04 * math.sin(k * 20.0), out_grip[2]), out_up, out_blade, left=0.0, right=0.55)
+
+    def roar(pose, u):
+        """The axe hoisted overhead level in both hands, head thrown back, chest out, roaring, shaking; lowered again at the end."""
+        up_in, hold_to, down = 0.2, 0.85, 1.0
+        rise = r.ease(u / up_in) if u < up_in else (1.0 - r.ease((u - hold_to) / (down - hold_to)) if u > hold_to else 1.0)
+        shake = math.sin(u * 90.0) * 2.5 * rise
+        legs(pose, 0.08 + 0.18 * rise, width=0.36 + 0.12 * rise)
+        hunch(pose, 22.0 - 38.0 * rise + shake, head=-14.0 - 40.0 * rise, turn=shake)
+        top_grip, top_up, top_blade = (-0.45, 2.3, 0.2), (1.0, 0.08, 0.0), (0.0, 1.0, 0.3)
+        hold(pose, r.v_lerp(ready[0], top_grip, rise), r.v_lerp(ready[1], top_up, rise), r.v_lerp(ready[2], top_blade, rise),
+             left=0.62 * (1.0 - rise), right=0.75 * rise)
+
+    def die(pose, u):
+        collapse(pose, u, 22.0, 0.86 * s)
+        k = r.ease(min(1.0, u / 0.6))
+        up = r.v_norm(r.v_lerp(ready[1], (0.2, 0.0, 1.0), k))
+        blade = r.v_norm(r.v_lerp(ready[2], (1.0, 0.0, 0.0), k))
+        pose.set("axe", r.q_aim(r.v_scale(up, -1.0), blade), p(r.v_lerp(ready[0], (0.7, 0.08, 0.6), k)))   # the axe falls from its hands to lie on the ground
+
+    return {"Idle": (IDLE_SECONDS, idle), "Walk": (gait.cycle, walk), "Die": (DIE_SECONDS, die), "Swing": (1.0, swing), "Cleave": (1.0, cleave),
+            "LeapSlam": (1.0, leap), "LineSlam": (1.0, line_slam), "Whirlwind": (1.0, whirlwind), "Roar": (1.0, roar)}
+
+
+MARAUDER_UNBOUND = EnemyModel("marauder_unbound.glb", MARAUDER_RIG, MARAUDER_GAIT, lambda rig: build_marauder(rig, MARAUDER_SCALE),
+                              marauder_poses(MARAUDER_SCALE, MARAUDER_GAIT))
+
 ENEMIES = {"ghoul": GHOUL, "crossbow_ghoul": CROSSBOW_GHOUL, "ghoul_mage": GHOUL_MAGE, "beast_rider": BEAST_RIDER, "ghoul_beast": GHOUL_BEAST, "ghoul_tactician": GHOUL_TACTICIAN,
-           "brute": BRUTE, "hollow_king": HOLLOW_KING, "hollow_king_unbound": HOLLOW_KING_UNBOUND}
+           "brute": BRUTE, "hollow_king": HOLLOW_KING, "hollow_king_unbound": HOLLOW_KING_UNBOUND,
+           "marauder_unbound": MARAUDER_UNBOUND}

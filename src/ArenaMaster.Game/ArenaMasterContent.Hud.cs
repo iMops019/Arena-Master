@@ -23,7 +23,7 @@ public sealed partial class ArenaMasterContent
         return _plan.Kind switch
         {
             Delve.RunKind.Classic => $"{clock} / {Clock(RunDirector.RunLength)}",
-            Delve.RunKind.Arena => _cacheAt is not null ? $"{clock}  ·  open the cache" : $"{clock}  ·  the Hollow King Unbound",
+            Delve.RunKind.Arena => _cacheAt is not null ? $"{clock}  ·  open the cache" : $"{clock}  ·  {_plan.HuntBoss.Name}",
             _ when _cacheAt is not null => $"{clock}  ·  open the cache",
             _ when _delveDirector is { BossCalled: true } => $"{clock}  ·  slay the King",
             _ when _delveDirector is { King: false } => $"{clock}  ·  the cache at {Clock(Delve.DelveDirector.BossAt)}",
@@ -96,7 +96,7 @@ public sealed partial class ArenaMasterContent
         }
         else if (_plan.Kind == Delve.RunKind.Arena)
         {
-            hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 82f), "Boss hunt", Unique, 0.75f);
+            hud.Text(HudAnchor.TopLeft, new Vector2D<float>(26f, 82f), $"Boss hunt  ·  {_plan.HuntBoss.Name}", Unique, 0.75f);
         }
         hud.Text(HudAnchor.TopRight, new Vector2D<float>(-26f, 32f), $"Kills  {_enemies.Kills}", White, 0.9f);
 
@@ -111,7 +111,8 @@ public sealed partial class ArenaMasterContent
         // The boss's health, under the clock, while one is on the field.
         if (_enemies.Boss is { } boss)
         {
-            hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 64f), boss.Kind.Name.ToUpperInvariant(), Red, 0.9f);
+            string state = boss.IsRoaring ? "  ·  IMMUNE" : boss.IsEnraged ? $"  ·  FRENZIED RAGE ({boss.Rage} RAGE)" : "";
+            hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 64f), boss.Kind.Name.ToUpperInvariant() + state, Red, 0.9f);
             hud.Bar(HudAnchor.TopCenter, new Vector2D<float>(0f, 88f), new Vector2D<float>(520f, 16f), boss.Health / boss.MaxHealth,
                 new Vector4D<float>(0.75f, 0.15f, 0.2f, 0.95f), Shade);
         }

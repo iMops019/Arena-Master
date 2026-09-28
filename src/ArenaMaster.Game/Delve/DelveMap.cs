@@ -108,6 +108,9 @@ internal sealed class DelveSave
     /// <summary>How many times the Hollow King Unbound has been slain (on a boss hunt; before those, on the old Boss nodes).</summary>
     public int BossesSlain { get; set; }
 
+    /// <summary>How many times the Marauder Unbound has been slain.</summary>
+    public int MaraudersSlain { get; set; }
+
     /// <summary>Node kind -> how many of that kind have been cleared.</summary>
     public Dictionary<string, int> ClearedByKind { get; set; } = new();
 }
@@ -161,34 +164,68 @@ internal static class DelveRules
 }
 
 /// <summary>
-/// The boss hunt: the Hollow King Unbound alone in his arena, a fight of its own, taken from the departure gate as often as the player likes - the way to hunt for
-/// gear (the user's call, 2026-09-27: finding gear in Armoury and Boss nodes deep in the Delve was too rare and too hard). Always the same fight, for now; tiers of
-/// it, and more bosses with their own chase gear, are for later. Pure.
+/// One boss of the boss hunt, and what a fight with him is: the enemy, how much tougher than his base numbers he is on a hunt, the level the player starts at,
+/// and what his cache pays (a chance of gear and of an item, silver and Delve Marks). <paramref name="LookDepth"/> is the Delve band whose sky the arena has.
+/// </summary>
+internal sealed record HuntBoss(string Id, Combat.EnemyKind Kind, Combat.EnemyScaling Scaling, int StartLevel, float GearChance, float ItemChance, long Silver,
+    long Marks, int LookDepth, string Fight)
+{
+    public string Name => Kind.Name;
+
+    public float Health => Kind.MaxHealth * Scaling.Health;
+
+    /// <summary>Whether this kill's cache holds gear: pure luck, every kill its own roll.</summary>
+    public bool RollsGear(Random random) => random.NextDouble() < GearChance;
+
+    public bool RollsItem(Random random) => random.NextDouble() < ItemChance;
+}
+
+/// <summary>
+/// The boss hunts: a boss alone in his arena, a fight of its own, taken from the departure gate as often as the player likes - the way to hunt for gear (the
+/// user's call, 2026-09-27: finding gear in Armoury and Boss nodes deep in the Delve was too rare and too hard). The Hollow King Unbound is open from the start;
+/// the Marauder Unbound, a tier up (the user's, 2026-09-28), opens once the King has been slain. Each is always the same fight, for now. Pure.
 /// </summary>
 internal static class BossHunt
 {
-    /// <summary>The chance a kill's cache holds a piece of gear: pure luck, every kill its own roll. 25% since 2026-09-27, with the new slots (was 20%).</summary>
-    public const float GearChance = 0.25f;
+    /// <summary>
+    /// The Hollow King Unbound: 45,500 health (the old depth-5 Boss node's was 41,600), hitting 30% harder, from level 16. A 25% chance of gear a kill (20% until
+    /// the belt, amulet and ring slots came, 2026-09-27).
+    /// </summary>
+    public static readonly HuntBoss HollowKing = new("hollow_king", Combat.DelveBosses.HollowKingUnbound, new(1.75f, 1.3f, 1f), StartLevel: 16,
+        GearChance: 0.25f, ItemChance: 0.10f, Silver: 150, Marks: 1, LookDepth: 5,
+        "Him alone, in four stages: leaps, shockwaves, charges, fire from the sky, the Crown and the Line of Fire.");
 
-    /// <summary>The chance a kill's cache holds an item, at a boss chest's odds.</summary>
-    public const float ItemChance = 0.10f;
+    /// <summary>
+    /// The Marauder Unbound, a tier up: 75,000 health (59,500 at first; the user raised it, 2026-09-28), hitting 35% harder, from level 21 (five more picks than the King; 18 at first). A 35% chance of gear a kill, normal rolls (the user's
+    /// call), and more silver and marks.
+    /// </summary>
+    public static readonly HuntBoss Marauder = new("marauder", Combat.DelveBosses.MarauderUnbound, new(2.5f, 1.35f, 1f), StartLevel: 21,
+        GearChance: 0.35f, ItemChance: 0.10f, Silver: 250, Marks: 2, LookDepth: 5,
+        "A giant with a two-handed axe: swings, a quick cleave to dash out of, slams, a rift across the arena and a whirlwind. At 35% he roars (nothing hurts him) and fights on in a Frenzied Rage.");
 
-    public const long Silver = 150;
-    public const long Marks = 1;
+    public static readonly IReadOnlyList<HuntBoss> All = new[] { HollowKing, Marauder };
 
-    /// <summary>The level the player starts the fight at, every level's upgrade picked first.</summary>
-    public const int StartLevel = 16;
+    public static HuntBoss? Find(string id) => All.FirstOrDefault(b => b.Id == id);
 
-    /// <summary>How much tougher than his base numbers the King is on a hunt: 45,500 health (the old depth-5 Boss node's was 41,600) and hitting 30% harder.</summary>
-    public static readonly Combat.EnemyScaling Scaling = new(1.75f, 1.3f, 1f);
+    /// <summary>How many times <paramref name="boss"/> has been slain.</summary>
+    public static int Slain(DelveSave save, HuntBoss boss) => boss == Marauder ? save.MaraudersSlain : save.BossesSlain;
 
-    /// <summary>The Delve band whose sky and weather the arena has (the Amber Hollows).</summary>
-    public const int LookDepth = 5;
+    /// <summary>Counts a kill of <paramref name="boss"/>.</summary>
+    public static void CountKill(DelveSave save, HuntBoss boss)
+    {
+        if (boss == Marauder)
+        {
+            save.MaraudersSlain++;
+        }
+        else
+        {
+            save.BossesSlain++;
+        }
+    }
 
-    public static float BossHealth => Combat.DelveBosses.HollowKingUnbound.MaxHealth * Scaling.Health;
+    /// <summary>Whether <paramref name="boss"/> can be hunted: the King always, the Marauder once the King has been slain.</summary>
+    public static bool IsOpen(DelveSave save, HuntBoss boss) => boss != Marauder || save.BossesSlain >= 1;
 
-    /// <summary>Whether this kill's cache holds gear.</summary>
-    public static bool RollsGear(Random random) => random.NextDouble() < GearChance;
-
-    public static bool RollsItem(Random random) => random.NextDouble() < ItemChance;
+    /// <summary>Why <paramref name="boss"/> can't be hunted yet, or null if he can.</summary>
+    public static string? WhyLocked(DelveSave save, HuntBoss boss) => IsOpen(save, boss) ? null : "Locked: slay the Hollow King Unbound first.";
 }

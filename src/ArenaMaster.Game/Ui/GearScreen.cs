@@ -82,7 +82,7 @@ internal sealed class GearScreen : GameScreen
         var start = ImGui.GetCursorScreenPos();
         float closeWidth = 150f * scale;
         UiTheme.Text(start + new Vector2(0f, buttonHeight * 0.2f),
-            $"Gear comes from the boss hunt at the departure gate: {BossHunt.GearChance * 100f:0}% a kill, any piece, every stat rolled in its range. Pick a place above, then click a copy to wear it there, or to take it off. Sell spare copies at the quartermaster.",
+            $"Gear comes from the boss hunts at the departure gate: {BossHunt.HollowKing.GearChance * 100f:0}% a kill from the Hollow King Unbound, {BossHunt.Marauder.GearChance * 100f:0}% from the Marauder Unbound; any piece, every stat rolled in its range. Pick a place above, then click a copy to wear it there, or to take it off. Sell spare copies at the quartermaster.",
             UiTheme.Muted, 0.78f, width - closeWidth - 20f * scale);
         ImGui.SetCursorScreenPos(start + new Vector2(width - closeWidth, 0f));
         bool close = UiTheme.Button("Close  [E]", new Vector2(closeWidth, buttonHeight));

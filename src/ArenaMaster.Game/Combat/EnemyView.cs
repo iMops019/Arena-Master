@@ -11,8 +11,9 @@ namespace ArenaMaster.Game.Combat;
 /// faint to bright as a shot winds up. A prop (a crate) is a plain crowd. The shots in flight are crowds too; a fireball's landing spot is marked with a
 /// burning ring while it flies, and it bursts in a ring of fire; a bomb tumbles, a ghostly ring on the ground under it showing its blast and pulsing faster as
 /// it slows, and goes off in a ring of green. Attacks show their telegraphs on the ground, as crowds too (so dozens at once cost what one does): a red lane for
-/// a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave. A Magic, Rare or Legendary enemy is drawn a little bigger, over a slowly turning ring in its
-/// rarity's colour.
+/// a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave; a red wedge filling up for a swing or a cleave, a strip of squares down a rift (the eruption eating it up as it runs out), a ring round a whirlwind's reach. A Magic,
+/// Rare or Legendary enemy is drawn a little bigger, over a slowly turning ring in its rarity's colour. A boss roaring into a rage (the Marauder) has red motes
+/// swirling up round it and a fire ring pulsing under it; enraged, fewer, for the rest of the fight.
 /// </summary>
 internal sealed class EnemyView
 {
@@ -28,9 +29,20 @@ internal sealed class EnemyView
     public const string BombMarkModel = "ghoul_bomb_mark.glb";
     public const string BombBurstModel = "ghoul_bomb_burst.glb";
 
+    /// <summary>A 10-degree slice of a wedge of radius 1 along +Z (dark), and the same slice bright, filling it; a 1 m square; the rage's motes and ring.</summary>
+    public const string SliceModel = "telegraph_slice.glb";
+    public const string SliceFillModel = "telegraph_slice_fill.glb";
+    public const string SquareModel = "telegraph_square.glb";
+    public const string RageMoteModel = "rage_mote.glb";
+    public const string RageRingModel = "rage_ring.glb";
+
+    /// <summary>How wide one slice is: a wedge is laid out in as many as it takes.</summary>
+    private const float SliceAngle = 10f * MathF.PI / 180f;
+
     private readonly Dictionary<string, List<CrowdInstance>> _telegraphs = new()   // telegraph model -> this frame's
     {
         [RingModel] = new(), [DiscModel] = new(), [LaneModel] = new(), [ShockwaveModel] = new(),
+        [SliceModel] = new(), [SliceFillModel] = new(), [SquareModel] = new(), [RageMoteModel] = new(), [RageRingModel] = new(),
     };
     private readonly Dictionary<string, List<CrowdInstance>> _crowds = new();       // model -> this frame's copies (props)
     private readonly Dictionary<string, List<SkinnedCrowdInstance>> _animated = new();   // model -> this frame's animated copies
@@ -101,6 +113,7 @@ internal sealed class EnemyView
             if (enemy.IsAlive)
             {
                 AddTelegraphs(enemy, groundAt);
+                AddRage(enemy, groundAt);
             }
         }
 
@@ -242,6 +255,13 @@ internal sealed class EnemyView
             position.Y -= MathF.Max(0f, t - 0.5f) * 2f * enemy.Kind.Height * 0.35f;
             flash = 0f;
         }
+        else if (enemy.IsRoaring)
+        {
+            // Shaking with the roar, and glowing with it in pulses.
+            position.X += 0.05f * MathF.Sin(enemy.RoarLeft * 55f);
+            position.Z += 0.05f * MathF.Cos(enemy.RoarLeft * 47f);
+            flash = MathF.Max(flash, 0.12f + 0.18f * MathF.Abs(MathF.Sin(enemy.RoarLeft * 10f)));
+        }
 
         return new SkinnedCrowdInstance(position, enemy.Yaw, motion.Clip, motion.Time, scale, pitch, flash, motion.From, motion.FromTime, motion.Fade);
     }
@@ -296,10 +316,26 @@ internal sealed class EnemyView
                 case (AttackPhase.Active, AttackType.LeapSlam):
                     pitch += 0.5f * (enemy.PhaseTime / attack.Active);                               // tipping forward to come down
                     break;
+                case (AttackPhase.WindUp, AttackType.LineSlam):
+                    pitch -= 0.25f * windUp;                                                          // rearing back with the axe up
+                    break;
+                case (AttackPhase.Active, AttackType.LineSlam):
+                    pitch += 0.3f;                                                                    // bent over the blow
+                    break;
+                case (AttackPhase.Recover, AttackType.Whirlwind):
+                    pitch += 0.3f;                                                                    // dizzy
+                    position.X += 0.06f * MathF.Sin(_time * 9f);
+                    break;
                 case (AttackPhase.Recover, _):
                     pitch += 0.2f;                                                                    // winded, open to punishment
                     break;
             }
+        }
+        else if (enemy.IsRoaring)
+        {
+            pitch -= 0.12f;                                                                            // chest out, roaring, and shaking with it
+            position.X += 0.05f * MathF.Sin(_time * 55f);
+            position.Z += 0.05f * MathF.Cos(_time * 47f);
         }
         else
         {
@@ -347,8 +383,107 @@ internal sealed class EnemyView
                 _telegraphs[ShockwaveModel].Add(new CrowdInstance(new Vector3D<float>(centre.X, ground + 0.15f, centre.Z), 0f, enemy.ShockwaveRadius));
                 break;
             }
+
+            case AttackType.Swing or AttackType.Cleave when enemy.AttackPhase == AttackPhase.WindUp:
+            {
+                // The wedge, in slices, and a brighter wedge filling it out from the attacker as the blow nears.
+                var aim = enemy.AttackTarget - enemy.AttackOrigin;
+                float yaw = MathF.Atan2(aim.X, aim.Z);
+                int slices = Math.Max(1, (int)MathF.Ceiling(2f * attack.HitWidth / SliceAngle));
+                float step = 2f * attack.HitWidth / slices;
+                float fill = MathF.Max(0.05f, attack.Reach * enemy.WindUpProgress);
+                var at = Ground(enemy.Position, groundAt);
+                for (int i = 0; i < slices; i++)
+                {
+                    float sliceYaw = yaw - attack.HitWidth + (i + 0.5f) * step;
+                    _telegraphs[SliceModel].Add(new CrowdInstance(Lift(at, 0.05f), sliceYaw, attack.Reach));
+                    _telegraphs[SliceFillModel].Add(new CrowdInstance(Lift(at, 0.07f), sliceYaw, fill));
+                }
+
+                break;
+            }
+
+            case AttackType.LineSlam when enemy.AttackPhase != AttackPhase.Recover:
+            {
+                // Each lane in squares as wide as it is; once the blow comes, the eruptions run out along them and the squares behind their fronts go.
+                float side = 2f * attack.HitWidth;
+                int squares = Math.Max(1, (int)MathF.Ceiling(attack.Reach / side));
+                float front = enemy.AttackPhase == AttackPhase.Active ? attack.Reach * Math.Clamp(enemy.PhaseTime / attack.Active, 0f, 1f) : 0f;
+                foreach (var way in EnemyField.RiftLanes(enemy, attack))
+                {
+                    float yaw = MathF.Atan2(way.X, way.Z);
+                    for (int k = 0; k < squares; k++)
+                    {
+                        float along = side * (k + 0.5f);
+                        if (along < front)
+                        {
+                            continue;
+                        }
+
+                        var centre = enemy.AttackOrigin + way * along;
+                        _telegraphs[SquareModel].Add(new CrowdInstance(Lift(Ground(centre, groundAt), 0.06f), yaw, side,
+                            Flash: 0.2f + 0.5f * enemy.WindUpProgress));
+                    }
+
+                    if (front > 0f)
+                    {
+                        var burst = enemy.AttackOrigin + way * front;
+                        _telegraphs[ShockwaveModel].Add(new CrowdInstance(Lift(Ground(burst, groundAt), 0.2f), 0f, attack.HitWidth * 1.3f));
+                    }
+                }
+
+                break;
+            }
+
+            case AttackType.Whirlwind when enemy.AttackPhase != AttackPhase.Recover:
+            {
+                // Its reach, round it as it winds up and all the while it spins.
+                var at = Ground(enemy.Position, groundAt);
+                _telegraphs[RingModel].Add(new CrowdInstance(Lift(at, 0.08f), 0f, attack.Reach));
+                if (enemy.AttackPhase == AttackPhase.WindUp)
+                {
+                    _telegraphs[DiscModel].Add(new CrowdInstance(Lift(at, 0.05f), 0f, MathF.Max(0.05f, attack.Reach * enemy.WindUpProgress)));
+                }
+
+                break;
+            }
         }
     }
+
+    /// <summary>
+    /// A boss's rage: roaring, red motes swirling up round it in waves and a fire ring pulsing under it; enraged after, fewer motes and a steady ring, for the rest
+    /// of the fight.
+    /// </summary>
+    private void AddRage(Enemy enemy, Func<float, float, float?> groundAt)
+    {
+        if (!enemy.IsRoaring && !enemy.IsEnraged)
+        {
+            return;
+        }
+
+        bool roaring = enemy.IsRoaring;
+        int count = roaring ? 40 : 12;
+        float swirl = roaring ? 2.4f : 1.2f;
+        float climb = roaring ? 1.1f : 0.5f;
+        var feet = Ground(enemy.Position, groundAt);
+        for (int i = 0; i < count; i++)
+        {
+            float k = (float)i / count;
+            float seed = i * 1.618f;
+            float rise = (_time * climb + k * 2.3f) % 1f;
+            float angle = _time * swirl + k * MathF.Tau + 0.5f * MathF.Sin(_time * 3f + seed);   // wavering as they go round
+            float radius = enemy.Kind.Radius * (0.9f + 0.5f * rise) + 0.3f * MathF.Sin(_time * 4f + seed);
+            var at = feet + new Vector3D<float>(MathF.Sin(angle) * radius, rise * enemy.Kind.Height * 1.1f, MathF.Cos(angle) * radius);
+            float size = (roaring ? 0.3f : 0.2f) * (1f - 0.6f * rise);
+            _telegraphs[RageMoteModel].Add(new CrowdInstance(at, angle, size, _time * 5f + seed, Flash: 0.5f + 0.5f * (1f - rise)));
+        }
+
+        float pulse = roaring ? 1.6f + 0.3f * MathF.Sin(_time * 12f) : 1.4f;
+        _telegraphs[RageRingModel].Add(new CrowdInstance(Lift(feet, 0.1f), _time * (roaring ? 3f : 0.8f), enemy.Kind.Radius * pulse,
+            Flash: roaring ? 0.6f + 0.4f * MathF.Abs(MathF.Sin(_time * 12f)) : 0.3f));
+    }
+
+    private static Vector3D<float> Ground(Vector3D<float> p, Func<float, float, float?> groundAt) => new(p.X, groundAt(p.X, p.Z) ?? p.Y, p.Z);
 
     private static Vector3D<float> Lift(Vector3D<float> p, float by) => new(p.X, p.Y + by, p.Z);
 }

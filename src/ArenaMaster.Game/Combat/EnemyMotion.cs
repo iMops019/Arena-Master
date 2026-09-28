@@ -15,6 +15,9 @@ internal sealed class EnemyMotion
     public const string WalkClip = "Walk";
     public const string DieClip = "Die";
 
+    /// <summary>A boss's roar at the start of a stage (the Marauder's growl into his Frenzied Rage), played over the roar.</summary>
+    public const string RoarClip = "Roar";
+
     /// <summary>Where an attack clip's wind-up ends and its blow ends (fractions of its one second). Must match WINDUP_END and ACTIVE_END in tools/enemy_models.py.</summary>
     public const float WindUpEnd = 0.4f;
     public const float ActiveEnd = 0.7f;
@@ -101,6 +104,11 @@ internal sealed class EnemyMotion
         if (enemy.IsFrozen)
         {
             return (state.Clip, state.Time);   // held fast in the ice, mid-stride or mid-swing
+        }
+
+        if (enemy.IsRoaring && clips.TryGetValue(RoarClip, out float roar))
+        {
+            return (RoarClip, roar * Math.Clamp(1f - enemy.RoarLeft / MathF.Max(enemy.RoarSeconds, 1e-3f), 0f, 1f));
         }
 
         if (enemy.Attack is { } attack && clips.TryGetValue(attack.Type.ToString(), out float length))

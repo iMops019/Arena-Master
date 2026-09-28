@@ -25,6 +25,8 @@ internal sealed class Enemy
         DamageScale = scaling.Damage * Rarity.Damage;
     }
 
+    private float _attackSpeedBoost = 1f;
+
     public int Id { get; }
 
     public EnemyKind Kind { get; }
@@ -39,7 +41,7 @@ internal sealed class Enemy
     public int Experience => (int)MathF.Round(Kind.Experience * Rarity.Experience);
 
     /// <summary>How much faster than its kind it attacks: its wind-ups, blows, recoveries, breathers and claws all run this much quicker.</summary>
-    public float AttackSpeed => Rarity.AttackSpeed;
+    public float AttackSpeed => Rarity.AttackSpeed * _attackSpeedBoost;
 
     public Vector3D<float> Position { get; set; }
 
@@ -52,7 +54,30 @@ internal sealed class Enemy
     public float Speed { get; }
 
     /// <summary>What its contact and attack damage are multiplied by.</summary>
-    public float DamageScale { get; }
+    public float DamageScale { get; private set; }
+
+    /// <summary>Seconds left of a stage's roar (see <see cref="BossPhase.Roar"/>): standing, roaring, and nothing hurts it. And how long the roar was.</summary>
+    public float RoarLeft { get; set; }
+
+    public float RoarSeconds { get; set; }
+
+    public bool IsRoaring => RoarLeft > 0f;
+
+    /// <summary>The rage it has gained (the Marauder's frenzy), for the HUD; 0 for none.</summary>
+    public int Rage { get; private set; }
+
+    public bool IsEnraged => Rage > 0;
+
+    /// <summary>A stage's boosts take hold: its damage and attack speed raised, and its rage.</summary>
+    public void Enrage(BossPhase phase)
+    {
+        DamageScale *= phase.DamageBoost;
+        _attackSpeedBoost *= phase.AttackSpeedBoost;
+        Rage += phase.Rage;
+    }
+
+    /// <summary>Seconds until a lasting attack (a whirlwind) may hit again.</summary>
+    public float TickLeft { get; set; }
 
     public bool IsAlive => Health > 0f;
 
@@ -466,9 +491,9 @@ internal sealed class EnemyField
     /// </summary>
     public bool Damage(Enemy enemy, float amount)
     {
-        if (!enemy.IsAlive)
+        if (!enemy.IsAlive || enemy.IsRoaring)
         {
-            return false;
+            return false;   // (a roaring boss shrugs everything off)
         }
 
         var effects = HitEffects;
@@ -696,6 +721,24 @@ internal sealed class EnemyField
         }
 
         UpdatePhase(enemy);
+        if (enemy.IsRoaring)
+        {
+            enemy.RoarLeft = MathF.Max(0f, enemy.RoarLeft - deltaSeconds);
+            var toward = Geometry.FlatDirection(enemy.Position, player.Feet, out float away);
+            if (away > 1e-3f)
+            {
+                enemy.Yaw = MathF.Atan2(toward.X, toward.Z);
+            }
+
+            if (!enemy.IsRoaring && enemy.CurrentPhase is { } roared)
+            {
+                enemy.Enrage(roared);   // the roar is over: the frenzy takes hold
+                enemy.AttackCooldown = 0.3f;
+            }
+
+            return;   // no step, no claw, no attack while it roars
+        }
+
         enemy.ChilledFor = MathF.Max(0f, enemy.ChilledFor - deltaSeconds);
         if (enemy.FrozenFor > 0f)
         {
@@ -922,6 +965,19 @@ internal sealed class EnemyField
             enemy.PhaseIndex = reached;
             enemy.AttackCooldown = MathF.Min(enemy.AttackCooldown, 0.5f);
             _phaseChanges.Add((enemy, phases[reached]));
+            var phase = phases[reached];
+            if (phase.Roar > 0f)
+            {
+                // Every attack stops: it roars first, and the stage's boosts come when the roar is done.
+                enemy.Attack = null;
+                enemy.ChainLeft = 0;
+                enemy.RoarLeft = phase.Roar;
+                enemy.RoarSeconds = phase.Roar;
+            }
+            else if (phase.DamageBoost != 1f || phase.AttackSpeedBoost != 1f || phase.Rage > 0)
+            {
+                enemy.Enrage(phase);
+            }
         }
     }
 
@@ -990,11 +1046,13 @@ internal sealed class EnemyField
         enemy.AttackPhase = AttackPhase.WindUp;
         enemy.PhaseTime = 0f;
         enemy.AttackLanded = false;
+        enemy.TickLeft = 0f;
         enemy.AttackOrigin = enemy.Position;
         enemy.AttackTarget = attack.Type switch
         {
-            // The lane is fixed the moment it is shown: the charge goes where the lane points, not where the player has moved to.
-            AttackType.Lunge => enemy.Position + toPlayer * attack.Reach,
+            // The lane is fixed the moment it is shown: the charge goes where the lane points, not where the player has moved to. A swing's wedge and a rift's
+            // lane likewise (after any tracking).
+            AttackType.Lunge or AttackType.Swing or AttackType.Cleave or AttackType.LineSlam => enemy.Position + toPlayer * attack.Reach,
 
             // The landing spot is where the player stood when the circle appeared - so the circle is the warning, and leaving it is the answer.
             AttackType.LeapSlam => new Vector3D<float>(player.Feet.X, groundAt(player.Feet.X, player.Feet.Z) ?? player.Feet.Y, player.Feet.Z),
@@ -1005,14 +1063,15 @@ internal sealed class EnemyField
     private void RunAttack(Enemy enemy, float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
     {
         var attack = enemy.Attack!;
+        LastDelta = deltaSeconds;
         enemy.PhaseTime += deltaSeconds * enemy.AttackSpeed;   // a quicker enemy runs through its whole attack quicker
 
         switch (enemy.AttackPhase)
         {
             case AttackPhase.WindUp:
-                if (attack.Type == AttackType.Lunge && enemy.PhaseTime < attack.Tracking)
+                if (Aimed(attack.Type) && enemy.PhaseTime < attack.Tracking)
                 {
-                    // The lane still follows the player; it locks once the tracking is over.
+                    // The lane (or wedge) still follows the player; it locks once the tracking is over.
                     enemy.AttackTarget = enemy.AttackOrigin + Geometry.FlatDirection(enemy.AttackOrigin, player.Feet, out _) * attack.Reach;
                 }
 
@@ -1052,6 +1111,14 @@ internal sealed class EnemyField
                         enemy.ChainLeft--;
                         StartAttack(enemy, attack, player, groundAt);
                         enemy.PhaseTime = attack.WindUp * 0.5f;
+                        break;
+                    }
+
+                    if (attack.FollowUp is { } next)
+                    {
+                        // Straight into its follow-up, aimed at the player where they are now, with no recovery between (the rifts off a jump slam).
+                        StartAttack(enemy, next, player, groundAt);
+                        enemy.ChainLeft = next.Chain;
                         break;
                     }
 
@@ -1124,7 +1191,97 @@ internal sealed class EnemyField
 
                 break;
             }
+
+            case AttackType.Swing or AttackType.Cleave when !enemy.AttackLanded:
+            {
+                enemy.AttackLanded = true;   // the blade passes once, at the start of the blow
+                if (InWedge(enemy, attack, player.Feet) && MathF.Abs(player.Feet.Y - enemy.Position.Y) < enemy.Kind.Height)
+                {
+                    Hit(enemy, attack, player, Geometry.FlatDirection(enemy.Position, player.Feet, out _));
+                }
+
+                break;
+            }
+
+            case AttackType.LineSlam when !enemy.AttackLanded:
+            {
+                // The eruptions run out along their lanes through the blow; one hits the player on the ground in its lane once its front reaches them (one hit
+                // however many lanes).
+                var offset = player.Feet - enemy.AttackOrigin;
+                foreach (var way in RiftLanes(enemy, attack))
+                {
+                    float along = offset.X * way.X + offset.Z * way.Z;
+                    float side = MathF.Abs(offset.X * way.Z - offset.Z * way.X);
+                    if (player.Grounded && along >= 0f && along <= attack.Reach * t && along <= attack.Reach + PlayerRadius && side <= attack.HitWidth + PlayerRadius)
+                    {
+                        enemy.AttackLanded = true;
+                        Hit(enemy, attack, player, way);
+                        break;
+                    }
+                }
+
+                break;
+            }
+
+            case AttackType.Whirlwind:
+            {
+                // Spinning after the player, faster than it walks, hitting whatever is in reach every tick.
+                var toward = Geometry.FlatDirection(enemy.Position, player.Feet, out float distance);
+                float step = MathF.Min(distance, enemy.WalkSpeed * attack.ProjectileSpeed * LastDelta);
+                var flat = enemy.Position + toward * step;
+                enemy.Position = new Vector3D<float>(flat.X, groundAt(flat.X, flat.Z) ?? enemy.Position.Y, flat.Z);
+                enemy.Yaw += WhirlwindTurn * LastDelta;
+                enemy.TickLeft -= LastDelta * enemy.AttackSpeed;
+                if (enemy.TickLeft <= 0f && distance <= attack.Reach + PlayerRadius && MathF.Abs(player.Feet.Y - enemy.Position.Y) < enemy.Kind.Height)
+                {
+                    enemy.TickLeft = attack.Tick;
+                    Hit(enemy, attack, player, toward);
+                }
+
+                break;
+            }
         }
+    }
+
+    /// <summary>The flat directions of a line slam's rifts: the one it is aimed along, and its others fanned <see cref="AttackSpec.Spread"/> apart either side.</summary>
+    public static List<Vector3D<float>> RiftLanes(Enemy enemy, AttackSpec attack)
+    {
+        var aim = Geometry.FlatDirection(enemy.AttackOrigin, enemy.AttackTarget, out _);
+        float yaw = MathF.Atan2(aim.X, aim.Z);
+        int count = Math.Max(1, attack.Count);
+        var lanes = new List<Vector3D<float>>(count);
+        for (int i = 0; i < count; i++)
+        {
+            float turn = yaw + (i - (count - 1) / 2f) * attack.Spread;
+            lanes.Add(new Vector3D<float>(MathF.Sin(turn), 0f, MathF.Cos(turn)));
+        }
+
+        return lanes;
+    }
+
+    /// <summary>How fast a whirlwind spins, in radians a second (about two turns).</summary>
+    public const float WhirlwindTurn = 13f;
+
+    /// <summary>This frame's step, for the attacks that move by it while they last (a whirlwind).</summary>
+    private float LastDelta { get; set; }
+
+    /// <summary>Whether <paramref name="at"/> is within <paramref name="attack"/>'s wedge: its reach from the attacker, and its half-width of where it is aimed.</summary>
+    public static bool InWedge(Enemy enemy, AttackSpec attack, Vector3D<float> at)
+    {
+        var aim = Geometry.FlatDirection(enemy.AttackOrigin, enemy.AttackTarget, out _);
+        var to = Geometry.FlatDirection(enemy.Position, at, out float distance);
+        if (distance > attack.Reach + PlayerRadius)
+        {
+            return false;
+        }
+
+        if (distance < enemy.Kind.Radius + PlayerRadius)
+        {
+            return true;   // right up against it: the haft if not the blade
+        }
+
+        float angle = MathF.Acos(Math.Clamp(aim.X * to.X + aim.Z * to.Z, -1f, 1f));
+        return angle <= attack.HitWidth;
     }
 
     /// <summary>An attack's hit on the player: its damage, then its shove and stun. A blocked blow stops all three.</summary>
@@ -1166,10 +1323,13 @@ internal sealed class EnemyField
         return true;
     }
 
-    /// <summary>Turns toward what the attack is aimed at: the lane or the landing spot while they are shown, otherwise the player.</summary>
+    /// <summary>Whether an attack of <paramref name="type"/> is aimed along a locked line: a lunge's lane, a swing's or cleave's wedge, a rift.</summary>
+    public static bool Aimed(AttackType type) => type is AttackType.Lunge or AttackType.Swing or AttackType.Cleave or AttackType.LineSlam;
+
+    /// <summary>Turns toward what the attack is aimed at: the lane, the wedge or the landing spot while they are shown, otherwise the player.</summary>
     private static void FaceAttack(Enemy enemy, PlayerTarget player)
     {
-        var at = enemy.Attack!.Type is AttackType.Lunge or AttackType.LeapSlam ? enemy.AttackTarget : player.Feet;
+        var at = Aimed(enemy.Attack!.Type) || enemy.Attack.Type == AttackType.LeapSlam ? enemy.AttackTarget : player.Feet;
         var toward = Geometry.FlatDirection(enemy.Position, at, out float distance);
         if (distance > 1e-3f)
         {

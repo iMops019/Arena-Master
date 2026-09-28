@@ -40,6 +40,13 @@
   telegraph_disc.glb      a flat dark-red disc of radius 1, scaled up inside the ring as an attack winds up
   telegraph_lane.glb      a flat red lane 1.6 m wide and 7.2 m long from the origin along +Z (a lunge's path)
   shockwave_ring.glb      a thin flat ring of radius 1 (width 0.07), scaled as a shockwave spreads
+  telegraph_slice.glb, telegraph_slice_fill.glb
+                          a flat 10-degree slice of a disc of radius 1 along +Z, dark with a red rim, and bright: laid side by side
+                          to mark a swing's or cleave's wedge, the bright one filling it as the blow comes
+  telegraph_square.glb    a flat red-edged square 1 m across, laid in a row down a rift (the Marauder's line slam)
+  rage_mote.glb, rage_ring.glb
+                          a mote of red rage (radius 1, drawn tiny) and a ring of fire with flames on it, swirling round and pulsing
+                          under a boss roaring into a frenzy
   chest_placeholder.glb   a wooden treasure chest with gold bands, 1 m wide
   crate_placeholder.glb   a breakable wooden crate, 0.9 m, planked with dark edges and a cross-brace
   pickup_magnet.glb, pickup_apple.glb, pickup_roast.glb, pickup_silver.glb, pickup_bomb.glb, pickup_frenzy.glb
@@ -675,6 +682,66 @@ def build_lane():
     flat(-w, length - edge, w, length, "warn")
     for z in (1.8, 3.6, 5.4):
         flat(-w + edge, z, w - edge, z + edge, "warn")
+    return m
+
+
+def build_slice(colour, rim=None):
+    """A flat 10-degree slice of a disc of radius 1, along +Z (from 5 degrees one side of it to 5 the other), with a rim round its edge if <rim>."""
+    import math
+    m = Mesh()
+    up = (0, 1, 0)
+    steps = 3
+    for i in range(steps):
+        a0 = math.radians(85.0 + 10.0 * i / steps)
+        a1 = math.radians(85.0 + 10.0 * (i + 1) / steps)
+        base = len(m.positions)
+        uv = swatch_uv(colour)
+        for q in ((0.0, 0.0, 0.0), (math.cos(a1), 0.0, math.sin(a1)), (math.cos(a0), 0.0, math.sin(a0))):
+            m.positions.append(q)
+            m.normals.append(up)
+            m.uvs.append(uv)
+        m.indices += [base, base + 1, base + 2]
+        if rim:
+            p0 = (math.cos(a0) * 0.95, 0.001, math.sin(a0) * 0.95)
+            p1 = (math.cos(a0), 0.001, math.sin(a0))
+            p2 = (math.cos(a1), 0.001, math.sin(a1))
+            p3 = (math.cos(a1) * 0.95, 0.001, math.sin(a1) * 0.95)
+            m.quad(p0, p3, p2, p1, up, rim)
+    return m
+
+
+def build_square():
+    """A flat square 1 m across, centred on the origin: dark red, edged bright red."""
+    m = Mesh()
+    up = (0, 1, 0)
+
+    def flat(x0, z0, x1, z1, colour, y=0.0):
+        m.quad((x0, y, z1), (x1, y, z1), (x1, y, z0), (x0, y, z0), up, colour)
+
+    flat(-0.5, -0.5, 0.5, 0.5, "warn_dark")
+    e = 0.06
+    flat(-0.5, -0.5, -0.5 + e, 0.5, "warn", 0.001)
+    flat(0.5 - e, -0.5, 0.5, 0.5, "warn", 0.001)
+    flat(-0.5, -0.5, 0.5, -0.5 + e, "warn", 0.001)
+    flat(-0.5, 0.5 - e, 0.5, 0.5, "warn", 0.001)
+    return m
+
+
+def build_rage_mote():
+    """A mote of red rage, radius 1 (the game draws it tiny): a glowing red orb."""
+    m = Mesh()
+    _orb(m, 0.0, 0.0, 0.0, 1.0, "warn", "fire_light")
+    return m
+
+
+def build_rage_ring():
+    """The ring of fire under a boss roaring into a frenzy: radius 1, red flames standing on it."""
+    m = build_ring(0.74, 1.0, "warn")
+    import math
+    for i in range(12):
+        a = 2 * math.pi * i / 12
+        x, z = math.cos(a) * 0.87, math.sin(a) * 0.87
+        m.pyramid(x - 0.06, 0.0, z - 0.06, x + 0.06, 0.0, z + 0.06, (x, 0.22, z), "fire")
     return m
 
 
@@ -1479,6 +1546,8 @@ if __name__ == "__main__":
                         ("xp_gem_placeholder.glb", build_xp_gem),
                         ("telegraph_ring.glb", lambda: build_ring(0.9, 1.0, "warn")), ("telegraph_disc.glb", lambda: build_disc("warn_dark")),
                         ("telegraph_lane.glb", build_lane), ("shockwave_ring.glb", lambda: build_ring(0.965, 1.035, "shock")),
+                        ("telegraph_slice.glb", lambda: build_slice("warn_dark", rim="warn")), ("telegraph_slice_fill.glb", lambda: build_slice("warn")),
+                        ("telegraph_square.glb", build_square), ("rage_mote.glb", build_rage_mote), ("rage_ring.glb", build_rage_ring),
                         ("chest_placeholder.glb", build_chest), ("loot_beam.glb", build_beam), ("crate_placeholder.glb", build_crate),
                         ("pickup_magnet.glb", build_pickup_magnet), ("pickup_apple.glb", build_pickup_apple), ("pickup_roast.glb", build_pickup_roast),
                         ("pickup_silver.glb", build_pickup_silver), ("pickup_bomb.glb", build_pickup_bomb), ("pickup_frenzy.glb", build_pickup_frenzy),
