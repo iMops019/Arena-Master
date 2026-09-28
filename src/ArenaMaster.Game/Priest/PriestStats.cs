@@ -85,8 +85,15 @@ internal sealed class PriestStats
     public const float MouthBlock = 0.08f;
     public const float MouthReach = 0.5f;
 
-    /// <summary>Black Death: seconds more of Plague.</summary>
+    /// <summary>
+    /// Black Death: seconds more of Plague, and what everything the Priest does to a Plagued enemy is multiplied by. (Until 2026-09-27 it let Plague's ticks crit
+    /// instead: the user wants no crit on damage over time, nor on the Unholy tree.)
+    /// </summary>
     public const float BlackDeathDuration = 1f;
+    public const float BlackDeathDamage = 1.15f;
+
+    /// <summary>Creeping Death, the level-up: increased damage over time a rank.</summary>
+    public const float CreepingDeathDot = 0.12f;
 
     /// <summary>Legion: seconds more of life for every skull.</summary>
     public const float LegionLife = 1f;
@@ -126,10 +133,10 @@ internal sealed class PriestStats
 
     /// <summary>What one stack of Plague deals over its whole time.</summary>
     public float PlagueDamage =>
-        BasePlagueDamage * (1f + 0.20f * LevelOf(PriestUpgrade.Virulence) + ItemDamage + Tree.PlagueDamage + Items.DotDamage + PestilenceBonus) * Items.DamageMultiplier * Items.DotMultiplier;
+        BasePlagueDamage * (1f + 0.20f * LevelOf(PriestUpgrade.Virulence) + ItemDamage + Tree.PlagueDamage + OverTimeIncrease) * Items.DamageMultiplier * Items.DotMultiplier;
 
-    /// <summary>Pestilence's increased damage over time, or nothing without it.</summary>
-    private float PestilenceBonus => Tree.Pestilence ? PestilenceDot : 0f;
+    /// <summary>Increased damage over time (Plague, rot and the Aura): items and gear, Pestilence, and the Creeping Death level-up.</summary>
+    private float OverTimeIncrease => Items.DotDamage + (Tree.Pestilence ? PestilenceDot : 0f) + CreepingDeathDot * LevelOf(PriestUpgrade.CreepingDeath);
 
     /// <summary>How long a stack of Plague lasts.</summary>
     public float PlagueDuration =>
@@ -141,7 +148,7 @@ internal sealed class PriestStats
 
     /// <summary>What the rot on the ground (Death and Decay, Rotting Step, the Aura) is multiplied by.</summary>
     public float DecayScale =>
-        (1f + ItemDamage + Tree.DecayDamage + Items.DotDamage + PestilenceBonus + 0.20f * LevelOf(PriestUpgrade.DeepDecay)) * Items.DamageMultiplier * Items.DotMultiplier;
+        (1f + ItemDamage + Tree.DecayDamage + OverTimeIncrease + 0.20f * LevelOf(PriestUpgrade.DeepDecay)) * Items.DamageMultiplier * Items.DotMultiplier;
 
     /// <summary>Seconds between casts.</summary>
     public float CastInterval =>
@@ -161,9 +168,10 @@ internal sealed class PriestStats
 
     public float SeekRange => BaseSeekRange + Tree.SeekRange;
 
-    public float CritChance => BaseCritChance * MathF.Max(0f, 1f + 0.20f * LevelOf(PriestUpgrade.CruelEye) + Items.CritChance + Tree.CritChance);
+    /// <summary>The skull's crit chance (only the skull's hit can crit; the Plague and rot never do). Nothing of the Priest's own raises it: only generic items and gear.</summary>
+    public float CritChance => BaseCritChance * MathF.Max(0f, 1f + Items.CritChance + Tree.CritChance);
 
-    public float CritMultiplier => BaseCritMultiplier + 0.15f * LevelOf(PriestUpgrade.CruelEye) + Items.CritDamage + Tree.CritDamage;
+    public float CritMultiplier => BaseCritMultiplier + Items.CritDamage + Tree.CritDamage;
 
     /// <summary>What every Priest hit on an elite or a boss is multiplied by.</summary>
     public float EliteMultiplier => 1f + Tree.EliteDamage + 0.15f * LevelOf(PriestUpgrade.Deathbringer);

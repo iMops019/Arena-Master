@@ -81,7 +81,7 @@ internal static class UnholyTree
         Major(DeathAndDecay, "Death and Decay", 3, 225, G, new[] { "skullguard" },
             "Every block has a 25% chance to spew Death and Decay from the Skull Shield: a wide cone of rot in front of you that lies on the ground for 3 s, and everything in it rots (15 damage a second)."),
         Minor("lingering", "Lingering Sickness", 3, 400, P, 3, new[] { VirulentStrain, "festering" }, "Plague lasts {Plague duration} s longer.", (PlagueDuration, 0.4f)),
-        Minor("fever", "Fever", 3, 510, P, 5, new[] { "festering" }, "+{Plague damage}% Plague damage and +{Crit chance}% increased critical chance.", (PlagueDamage, 10), (CritChance, 8)),
+        Minor("fever", "Fever", 3, 510, P, 5, new[] { "festering" }, "+{Plague damage}% Plague damage and +{Rot damage}% rot damage.", (PlagueDamage, 10), (DecayDamage, 6)),
         Major(TwinSkulls, "Twin Skulls", 3, 640, S, new[] { "grinning", "hollowchant" }, "Every cast fires a second skull a moment after the first."),
         Minor("splinters", "Bone Splinters", 3, 760, S, 3, new[] { "grinning", "hollowchant" }, "Skulls pierce {Pierce} more enemies.", (Pierce, 1)),
         Minor("festerground", "Festering Ground", 3, 880, R, 5, new[] { "rotwalker" }, "+{Rot damage}% rot damage.", (DecayDamage, 12)),
@@ -100,7 +100,7 @@ internal static class UnholyTree
         Minor("shieldofskulls", "Shield of Skulls", 5, 235, G, 3, new[] { "spreadingrot" }, "+{Block chance}% block chance and +{Death and Decay chance}% Death and Decay chance.", (BlockChance, 3), (DecayChance, 4)),
         Minor("putrid", "Putrid", 5, 395, P, 5, new[] { Pestilence }, "+{Plague damage}% Plague damage and +{Damage to elites and bosses}% damage to elites and bosses.", (PlagueDamage, 12), (EliteDamage, 8)),
         Major(GnashingSkulls, "Gnashing Skulls", 5, 560, S, new[] { "swiftbones", "hungry" }, "A skull that kills gains 1 more pierce and 10% more damage, for every kill."),
-        Minor("marrowdrinker", "Marrow Drinker", 5, 690, S, 3, new[] { "hungry" }, "+{Skull damage}% skull damage and +{Crit damage}% critical damage.", (SkullDamage, 12), (CritDamage, 12)),
+        Minor("marrowdrinker", "Marrow Drinker", 5, 690, S, 3, new[] { "hungry" }, "+{Skull damage}% skull damage and +{Skull speed}% skull speed.", (SkullDamage, 12), (ProjectileSpeed, 10)),
         Minor("sprawl", "Sprawling Rot", 5, 860, R, 3, new[] { GraveSoil }, "Rot on the ground lasts {Rot duration} s longer and spreads {Rot area}% wider.", (DecayDuration, 0.5f), (DecayArea, 10)),
 
         // Tier 6 (level 21)
@@ -114,7 +114,7 @@ internal static class UnholyTree
         // Tier 7 (level 28): the capstones.
         Major(MouthOfTheGrave, "Mouth of the Grave", 7, 185, G, new[] { SoulHarvest, "deathless" },
             "+8% block chance. Every block spews Death and Decay (if you have it), and its cone reaches 50% further."),
-        Major(BlackDeath, "Black Death", 7, 450, P, new[] { Epidemic, "plaguelord" }, "Plague's ticks can be critical hits, and Plague lasts 1 s longer."),
+        Major(BlackDeath, "Black Death", 7, 450, P, new[] { Epidemic, "plaguelord" }, "Plague lasts 1 s longer, and Plagued enemies take 15% more damage from you."),
         Major(Legion, "Legion", 7, 640, S, new[] { "ossuary" }, "Every cast fires one more skull, and skulls last 1 s longer."),
         Major(Necropolis, "Necropolis", 7, 860, R, new[] { AuraOfDecay }, "Rot on the ground lasts twice as long, and every enemy it touches catches a stack of Plague each second."),
     }, new[] { 1, 3, 6, 10, 15, 21, 28 },

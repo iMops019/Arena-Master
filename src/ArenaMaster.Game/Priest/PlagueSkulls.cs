@@ -303,6 +303,11 @@ internal sealed class PlagueSkulls
             amount *= stats.EliteMultiplier;
         }
 
+        if (stats.Tree.BlackDeath && _infections.ContainsKey(enemy))
+        {
+            amount *= PriestStats.BlackDeathDamage;   // Plagued: 15% more from everything the Priest does
+        }
+
         bool killed = enemies.Damage(enemy, amount);
         hits.Add(new PriestHit(enemy, enemy.Position + new Vector3D<float>(0f, enemy.Kind.Height * 0.7f, 0f), amount, killed, crit, source));
         return killed;
@@ -473,7 +478,7 @@ internal sealed class PlagueSkulls
     }
 
     /// <summary>
-    /// The Plague on every enemy: each stack running down, and every tick the enemy takes its share of every stack's damage (able to crit, with Black Death). A
+    /// The Plague on every enemy: each stack running down, and every tick the enemy takes its share of every stack's damage (never a crit: damage over time doesn't crit). A
     /// Plagued enemy that died (from anything) is counted for Soul Harvest.
     /// </summary>
     private void TickPlague(float deltaSeconds, PriestStats stats, EnemyField enemies, List<PriestHit> hits)
@@ -502,9 +507,7 @@ internal sealed class PlagueSkulls
             while (infection.TickIn <= 0f && infection.Stacks.Count > 0 && enemy.IsAlive)
             {
                 infection.TickIn += PlagueTick;
-                bool crit = stats.Tree.BlackDeath && _random.NextDouble() < stats.CritChance;
-                float damage = perStackTick * infection.Stacks.Count * (crit ? stats.CritMultiplier : 1f);
-                Hurt(enemy, damage, crit, PriestSource.Plague, stats, enemies, hits);
+                Hurt(enemy, perStackTick * infection.Stacks.Count, crit: false, PriestSource.Plague, stats, enemies, hits);
             }
 
             infection.Stacks.RemoveAll(left => left <= 0f);

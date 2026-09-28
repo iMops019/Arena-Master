@@ -287,6 +287,69 @@ public class PlagueSkullTests
     }
 
     [Fact]
+    public void TheUnholyTree_HasNoCrit_AnywhereInIt()
+    {
+        foreach (var node in UnholyTree.Tree.Nodes)
+        {
+            var bonuses = UnholyBonuses.From(new Dictionary<string, int> { [node.Id] = node.MaxRanks });
+            Assert.Equal(0f, bonuses.CritChance);
+            Assert.Equal(0f, bonuses.CritDamage);
+            Assert.DoesNotContain("critical", node.Text, StringComparison.OrdinalIgnoreCase);
+        }
+
+        Assert.DoesNotContain(PriestUpgrades.All, u => u.Description.Contains("critical", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Plague_NeverCrits_EvenWithBlackDeath_WhateverTheCritChance()
+    {
+        var field = PriestTesting.QuietField();
+        var enemy = PriestTesting.Sturdy(field, 0f, 10f);
+        var skulls = new PlagueSkulls(new Random(1));
+        var stats = PriestTesting.With((UnholyTree.BlackDeath, 1));
+        stats.Items = new ItemBonuses { CritChance = 100f };   // every roll a crit, if one were rolled
+        skulls.Infect(enemy, stats);
+
+        var hits = PriestTesting.Run(skulls, stats, field, 1f);
+
+        var plague = hits.Where(h => h.Source == PriestSource.Plague).ToList();
+        Assert.NotEmpty(plague);
+        Assert.All(plague, h => Assert.False(h.Crit));
+    }
+
+    [Fact]
+    public void BlackDeath_PlaguedEnemiesTake15PercentMore_FromThePriest()
+    {
+        var field = PriestTesting.QuietField();
+        var plain = PriestTesting.Sturdy(field, 0f, 10f);
+        var marked = PriestTesting.Sturdy(field, 5f, 10f);
+        var skulls = new PlagueSkulls(new Random(1));
+        var stats = PriestTesting.With((UnholyTree.BlackDeath, 1));
+        skulls.Infect(marked, stats);
+        var hits = new List<PriestHit>();
+
+        skulls.Hurt(plain, 100f, false, PriestSource.Rot, stats, field, hits);
+        skulls.Hurt(marked, 100f, false, PriestSource.Rot, stats, field, hits);
+
+        Assert.Equal(100f, hits[0].Damage, 3);
+        Assert.Equal(115f, hits[1].Damage, 3);
+        Assert.Equal(PriestTesting.With().PlagueDuration + 1f, stats.PlagueDuration, 4);
+    }
+
+    [Fact]
+    public void CreepingDeath_RaisesDamageOverTime_NotTheSkull()
+    {
+        var plain = PriestTesting.With();
+        var creeping = PriestTesting.With();
+        creeping.Increase(PriestUpgrade.CreepingDeath);
+        creeping.Increase(PriestUpgrade.CreepingDeath);
+        Assert.Equal(plain.PlagueDamage * 1.24f, creeping.PlagueDamage, 2);
+        Assert.Equal(plain.DecayScale * 1.24f, creeping.DecayScale, 3);
+        Assert.Equal(plain.SkullDamage, creeping.SkullDamage, 3);
+        Assert.Equal(plain.CritChance, creeping.CritChance, 5);
+    }
+
+    [Fact]
     public void APlaguedEnemysDeath_IsCounted_AndThePlagueDiesWithIt()
     {
         var field = PriestTesting.QuietField();
