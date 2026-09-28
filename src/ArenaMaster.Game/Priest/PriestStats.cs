@@ -70,9 +70,9 @@ internal sealed class PriestStats
     /// <summary>Epidemic: how near the struck enemy the others are Plagued too.</summary>
     public const float EpidemicRadius = 2.5f;
 
-    /// <summary>Pestilence: how many it spreads to, and how far it looks.</summary>
-    public const int PestilenceCount = 3;
-    public const float PestilenceRange = 5f;
+    /// <summary>Pestilence: how much longer Plague lasts, and the increased damage over time (Plague, rot and the Aura). The user's, 2026-09-27; it spread Plague before.</summary>
+    public const float PestilenceDuration = 1.3f;
+    public const float PestilenceDot = 0.25f;
 
     /// <summary>Soul Harvest: the share of max health a Plagued kill heals.</summary>
     public const float SoulHarvestHeal = 0.01f;
@@ -126,18 +126,22 @@ internal sealed class PriestStats
 
     /// <summary>What one stack of Plague deals over its whole time.</summary>
     public float PlagueDamage =>
-        BasePlagueDamage * (1f + 0.20f * LevelOf(PriestUpgrade.Virulence) + ItemDamage + Tree.PlagueDamage + Items.DotDamage) * Items.DamageMultiplier * Items.DotMultiplier;
+        BasePlagueDamage * (1f + 0.20f * LevelOf(PriestUpgrade.Virulence) + ItemDamage + Tree.PlagueDamage + Items.DotDamage + PestilenceBonus) * Items.DamageMultiplier * Items.DotMultiplier;
+
+    /// <summary>Pestilence's increased damage over time, or nothing without it.</summary>
+    private float PestilenceBonus => Tree.Pestilence ? PestilenceDot : 0f;
 
     /// <summary>How long a stack of Plague lasts.</summary>
     public float PlagueDuration =>
-        BasePlagueDuration + 0.3f * LevelOf(PriestUpgrade.LongFever) + Tree.PlagueDuration + Items.Duration + (Tree.BlackDeath ? BlackDeathDuration : 0f);
+        BasePlagueDuration + 0.3f * LevelOf(PriestUpgrade.LongFever) + Tree.PlagueDuration + Items.Duration + (Tree.BlackDeath ? BlackDeathDuration : 0f)
+        + (Tree.Pestilence ? PestilenceDuration : 0f);
 
     /// <summary>The most stacks of Plague one enemy can carry.</summary>
     public int PlagueStacks => (Tree.VirulentStrain ? VirulentStacks : BasePlagueStacks) + (int)Tree.PlagueStacks + Items.PlagueStacks;
 
     /// <summary>What the rot on the ground (Death and Decay, Rotting Step, the Aura) is multiplied by.</summary>
     public float DecayScale =>
-        (1f + ItemDamage + Tree.DecayDamage + Items.DotDamage + 0.20f * LevelOf(PriestUpgrade.DeepDecay)) * Items.DamageMultiplier * Items.DotMultiplier;
+        (1f + ItemDamage + Tree.DecayDamage + Items.DotDamage + PestilenceBonus + 0.20f * LevelOf(PriestUpgrade.DeepDecay)) * Items.DamageMultiplier * Items.DotMultiplier;
 
     /// <summary>Seconds between casts.</summary>
     public float CastInterval =>

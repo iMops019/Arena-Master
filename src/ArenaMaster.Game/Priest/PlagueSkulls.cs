@@ -99,16 +99,6 @@ internal sealed class RotSpray
     public float Age { get; set; }
 }
 
-/// <summary>Plague leaping from a dead enemy to another (Pestilence), for the view.</summary>
-internal sealed class PlagueLeap
-{
-    public Vector3D<float> From { get; init; }
-
-    public Vector3D<float> To { get; init; }
-
-    public float Age { get; set; }
-}
-
 internal enum PriestSource
 {
     Skull,
@@ -147,9 +137,8 @@ internal sealed class PlagueSkulls
     public const float PlagueTick = 0.25f;
     public const float RotTick = 0.5f;
 
-    /// <summary>How long a spray and a leap show.</summary>
+    /// <summary>How long a spray shows.</summary>
     public const float SprayTime = 0.4f;
-    public const float LeapTime = 0.3f;
 
     /// <summary>The first cast of a run can go this soon.</summary>
     public const float FirstCast = 0.4f;
@@ -159,7 +148,6 @@ internal sealed class PlagueSkulls
     private readonly Dictionary<Enemy, Infection> _infections = new();
     private readonly List<RotPatch> _patches = new();
     private readonly List<RotSpray> _sprays = new();
-    private readonly List<PlagueLeap> _leaps = new();
     private readonly List<(float Delay, int Index, int Count)> _launches = new();
     private float _auraIn = RotTick;
 
@@ -172,8 +160,6 @@ internal sealed class PlagueSkulls
     public IReadOnlyList<RotPatch> Patches => _patches;
 
     public IReadOnlyList<RotSpray> Sprays => _sprays;
-
-    public IReadOnlyList<PlagueLeap> Leaps => _leaps;
 
     /// <summary>Seconds until the next cast may go (it waits, at 0, for an enemy in range).</summary>
     public float CastIn { get; private set; } = FirstCast;
@@ -235,12 +221,6 @@ internal sealed class PlagueSkulls
         }
 
         _sprays.RemoveAll(s => s.Age >= SprayTime);
-        foreach (var leap in _leaps)
-        {
-            leap.Age += deltaSeconds;
-        }
-
-        _leaps.RemoveAll(l => l.Age >= LeapTime);
     }
 
     /// <summary>A cast: its skulls lined up a moment apart.</summary>
@@ -335,7 +315,6 @@ internal sealed class PlagueSkulls
         _infections.Clear();
         _patches.Clear();
         _sprays.Clear();
-        _leaps.Clear();
         _launches.Clear();
         CastIn = FirstCast;
         Casts = 0;
@@ -495,7 +474,7 @@ internal sealed class PlagueSkulls
 
     /// <summary>
     /// The Plague on every enemy: each stack running down, and every tick the enemy takes its share of every stack's damage (able to crit, with Black Death). A
-    /// Plagued enemy that died (from anything) is counted for Soul Harvest and, with Pestilence, its Plague leaps to the nearest others.
+    /// Plagued enemy that died (from anything) is counted for Soul Harvest.
     /// </summary>
     private void TickPlague(float deltaSeconds, PriestStats stats, EnemyField enemies, List<PriestHit> hits)
     {
@@ -510,7 +489,7 @@ internal sealed class PlagueSkulls
             if (!enemy.IsAlive)
             {
                 _infections.Remove(enemy);
-                Died(enemy, infection.Stacks.Count, stats, enemies);
+                PlaguedDeaths++;
                 continue;
             }
 
@@ -532,38 +511,12 @@ internal sealed class PlagueSkulls
             if (!enemy.IsAlive)
             {
                 _infections.Remove(enemy);
-                Died(enemy, Math.Max(1, infection.Stacks.Count), stats, enemies);
+                PlaguedDeaths++;
             }
             else if (infection.Stacks.Count == 0)
             {
                 _infections.Remove(enemy);
             }
-        }
-    }
-
-    /// <summary>A Plagued enemy died: counted, and with Pestilence, its <paramref name="stacks"/> leap to the nearest enemies around it.</summary>
-    private void Died(Enemy enemy, int stacks, PriestStats stats, EnemyField enemies)
-    {
-        PlaguedDeaths++;
-        if (!stats.Tree.Pestilence || stacks <= 0)
-        {
-            return;
-        }
-
-        var next = enemies.Within(enemy.Position, PriestStats.PestilenceRange)
-            .Where(e => e != enemy && !e.Kind.IsProp)
-            .OrderBy(e => Vector3D.DistanceSquared(e.Position, enemy.Position))
-            .Take(PriestStats.PestilenceCount)
-            .ToList();
-        var from = enemy.Position + new Vector3D<float>(0f, enemy.Kind.Height * 0.6f, 0f);
-        foreach (var other in next)
-        {
-            for (int i = 0; i < stacks; i++)
-            {
-                Infect(other, stats);
-            }
-
-            _leaps.Add(new PlagueLeap { From = from, To = other.Position + new Vector3D<float>(0f, other.Kind.Height * 0.6f, 0f) });
         }
     }
 

@@ -90,7 +90,7 @@ internal static class UnholyTree
         Minor("gravecloth", "Gravecloth", 4, 100, G, 3, new[] { "gravehold" }, "+{Max health} max health and {Damage taken cut}% less damage taken.", (MaxHealth, 10), (DamageTakenCut, 4)),
         Minor("spreadingrot", "Spreading Rot", 4, 225, G, 3, new[] { DeathAndDecay }, "+{Death and Decay chance}% Death and Decay chance, and a block heals {Heal on block} health.", (DecayChance, 5), (BlockHeal, 1.5f)),
         Major(Pestilence, "Pestilence", 4, 400, P, new[] { "lingering", "fever" },
-            "When a Plagued enemy dies, its Plague spreads to the 3 nearest enemies within 5 m, every stack of it."),
+            "Plague lasts an additional 1.3 seconds. 25% increased damage over time."),
         Minor("swiftbones", "Swift Bones", 4, 580, S, 3, new[] { TwinSkulls, "splinters" }, "+{Skull speed}% skull speed, and skulls last {Skull duration} s longer.", (ProjectileSpeed, 12), (SkullLife, 0.3f)),
         Minor("hungry", "Hungry Skull", 4, 700, S, 3, new[] { "splinters" }, "Skulls sense enemies {Seek range} m further off.", (SeekRange, 2)),
         Major(GraveSoil, "Grave Soil", 4, 860, R, new[] { "festerground" }, "Rot on the ground clings: enemies in it are slowed by 30%."),

@@ -53,7 +53,6 @@ internal sealed class PriestView
     private readonly List<CrowdInstance> _ash = new();
     private readonly List<CrowdInstance> _pools = new();
     private readonly HashSet<RotSpray> _sprayed = new();
-    private readonly HashSet<PlagueLeap> _leapt = new();
     private float _time;
 
     /// <summary>
@@ -115,15 +114,6 @@ internal sealed class PriestView
             }
 
             _sprayed.RemoveWhere(s => !skulls.Sprays.Contains(s));
-            foreach (var leap in skulls.Leaps)
-            {
-                if (_leapt.Add(leap))
-                {
-                    Streak(leap.From, leap.To);
-                }
-            }
-
-            _leapt.RemoveWhere(l => !skulls.Leaps.Contains(l));
         }
 
         MoveMotes(deltaSeconds);
@@ -149,7 +139,6 @@ internal sealed class PriestView
     {
         _motes.Clear();
         _sprayed.Clear();
-        _leapt.Clear();
         foreach (var model in new[] { SkullModel, WispModel, PoolModel, MoteModel, AshModel })
         {
             window.SetCrowd(model, ReadOnlySpan<CrowdInstance>.Empty);
@@ -198,16 +187,6 @@ internal sealed class PriestView
             float speed = spray.Reach * (1.1f + 1.2f * (float)_random.NextDouble());
             var way = new Vector3D<float>(MathF.Sin(yaw), 0.15f + 0.2f * (float)_random.NextDouble(), MathF.Cos(yaw));
             Add(spray.Origin + new Vector3D<float>(0f, 0.9f, 0f), way * speed, 0.35f + 0.3f * (float)_random.NextDouble(), 0.16f, ash: i % 3 == 0);
-        }
-    }
-
-    /// <summary>Pestilence leaping: a line of motes from the dead to the living.</summary>
-    private void Streak(Vector3D<float> from, Vector3D<float> to)
-    {
-        for (int i = 0; i <= 14; i++)
-        {
-            var at = Vector3D.Lerp(from, to, i / 14f) + new Vector3D<float>(0f, MathF.Sin(i / 14f * MathF.PI) * 0.6f, 0f);
-            Add(at, Jitter(0.3f), 0.35f, 0.13f, ash: false);
         }
     }
 

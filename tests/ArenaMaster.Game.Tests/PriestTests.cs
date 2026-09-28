@@ -276,42 +276,31 @@ public class PlagueSkullTests
     }
 
     [Fact]
-    public void Pestilence_SpreadsEveryStack_ToTheNearestThree_WhenAPlaguedEnemyDies()
+    public void Pestilence_PlagueLasts1Point3SecondsLonger_And25PercentMoreDamageOverTime()
     {
-        var field = PriestTesting.QuietField();
-        var victim = PriestTesting.Sturdy(field, 0f, 10f);
-        var near = new[] { PriestTesting.Sturdy(field, 1.5f, 10f), PriestTesting.Sturdy(field, -1.5f, 10f), PriestTesting.Sturdy(field, 0f, 12f) };
-        var fourth = PriestTesting.Sturdy(field, 0f, 13.5f);
-        var far = PriestTesting.Sturdy(field, 8f, 10f);
-        var skulls = new PlagueSkulls(new Random(1));
-        var stats = PriestTesting.With((UnholyTree.Pestilence, 1));
-        skulls.Infect(victim, stats);
-        skulls.Infect(victim, stats);
-
-        field.Damage(victim, 1e6f);
-        PriestTesting.Run(skulls, stats, field, PriestTesting.Step);
-
-        Assert.All(near, e => Assert.Equal(2, skulls.StacksOn(e)));
-        Assert.Equal(0, skulls.StacksOn(fourth));
-        Assert.Equal(0, skulls.StacksOn(far));
-        Assert.Equal(3, skulls.Leaps.Count);
-        Assert.Equal(1, skulls.PlaguedDeaths);
+        var plain = PriestTesting.With();
+        var pestilence = PriestTesting.With((UnholyTree.Pestilence, 1));
+        Assert.Equal(plain.PlagueDuration + 1.3f, pestilence.PlagueDuration, 4);
+        Assert.Equal(plain.PlagueDamage * 1.25f, pestilence.PlagueDamage, 2);
+        Assert.Equal(plain.DecayScale * 1.25f, pestilence.DecayScale, 3);   // rot and the Aura too
+        Assert.Equal(plain.SkullDamage, pestilence.SkullDamage, 3);         // not the skull's hit
     }
 
     [Fact]
-    public void WithoutPestilence_ThePlagueDiesWithIt()
+    public void APlaguedEnemysDeath_IsCounted_AndThePlagueDiesWithIt()
     {
         var field = PriestTesting.QuietField();
         var victim = PriestTesting.Sturdy(field, 0f, 10f);
         var near = PriestTesting.Sturdy(field, 1.5f, 10f);
         var skulls = new PlagueSkulls(new Random(1));
-        var stats = PriestTesting.With();
+        var stats = PriestTesting.With((UnholyTree.Pestilence, 1));
         skulls.Infect(victim, stats);
 
         field.Damage(victim, 1e6f);
         PriestTesting.Run(skulls, stats, field, PriestTesting.Step);
 
-        Assert.Equal(0, skulls.StacksOn(near));
+        Assert.Equal(0, skulls.StacksOn(near));   // Pestilence no longer spreads it
+        Assert.Equal(1, skulls.PlaguedDeaths);
     }
 
     [Fact]

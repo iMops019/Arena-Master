@@ -208,7 +208,7 @@ The user's brief (2026-09-26): a Priest whose first tree is **Unholy**, with a d
   - *Virulent Strain* (tier 2, Plague): Plague stacks to 5, not 3.
   - *Death and Decay* (tier 3, Grave Ward; the user's): every block has a 25% chance to spew a 110-degree cone of rot, 6 m long, from the Skull Shield; it lies for 3 s and everything in it rots for 15 damage a second. Its chance grows with Spreading Rot and Shield of Skulls (tree), Spreading Rot (level-up) and the Bone Charm.
   - *Twin Skulls* (tier 3, Skulls): every cast fires a second skull a moment after the first.
-  - *Pestilence* (tier 4, Plague; the user's name): when a Plagued enemy dies, its Plague leaps to the 3 nearest enemies within 5 m, every stack of it (a green streak shows each leap).
+  - *Pestilence* (tier 4, Plague; the user's name and, since 2026-09-27, the user's effect): Plague lasts an additional 1.3 seconds, and 25% increased damage over time (Plague, rot and the Aura; added to the other increases, like the damage over time stat). Until 2026-09-27 it spread a dying enemy's Plague, every stack of it, to the 3 nearest enemies within 5 m.
   - *Grave Soil* (tier 4, Rot): rot on the ground slows what is in it by 30%.
   - *Bone Armour* (tier 5, Grave Ward): every block raises a bone barrier of 8% of max health (25% at most at once).
   - *Gnashing Skulls* (tier 5, Skulls): a skull that kills gains a pierce and 10% damage, every kill.
