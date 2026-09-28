@@ -449,7 +449,7 @@ public class PlagueSkullTests
 
         Assert.True(enemy.IsChilled);
         Assert.True(skulls.StacksOn(enemy) > 0);
-        Assert.Equal(stats.DecayTime(PriestStats.StepRotSeconds), 2f * PriestStats.StepRotSeconds, 3);   // Necropolis: twice as long
+        Assert.Equal(2f * PriestStats.StepRotSeconds, stats.DecayTime(PriestStats.StepRotSeconds), 3);   // Necropolis: twice as long
     }
 
     [Fact]
