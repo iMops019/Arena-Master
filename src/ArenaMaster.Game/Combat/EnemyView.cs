@@ -262,7 +262,7 @@ internal sealed class EnemyView
     {
         var position = enemy.Position;
         bool fodder = enemy.Kind.Tier == EnemyTier.Fodder;
-        float scale = (1f + 0.08f * enemy.HitFlash * (fodder ? 1f : 0.3f)) * enemy.Rarity.Size;
+        float scale = (1f + 0.08f * enemy.HitFlash * (fodder ? 1f : 0.3f)) * enemy.Rarity.Size * enemy.Kind.DrawScale;
         float pitch = -0.2f * enemy.HitFlash * (fodder ? 1f : 0.2f);
         float flash = MathF.Max(Brighten, enemy.IsFrozen ? MathF.Max(0.55f, enemy.HitFlash) : enemy.HitFlash);
         if (!enemy.IsAlive)

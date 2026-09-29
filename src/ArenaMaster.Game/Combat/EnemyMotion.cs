@@ -124,7 +124,7 @@ internal sealed class EnemyMotion
 
         if (state.Walking)
         {
-            state.Stride = Wrap(state.Stride + moved, clips.GetValueOrDefault(WalkClip));
+            state.Stride = Wrap(state.Stride + moved / enemy.Kind.DrawScale, clips.GetValueOrDefault(WalkClip));   // a model drawn bigger takes bigger strides
             return (WalkClip, state.Stride);
         }
 

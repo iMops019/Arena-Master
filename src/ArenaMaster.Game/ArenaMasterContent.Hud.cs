@@ -117,6 +117,11 @@ public sealed partial class ArenaMasterContent
                 new Vector4D<float>(0.75f, 0.15f, 0.2f, 0.95f), Shade);
         }
 
+        if (_window is { } stirWindow)
+        {
+            DrawStirringHud(hud, stirWindow.PlayerFeet);   // a mini boss stirring (where, when, how far), or awake (its health)
+        }
+
         // Health, bottom left, flashing red when hit.
         float health = _health.Current / _health.Max;
         var healthColor = Vector4D.Lerp(new Vector4D<float>(0.78f, 0.2f, 0.22f, 0.95f), new Vector4D<float>(1f, 0.55f, 0.55f, 1f), _health.HurtFlash);

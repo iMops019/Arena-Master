@@ -1608,6 +1608,166 @@ def fiend_poses(s, gait):
 FIEND = EnemyModel("fiend.glb", FIEND_RIG, FIEND_GAIT, lambda rig: build_fiend(rig, FIEND_SCALE), fiend_poses(FIEND_SCALE, FIEND_GAIT),
                    held=(("fiend_crossbow.glb", lambda rig: build_fiend_crossbow(rig, FIEND_SCALE)),), scaled=("grenade",))
 
+# =========================================================================================================================================================
+# The cave's mini bosses (the user's call, 2026-09-29: custom ones for the "it stirs, get there" event, lighter than a boss hunt's). Each is a new body on one of
+# the fodder's skeletons, using that skeleton's clips and a new one or two of its own; the game draws them bigger (EnemyKind.DrawScale), so the clips scale with
+# them. The Gorewatcher (the brute's build): a bloated butcher of a ghoul, a leather apron, meat hooks at its belt, a great cleaver. The Bone Weaver (the mage's):
+# a robe hung with ribs and knucklebones, a crown of antlers, a violet flame. The Gutter Hound (the beast's): a huge mangy hound in a spiked iron collar and
+# a trailing chain, bone plates along its back, eyes burning green.
+
+def build_gorewatcher(rig):
+    m = Mesh()
+    j = rig.index
+    for side in ("l", "r"):
+        limbs(m, j, side, [("foot", 0.12, 0.42, 0.0, -0.18, 0.18, 0.26, "brute_hide"),
+                           ("shin", 0.14, 0.40, 0.14, -0.15, 0.6, 0.15, "ghoul_skin"),
+                           ("thigh", 0.13, 0.43, 0.52, -0.19, 1.02, 0.19, "ghoul_skin"),
+                           ("upper_arm", 0.62, 0.9, 1.42, -0.17, 1.98, 0.17, "ghoul_skin"),
+                           ("forearm", 0.63, 0.89, 0.98, -0.16, 1.5, 0.16, "ghoul_skin"),
+                           ("hand", 0.61, 0.89, 0.8, -0.15, 1.02, 0.15, "brute_skin")])
+        sx = -1.0 if side == "l" else 1.0
+        m.joint = j[f"upper_arm_{side}"]                                       # bone plates on the shoulders
+        x0, x1 = sorted((sx * 0.56, sx * 0.96))
+        m.box(x0, 1.74, -0.24, x1, 2.06, 0.24, "bone")
+        m.pyramid(sx * 0.7, 2.06, -0.08, sx * 0.84, 2.06, 0.08, (sx * 0.8, 2.36, -0.05), "bone")
+    m.joint = j["hips"]
+    m.box(-0.52, 0.8, -0.3, 0.52, 1.14, 0.34, "ghoul_skin")
+    m.box(-0.54, 0.98, -0.32, 0.54, 1.08, 0.36, "leather")                    # the belt, meat hooks hanging from it
+    for x in (-0.4, -0.15, 0.3):
+        m.box(x - 0.015, 0.8, 0.36, x + 0.015, 0.98, 0.39, "iron")
+        m.box(x - 0.015, 0.78, 0.36, x + 0.06, 0.81, 0.39, "iron")
+    m.joint = j["chest"]
+    m.box(-0.58, 1.02, -0.3, 0.58, 1.66, 0.46, "ghoul_skin")                   # the bloated gut
+    m.box(-0.66, 1.55, -0.28, 0.66, 2.05, 0.34, "ghoul_skin")
+    m.box(-0.42, 0.62, 0.46, 0.42, 1.8, 0.5, "leather")                        # the apron, stained
+    m.box(-0.2, 0.9, 0.5, 0.05, 1.2, 0.51, "target_red")
+    m.box(0.1, 1.35, 0.5, 0.3, 1.5, 0.51, "target_red")
+    for y in (1.5, 1.75):                                                     # stitches across the gut
+        m.box(-0.5, y, 0.46, 0.5, y + 0.03, 0.47, "bone")
+    m.joint = j["head"]
+    m.box(-0.22, 1.9, -0.14, 0.22, 2.28, 0.24, "ghoul_skin")
+    m.box(-0.16, 2.1, 0.24, -0.06, 2.16, 0.245, "ghost_eye")                   # burning green eyes
+    m.box(0.06, 2.1, 0.24, 0.16, 2.16, 0.245, "ghost_eye")
+    m.box(-0.18, 1.9, 0.2, 0.18, 2.0, 0.3, "bone")                             # a jaw of teeth
+    m.box(-0.24, 2.24, -0.16, 0.24, 2.32, 0.26, "leather")                     # a butcher's cap
+    # The cleaver, up from the right fist: a long haft and a broad blade
+    m.joint = j["hand_r"]
+    m.box(0.71, 0.84, -0.05, 0.79, 1.7, 0.05, "wood")
+    m.box(0.73, 1.45, -0.02, 0.77, 2.3, 0.62, "steel")
+    m.box(0.72, 2.2, 0.0, 0.78, 2.32, 0.64, "plate_dark")
+    m.box(0.72, 1.6, 0.4, 0.78, 1.9, 0.52, "target_red")
+    return m
+
+
+def brute_slam(pose, u):
+    """The Gorewatcher's ground slam: the cleaver hoisted overhead in both hands, then driven into the ground in front, crouched over it, and up again."""
+    r.stand_legs(pose, 0.0, 0.0, width=0.4, crouch=keyed(u, 0.08, 0.02, 0.4, settle=0.3))
+    hunch(pose, keyed(u, 24.0, -10.0, 58.0, settle=40.0), head=keyed(u, -16.0, -30.0, -40.0))
+    club = keyed(u, (0.8, 1.05, 0.45), (0.3, 2.6, -0.1), (0.3, 0.7, 1.2), settle=(0.5, 0.8, 1.0))
+    left = keyed(u, (-0.8, 1.0, 0.3), (-0.2, 2.5, -0.1), (-0.1, 0.8, 1.1))
+    _brute_arms(pose, club, keyed(u, 70.0, -40.0, 150.0, settle=120.0), left)
+
+
+GOREWATCHER = EnemyModel("gorewatcher.glb", BRUTE_RIG, BRUTE_GAIT, build_gorewatcher,
+                         {"Idle": (IDLE_SECONDS, brute_idle), "Walk": (BRUTE_GAIT.cycle, brute_walk), "Die": (DIE_SECONDS, brute_die),
+                          "Lunge": (1.0, brute_lunge), "LeapSlam": (1.0, brute_leap), "Shockwave": (1.0, brute_slam)})
+
+
+def build_bone_weaver(rig):
+    m = Mesh()
+    j = rig.index
+    for side in ("l", "r"):
+        limbs(m, j, side, [("foot", 0.05, 0.17, 0.0, -0.06, 0.09, 0.14, "ghoul_skin"),
+                           ("shin", 0.05, 0.17, 0.08, -0.06, 0.4, 0.06, "king_robe"),
+                           ("thigh", 0.045, 0.175, 0.34, -0.065, 0.68, 0.065, "king_robe"),
+                           ("upper_arm", 0.19, 0.31, 0.88, -0.06, 1.18, 0.06, "king_robe"),
+                           ("forearm", 0.19, 0.31, 0.62, -0.07, 0.92, 0.07, "king_robe"),
+                           ("hand", 0.2, 0.3, 0.52, -0.05, 0.64, 0.05, "bone")])
+    m.joint = j["hips"]
+    m.box(-0.22, 0.56, -0.15, 0.22, 0.8, 0.16, "king_robe")
+    for x in (-0.18, -0.06, 0.06, 0.18):                                      # knucklebones hung from the cord
+        m.box(x - 0.02, 0.6, 0.16, x + 0.02, 0.74, 0.19, "bone")
+    m.joint = j["robe_front"]
+    m.box(-0.26, 0.0, 0.14, 0.26, 0.72, 0.19, "king_robe")
+    for y in (0.15, 0.35, 0.55):
+        m.box(-0.2, y, 0.19, 0.2, y + 0.03, 0.2, "bone")
+    m.joint = j["robe_back"]
+    m.box(-0.26, 0.0, -0.19, 0.26, 0.72, -0.14, "king_robe")
+    m.joint = j["chest"]
+    m.box(-0.22, 0.76, -0.14, 0.22, 1.2, 0.15, "king_robe")
+    for k in range(4):                                                        # a cage of ribs over the chest
+        y = 0.86 + k * 0.08
+        m.box(-0.2, y, 0.15, 0.2, y + 0.025, 0.18, "bone")
+    m.box(-0.02, 0.84, 0.15, 0.02, 1.16, 0.19, "bone")
+    m.box(-0.3, 1.1, -0.16, 0.3, 1.22, 0.16, "bone")                           # a mantle of bones over the shoulders
+    m.joint = j["head"]
+    m.box(-0.12, 1.2, -0.1, 0.12, 1.46, 0.14, "bone")                          # a skull for a face
+    m.box(-0.09, 1.33, 0.14, -0.03, 1.38, 0.145, "crystal_light")
+    m.box(0.03, 1.33, 0.14, 0.09, 1.38, 0.145, "crystal_light")
+    m.box(-0.16, 1.18, -0.18, 0.16, 1.5, -0.1, "king_robe")                   # the hood
+    m.box(-0.165, 1.18, -0.1, -0.13, 1.46, 0.1, "king_robe")
+    m.box(0.13, 1.18, -0.1, 0.165, 1.46, 0.1, "king_robe")
+    for sx in (-1.0, 1.0):                                                    # the antlers, branching
+        x0, x1 = sorted((sx * 0.08, sx * 0.14))
+        m.pyramid(x0, 1.46, -0.04, x1, 1.46, 0.04, (sx * 0.36, 1.86, -0.08), "horn")
+        m.pyramid(sx * 0.2 - 0.02, 1.62, -0.06, sx * 0.2 + 0.02, 1.62, -0.02, (sx * 0.16, 1.9, 0.02), "horn")
+        m.pyramid(sx * 0.28 - 0.02, 1.72, -0.08, sx * 0.28 + 0.02, 1.72, -0.04, (sx * 0.42, 1.98, -0.1), "horn")
+    return m
+
+
+def build_bone_weaver_flame(rig):
+    """The Weaver's flame: violet, on its own joint between the hands."""
+    m = Mesh()
+    m.joint = rig.index["flame"]
+    x, y, z = rig.bind["flame"]
+    _orb(m, x, y, z, 0.16, "crystal", "crystal_light")
+    return m
+
+
+def mage_call(pose, u):
+    """Arms flung up over the head, the flame swelling high between them, calling down or calling up; then lowered, the flame back in the hands."""
+    r.stand_legs(pose, 0.0, 0.0, width=0.16, crouch=keyed(u, 0.03, 0.0, 0.06))
+    hunch(pose, keyed(u, 14.0, -14.0, -4.0, settle=6.0), head=keyed(u, -6.0, -40.0, -20.0))
+    skirt_flaps(pose, "robe_front", "robe_back", margin=keyed(u, 1.0, 3.0, 8.0))
+    centre = keyed(u, (0.0, 0.98, 0.32), (0.0, 1.95, 0.1), (0.0, 1.9, 0.3), settle=(0.0, 1.3, 0.35))
+    name, k = stage(u)
+    size = {"windup": 1.0 + 1.2 * r.ease(k), "active": 2.2, "recover": 2.2 - 1.2 * r.ease(k)}[name]
+    return _cup_flame(pose, centre, size, math.sin(2 * math.pi * u * 7.0))
+
+
+BONE_WEAVER = EnemyModel("bone_weaver.glb", MAGE_RIG, MAGE_GAIT, build_bone_weaver,
+                         {"Idle": (IDLE_SECONDS, ghoul_mage_idle), "Walk": (MAGE_GAIT.cycle, ghoul_mage_walk),
+                          "Die": (DIE_SECONDS, lambda pose, u: ghoul_mage_die(pose, u)), "Shoot": (1.0, ghoul_mage_shoot),
+                          "Barrage": (1.0, mage_call), "Summon": (1.0, mage_call)},
+                         held=(("bone_weaver_flame.glb", build_bone_weaver_flame),), scaled=("flame",))
+
+
+def build_gutter_hound(rig):
+    m = Mesh()
+    j = rig.index
+    _beast_body(m, j, saddled=False)
+    m.joint = j["hips"]
+    for z in (-0.5, -0.2, 0.1, 0.4):                                          # bone plates along its back
+        m.box(-0.22, 1.36, z - 0.1, 0.22, 1.44, z + 0.1, "bone")
+    m.joint = j["neck"]                                                       # a spiked iron collar
+    m.box(-0.22, 1.1, 0.64, 0.22, 1.44, 0.74, "iron")
+    for sx in (-1.0, 1.0):
+        m.pyramid(sx * 0.22 - 0.03, 1.24, 0.66, sx * 0.22 + 0.03, 1.3, 0.72, (sx * 0.36, 1.27, 0.69), "steel")
+    m.pyramid(-0.03, 1.44, 0.66, 0.03, 1.44, 0.72, (0.0, 1.58, 0.69), "steel")
+    for k in range(4):                                                        # the broken chain hanging from it
+        y = 1.02 - k * 0.13
+        m.box(-0.03, y, 0.7 + k * 0.03, 0.03, y + 0.1, 0.74 + k * 0.03, "iron")
+    m.joint = j["beast_head"]
+    m.box(-0.175, 1.46, 1.36, -0.065, 1.54, 1.37, "ghost_eye")                 # green fire in its eyes
+    m.box(0.065, 1.46, 1.36, 0.175, 1.54, 1.37, "ghost_eye")
+    return m
+
+
+GUTTER_HOUND = EnemyModel("gutter_hound.glb", BEAST_RIG, BEAST_GAIT, build_gutter_hound,
+                          {"Idle": (IDLE_SECONDS, beast_idle), "Walk": (BEAST_GAIT.cycle, beast_walk), "Die": (DIE_SECONDS, beast_die),
+                           "Lunge": (1.0, beast_pounce), "LeapSlam": (1.0, beast_pounce)})
+
 ENEMIES = {"ghoul": GHOUL, "crossbow_ghoul": CROSSBOW_GHOUL, "ghoul_mage": GHOUL_MAGE, "beast_rider": BEAST_RIDER, "ghoul_beast": GHOUL_BEAST, "ghoul_tactician": GHOUL_TACTICIAN,
            "brute": BRUTE, "hollow_king": HOLLOW_KING, "hollow_king_unbound": HOLLOW_KING_UNBOUND,
-           "marauder_unbound": MARAUDER_UNBOUND, "fiend": FIEND}
+           "marauder_unbound": MARAUDER_UNBOUND, "fiend": FIEND,
+           "gorewatcher": GOREWATCHER, "bone_weaver": BONE_WEAVER, "gutter_hound": GUTTER_HOUND}

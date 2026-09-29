@@ -191,6 +191,7 @@ public sealed partial class ArenaMasterContent : IGameContent
     public void DrawOverlay(EngineWindow window)
     {
         DrawScreens(window);
+        DrawStirringArrow(window);
         switch (_fade.Advance(ImGui.GetIO().DeltaTime))
         {
             case ScreenFade.Step.Dark:

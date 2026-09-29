@@ -12,12 +12,13 @@ public class EnemyModelTests
     {
         EnemyKind.Ghoul.Name, EnemyKind.CrossbowGhoul.Name, EnemyKind.GhoulMage.Name, EnemyKind.BeastRider.Name, EnemyKind.GhoulBeast.Name, EnemyKind.GhoulTactician.Name,
         EnemyKind.Brute.Name, EnemyKind.HollowKing.Name, DelveBosses.HollowKingUnbound.Name, DelveBosses.MarauderUnbound.Name, DelveBosses.Fiend.Name,
+        MiniBosses.Gorewatcher.Name, MiniBosses.BoneWeaver.Name, MiniBosses.GutterHound.Name,
     };
 
     private static readonly EnemyKind[] All =
     {
         EnemyKind.Ghoul, EnemyKind.CrossbowGhoul, EnemyKind.GhoulMage, EnemyKind.BeastRider, EnemyKind.GhoulBeast, EnemyKind.GhoulTactician, EnemyKind.Brute, EnemyKind.HollowKing,
-        DelveBosses.HollowKingUnbound, DelveBosses.MarauderUnbound, DelveBosses.Fiend,
+        DelveBosses.HollowKingUnbound, DelveBosses.MarauderUnbound, DelveBosses.Fiend, MiniBosses.Gorewatcher, MiniBosses.BoneWeaver, MiniBosses.GutterHound,
     };
 
     private static EnemyKind Kind(string name) => All.Single(k => k.Name == name);

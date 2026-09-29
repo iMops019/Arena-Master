@@ -14,6 +14,9 @@
   cave_fungus.glb       a cluster of glowing teal mushrooms on pale stems, about 0.6 m across (drawn glowing)
   cave_bat_up.glb, cave_bat_down.glb
                         a bat, wings up and wings down (drawn in turn as it flaps), about 0.7 m across
+  stirring_sigil.glb, stirring_column.glb
+                        where a mini boss stirs: a sigil on the ground (a red ring of radius 1 with spokes and runes, scaled up) and a thin column of red light
+                        rising 30 m from it, both drawn glowing and pulsing
   cave_wisp.glb, cave_wisp_violet.glb
                         a wisp: a small bright orb in a paler halo, green and violet (drawn glowing, drifting through the chambers)
   camp_descent.glb      the way down at camp, where the gate was: a stair cut going down between stone walls to the tunnel's mouth, set in the palisade
@@ -303,9 +306,43 @@ def build_cave_wisp_violet():
     return _wisp("crystal_light", "crystal")
 
 
+def build_stirring_sigil():
+    """Where a mini boss stirs: a red ring of radius 1 on the ground, an inner ring, six spokes and a rune at the end of each."""
+    m = Mesh()
+    up = (0.0, 1.0, 0.0)
+
+    def ring(inner, outer, colour, sides=36):
+        for i in range(sides):
+            a0, a1 = math.tau * i / sides, math.tau * (i + 1) / sides
+            m.facing([(math.cos(a0) * inner, 0.0, math.sin(a0) * inner), (math.cos(a0) * outer, 0.0, math.sin(a0) * outer),
+                      (math.cos(a1) * outer, 0.0, math.sin(a1) * outer), (math.cos(a1) * inner, 0.0, math.sin(a1) * inner)], up, colour)
+
+    ring(0.9, 1.0, "warn")
+    ring(0.5, 0.56, "warn")
+    for k in range(6):
+        a = math.tau * k / 6
+        cx, cz, sx, sz = math.cos(a), math.sin(a), -math.sin(a), math.cos(a)
+        w = 0.025
+        m.facing([(cx * 0.56 + sx * w, 0.0, cz * 0.56 + sz * w), (cx * 0.9 + sx * w, 0.0, cz * 0.9 + sz * w),
+                  (cx * 0.9 - sx * w, 0.0, cz * 0.9 - sz * w), (cx * 0.56 - sx * w, 0.0, cz * 0.56 - sz * w)], up, "warn")
+        rx, rz = cx * 0.74, cz * 0.74                                            # a rune: a small diamond astride the spoke
+        m.facing([(rx + cx * 0.08, 0.0, rz + cz * 0.08), (rx + sx * 0.06, 0.0, rz + sz * 0.06), (rx - cx * 0.08, 0.0, rz - cz * 0.08),
+                  (rx - sx * 0.06, 0.0, rz - sz * 0.06)], up, "fire_light")
+    return m
+
+
+def build_stirring_column():
+    """A thin column of red light rising 30 m, a little wider at its foot."""
+    m = Mesh()
+    m.prism(0.0, 0.0, 0.35, 0.0, 2.0, "warn", sides=8)
+    m.prism(0.0, 0.0, 0.18, 2.0, 30.0, "warn", sides=8)
+    return m
+
+
 CAVE_MODELS = (("cave_ceiling.glb", build_cave_ceiling), ("cave_stalagmite.glb", build_cave_stalagmite), ("cave_crystals.glb", build_cave_crystals),
                ("cave_bones.glb", build_cave_bones), ("cave_lantern.glb", build_cave_lantern),
                ("cave_lantern_fire.glb", build_cave_lantern_fire), ("cave_tunnel.glb", build_cave_tunnel),
                ("camp_descent.glb", build_descent), ("cave_pool.glb", build_cave_pool), ("cave_ripple.glb", build_cave_ripple),
                ("cave_drop.glb", build_cave_drop), ("cave_fungus.glb", build_cave_fungus), ("cave_bat_up.glb", build_cave_bat_up),
-               ("cave_bat_down.glb", build_cave_bat_down), ("cave_wisp.glb", build_cave_wisp), ("cave_wisp_violet.glb", build_cave_wisp_violet))
+               ("cave_bat_down.glb", build_cave_bat_down), ("cave_wisp.glb", build_cave_wisp), ("cave_wisp_violet.glb", build_cave_wisp_violet),
+               ("stirring_sigil.glb", build_stirring_sigil), ("stirring_column.glb", build_stirring_column))

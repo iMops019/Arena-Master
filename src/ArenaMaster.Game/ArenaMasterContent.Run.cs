@@ -87,6 +87,7 @@ public sealed partial class ArenaMasterContent
         _plan = plan;
         RememberCampLook(window);
         EnterCave(window);   // every run is played underground
+        BeginStirring();
         _hero.UseTree(_tree.Save.Ranks);
         _items.Begin(Loadout.ItemsToBring(_profile));   // the loadout as it stands now: finds made on this run won't join it
         WearGear();
@@ -165,6 +166,7 @@ public sealed partial class ArenaMasterContent
         }
 
         _rush.Apply(_enemies);
+        UpdateStirring(window, deltaSeconds);
 
         // The class attacks; the enemies move and strike (against the block chance and damage cut as they stand this frame); the class answers their blows.
         bool standingStill = window.PlayerMoveDirection == Vector3D<float>.Zero && _hero.DashVelocity == Vector3D<float>.Zero && _condition.Knockback == Vector3D<float>.Zero;
@@ -289,6 +291,7 @@ public sealed partial class ArenaMasterContent
         _itemEffectsView.Clear(window);
         ClearCrates(window);
         RemoveCache(window);
+        ClearStirringMarker(window);
         _delveDirector = null;
         _enemies.HitEffects = HitEffects.None;
         _enemies.HealthBonus = 0f;
@@ -316,6 +319,13 @@ public sealed partial class ArenaMasterContent
         _health.Heal(_items.Carried.Bonuses.HealOnKill);
         _hero.OnKill(killed, _runSeconds);
         _itemEffects.OnKill(_items.Carried.Bonuses);
+        if (MiniBosses.Is(killed.Kind))
+        {
+            _elitesKilled++;
+            OnMiniBossKilled(killed);   // its own reward, in place of an elite's chest
+            return;
+        }
+
         if (_loot.RollRarityDrop(killed.Rarity))
         {
             // A Rare's chest has the world's odds, a Legendary's an elite's; it takes the place of any drop its kind would have had.

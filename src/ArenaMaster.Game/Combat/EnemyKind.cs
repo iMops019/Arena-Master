@@ -230,6 +230,12 @@ internal sealed record EnemyKind(
 
     public float ShotForward { get; init; } = EnemyField.ShotForward;
 
+    /// <summary>
+    /// How much bigger than its model it is drawn (its clips with it): the cave's mini bosses are new bodies on the fodder's skeletons, drawn big. Its
+    /// <see cref="Radius"/> and <see cref="Height"/> are its size as drawn.
+    /// </summary>
+    public float DrawScale { get; init; } = 1f;
+
     /// <summary>How high above its feet a bomb it lobs leaves its hand.</summary>
     public float LobHeight { get; init; } = EnemyField.LobHeight;
 
@@ -454,7 +460,7 @@ internal sealed record EnemyKind(
     public static readonly IReadOnlyList<EnemyKind> Foes = new[]
     {
         Ghoul, CrossbowGhoul, GhoulMage, BeastRider, GhoulTactician, GhoulBeast, Brute, HollowKing, DelveBosses.HollowKingUnbound, DelveBosses.MarauderUnbound,
-        DelveBosses.Fiend,
+        DelveBosses.Fiend, MiniBosses.Gorewatcher, MiniBosses.BoneWeaver, MiniBosses.GutterHound,
     };
 }
 
