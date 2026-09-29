@@ -215,7 +215,7 @@ internal static class BossHunt
 
     /// <summary>
     /// The Fiend, a tier up again (the user's, 2026-09-28): 108,000 health, hitting 40% harder, from level 26 (five more picks than the Marauder). A 45% chance of
-    /// gear a kill, and more silver and marks. Fought by night (the Night Hollows' sky).
+    /// gear a kill, and more silver and marks. Fought under the Glimmering Dark's blue mist and wisps.
     /// </summary>
     public static readonly HuntBoss Fiend = new("fiend", Combat.DelveBosses.Fiend, new(3f, 1.4f, 1f), StartLevel: 26,
         GearChance: 0.45f, ItemChance: 0.10f, Silver: 350, Marks: 3, LookDepth: 15,

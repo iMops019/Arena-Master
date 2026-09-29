@@ -90,10 +90,11 @@ public sealed partial class ArenaMasterContent
         var cave = window.Cave;
         cave.Enabled = true;
         cave.FogColor = CaveFog;
-        cave.Visibility = 140f;
-        cave.Ambient = 0.22f;
-        cave.AmbientTint = new System.Numerics.Vector3(0.7f, 0.78f, 1f);
-        cave.TopLight = 0.35f;
+        // Darker than at first (the user's call, 2026-09-29: more edge), but not so dark a monster can't be seen coming.
+        cave.Visibility = 120f;
+        cave.Ambient = 0.15f;
+        cave.AmbientTint = new System.Numerics.Vector3(0.68f, 0.76f, 1f);
+        cave.TopLight = 0.26f;
         window.GroundMist.Amount = 0.35f;
         window.GroundMist.Color = CaveMist;
         window.GroundMist.ReferenceHeight = CaveLayout.FloorHeight + 0.5f;

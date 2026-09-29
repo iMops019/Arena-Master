@@ -209,9 +209,9 @@ internal static class Bounties
         // The Delve.
         new("into_the_dark", "Into the Dark", "Clear your first Delve node.", 50, null, (_, profile, _) => profile.Delve.Cleared.Count >= 1),
         new("deeper_still", "Deeper Still", "Open Delve depth 5.", 100, null, (_, profile, _) => profile.Delve.Deepest >= 5),
-        new("the_mistdeep", "The Mistdeep", "Open Delve depth 10.", 200, null, (_, profile, _) => profile.Delve.Deepest >= 10),
+        new("the_mistdeep", "The Weeping Grottos", "Open Delve depth 10.", 200, null, (_, profile, _) => profile.Delve.Deepest >= 10),
         new("night_walker", "Night Walker", "Open Delve depth 15.", 350, null, (_, profile, _) => profile.Delve.Deepest >= 15),
-        new("frozen_deep", "The Frozen Deep", "Open Delve depth 20.", 500, null, (_, profile, _) => profile.Delve.Deepest >= 20),
+        new("frozen_deep", "The Rimebone Depths", "Open Delve depth 20.", 500, null, (_, profile, _) => profile.Delve.Deepest >= 20),
         new("abyss_gazer", "Abyss Gazer", "Open Delve depth 30.", 1000, null, (_, profile, _) => profile.Delve.Deepest >= 30),
         new("delver", "Delver", "Clear 10 Delve nodes.", 125, null, (_, profile, _) => profile.Delve.Cleared.Count >= 10),
         new("veteran_delver", "Veteran Delver", "Clear 40 Delve nodes.", 400, null, (_, profile, _) => profile.Delve.Cleared.Count >= 40),

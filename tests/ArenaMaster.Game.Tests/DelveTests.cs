@@ -69,11 +69,11 @@ public class DelveMapTests
     [Fact]
     public void Bands_GetDarkerAndColderGoingDown()
     {
-        Assert.Equal("The Greenwood", DelveBands.For(1).Name);
-        Assert.Equal("The Amber Hollows", DelveBands.For(5).Name);
-        Assert.Equal("The Mistdeep", DelveBands.For(12).Name);
-        Assert.Equal("The Night Hollows", DelveBands.For(15).Name);
-        Assert.Equal("The Frozen Deep", DelveBands.For(99).Name);
+        Assert.Equal("The Gnawing Warrens", DelveBands.For(1).Name);
+        Assert.Equal("The Charnel Pits", DelveBands.For(5).Name);
+        Assert.Equal("The Weeping Grottos", DelveBands.For(12).Name);
+        Assert.Equal("The Glimmering Dark", DelveBands.For(15).Name);
+        Assert.Equal("The Rimebone Depths", DelveBands.For(99).Name);
         Assert.True(DelveBands.For(20).Snow > 0f);
     }
 }
@@ -166,7 +166,7 @@ public class DelveRulesTests
         Assert.Equal(5, RunPlan.For(run).Depth);
         Assert.False(RunPlan.Classic.IsDelve);
         Assert.Equal(0, RunPlan.Classic.Depth);
-        Assert.Contains("Amber Hollows", RunPlan.For(run).Title);
+        Assert.Contains("Charnel Pits", RunPlan.For(run).Title);
     }
 }
 
