@@ -17,6 +17,9 @@
   stirring_sigil.glb, stirring_column.glb
                         where a mini boss stirs: a sigil on the ground (a red ring of radius 1 with spokes and runes, scaled up) and a thin column of red light
                         rising 30 m from it, both drawn glowing and pulsing
+  hunger_maw.glb        the Hungering Maw: a mouth in the floor about 3 m across - a fleshy lip, rings of teeth leaning in, a glowing red gullet
+  hunger_ring.glb       a thin ring of radius 1 (scaled to the maw's reach) round it: kills inside it feed it
+  hunger_mote.glb       a small red mote, flying from a kill into the maw
   cave_wisp.glb, cave_wisp_violet.glb
                         a wisp: a small bright orb in a paler halo, green and violet (drawn glowing, drifting through the chambers)
   camp_descent.glb      the way down at camp, where the gate was: a stair cut going down between stone walls to the tunnel's mouth, set in the palisade
@@ -339,10 +342,61 @@ def build_stirring_column():
     return m
 
 
+def build_hunger_maw():
+    """The Hungering Maw, a mouth in the cave floor: a raised lip of flesh 1.5 m round, two rings of teeth leaning in, and the gullet glowing red far down."""
+    m = Mesh()
+    up = (0.0, 1.0, 0.0)
+    sides = 16
+    for i in range(sides):
+        a0, a1 = math.tau * i / sides, math.tau * (i + 1) / sides
+        c0, s0, c1, s1 = math.cos(a0), math.sin(a0), math.cos(a1), math.sin(a1)
+        wob0, wob1 = 1.0 + 0.08 * _unit_noise(i, 31.0), 1.0 + 0.08 * _unit_noise((i + 1) % sides, 31.0)
+        outer0, outer1 = (c0 * 1.6 * wob0, -0.45, s0 * 1.6 * wob0), (c1 * 1.6 * wob1, -0.45, s1 * 1.6 * wob1)   # (buried: the game sets it 0.42 up)
+        top0, top1 = (c0 * 1.35 * wob0, 0.35, s0 * 1.35 * wob0), (c1 * 1.35 * wob1, 0.35, s1 * 1.35 * wob1)
+        in0, in1 = (c0 * 1.05, 0.2, s0 * 1.05), (c1 * 1.05, 0.2, s1 * 1.05)
+        m.facing([outer0, outer1, top1, top0], (c0 + c1, 0.4, s0 + s1), "target_red")          # the lip, outside
+        m.facing([top0, top1, in1, in0], (0.0, 1.0, 0.0), "potion")                             # its rim
+        m.facing([in0, in1, (c1 * 0.8, -0.4, s1 * 0.8), (c0 * 0.8, -0.4, s0 * 0.8)], (-(c0 + c1), 0.2, -(s0 + s1)), "meat")   # the throat
+    for i in range(sides):                                                    # the gullet, glowing
+        a0, a1 = math.tau * i / sides, math.tau * (i + 1) / sides
+        m.facing([(0.0, -0.35, 0.0), (math.cos(a0) * 0.8, -0.4, math.sin(a0) * 0.8), (math.cos(a1) * 0.8, -0.4, math.sin(a1) * 0.8)], up, "fire")
+    for ring, count, lean, height in ((1.15, 14, 0.35, 0.45), (0.9, 10, 0.3, 0.32)):
+        for k in range(count):                                                # teeth leaning in over the mouth
+            a = math.tau * (k + 0.5 * (ring < 1.0)) / count
+            cx, cz = math.cos(a) * ring, math.sin(a) * ring
+            tip = (cx - math.cos(a) * lean, 0.2 + height, cz - math.sin(a) * lean)
+            m.pyramid(cx - 0.06, 0.18, cz - 0.06, cx + 0.06, 0.18, cz + 0.06, tip, "bone")
+    return m
+
+
+def build_hunger_ring():
+    """How far the maw's hunger reaches: a thin ring of radius 1 with little teeth on it, pointing in."""
+    m = Mesh()
+    up = (0.0, 1.0, 0.0)
+    for i in range(48):
+        a0, a1 = math.tau * i / 48, math.tau * (i + 1) / 48
+        m.facing([(math.cos(a0) * 0.96, 0.0, math.sin(a0) * 0.96), (math.cos(a0), 0.0, math.sin(a0)), (math.cos(a1), 0.0, math.sin(a1)),
+                  (math.cos(a1) * 0.96, 0.0, math.sin(a1) * 0.96)], up, "target_red")
+    for k in range(16):
+        a = math.tau * k / 16
+        c, s_ = math.cos(a), math.sin(a)
+        m.facing([(c * 0.96 - s_ * 0.02, 0.0, s_ * 0.96 + c * 0.02), (c * 0.9, 0.0, s_ * 0.9), (c * 0.96 + s_ * 0.02, 0.0, s_ * 0.96 - c * 0.02)], up, "target_red")
+    return m
+
+
+def build_hunger_mote():
+    """A red mote of what the maw feeds on, radius about 0.15."""
+    m = Mesh()
+    _cone(m, 0.0, 0.0, 0.0, 0.15, 0.1, "fire_light", sides=5)
+    _cone(m, 0.0, 0.0, 0.0, -0.15, 0.1, "target_red", sides=5)
+    return m
+
+
 CAVE_MODELS = (("cave_ceiling.glb", build_cave_ceiling), ("cave_stalagmite.glb", build_cave_stalagmite), ("cave_crystals.glb", build_cave_crystals),
                ("cave_bones.glb", build_cave_bones), ("cave_lantern.glb", build_cave_lantern),
                ("cave_lantern_fire.glb", build_cave_lantern_fire), ("cave_tunnel.glb", build_cave_tunnel),
                ("camp_descent.glb", build_descent), ("cave_pool.glb", build_cave_pool), ("cave_ripple.glb", build_cave_ripple),
                ("cave_drop.glb", build_cave_drop), ("cave_fungus.glb", build_cave_fungus), ("cave_bat_up.glb", build_cave_bat_up),
                ("cave_bat_down.glb", build_cave_bat_down), ("cave_wisp.glb", build_cave_wisp), ("cave_wisp_violet.glb", build_cave_wisp_violet),
-               ("stirring_sigil.glb", build_stirring_sigil), ("stirring_column.glb", build_stirring_column))
+               ("stirring_sigil.glb", build_stirring_sigil), ("stirring_column.glb", build_stirring_column),
+               ("hunger_maw.glb", build_hunger_maw), ("hunger_ring.glb", build_hunger_ring), ("hunger_mote.glb", build_hunger_mote))

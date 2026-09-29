@@ -120,6 +120,7 @@ public sealed partial class ArenaMasterContent
         if (_window is { } stirWindow)
         {
             DrawStirringHud(hud, stirWindow.PlayerFeet);   // a mini boss stirring (where, when, how far), or awake (its health)
+            DrawHungerHud(hud);                            // a Hungering Maw: how fed, how long left
         }
 
         // Health, bottom left, flashing red when hit.

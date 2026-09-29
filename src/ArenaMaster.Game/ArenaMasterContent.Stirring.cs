@@ -134,8 +134,8 @@ public sealed partial class ArenaMasterContent
         }
         else if (stirring.Awake is { IsAlive: true } boss && _enemies.Boss is null)
         {
-            hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 64f), boss.Kind.Name.ToUpperInvariant(), StirRed, 0.85f);
-            hud.Bar(HudAnchor.TopCenter, new Vector2D<float>(0f, 86f), new Vector2D<float>(380f, 12f), boss.Health / boss.MaxHealth,
+            hud.Text(HudAnchor.TopCenter, new Vector2D<float>(0f, 160f), boss.Kind.Name.ToUpperInvariant(), StirRed, 0.85f);   // below a rush or a maw
+            hud.Bar(HudAnchor.TopCenter, new Vector2D<float>(0f, 182f), new Vector2D<float>(380f, 12f), boss.Health / boss.MaxHealth,
                 new Vector4D<float>(0.85f, 0.35f, 0.2f, 0.95f), new Vector4D<float>(0f, 0f, 0f, 0.55f));
         }
     }
