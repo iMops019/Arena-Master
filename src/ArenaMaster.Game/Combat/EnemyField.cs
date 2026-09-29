@@ -379,6 +379,16 @@ internal sealed class EnemyField
     /// </summary>
     public (Vector2D<float> Centre, float Radius)? Arena { get; set; }
 
+    /// <summary>
+    /// The way an enemy walks to the player when it can't go straight (a wall between them): given where it is and where the player is, the flat way to walk, or
+    /// null to walk straight at them. An enemy steered round a wall doesn't attack until it has a clear line again. Null for no walls (straight, always). In the
+    /// game it is the cave's way through its tunnels (<c>World/CaveFlow</c>).
+    /// </summary>
+    public Func<Vector3D<float>, Vector3D<float>, Vector3D<float>?>? Steer { get; set; }
+
+    /// <summary>Whether an enemy may be put at a spot (x, z) as it spawns or is brought back: in the cave, only where there is a way to the player. Null for anywhere.</summary>
+    public Func<float, float, bool>? SpawnFilter { get; set; }
+
     /// <summary>How long a burst lasts, for the view.</summary>
     public const float BlastSeconds = 0.35f;
 
@@ -709,13 +719,13 @@ internal sealed class EnemyField
 
     private bool TryPickSpawnPoint(Vector3D<float> playerFeet, Func<float, float, float?> groundAt, out Vector3D<float> point)
     {
-        for (int attempt = 0; attempt < 8; attempt++)
+        for (int attempt = 0; attempt < 12; attempt++)
         {
             float angle = (float)_random.NextDouble() * MathF.Tau;
             float distance = SpawnMinDistance + (float)_random.NextDouble() * (SpawnMaxDistance - SpawnMinDistance);
             float x = playerFeet.X + MathF.Sin(angle) * distance;
             float z = playerFeet.Z + MathF.Cos(angle) * distance;
-            if (groundAt(x, z) is { } ground)
+            if (groundAt(x, z) is { } ground && SpawnFilter?.Invoke(x, z) != false)
             {
                 point = new Vector3D<float>(x, ground, z);
                 return true;
@@ -784,6 +794,12 @@ internal sealed class EnemyField
             {
                 return;   // it pounced
             }
+        }
+        else if (Steer?.Invoke(enemy.Position, player.Feet) is { } way)
+        {
+            // A wall between it and the player: round by the way through, and no attacking until it has a clear line again.
+            enemy.Yaw = MathF.Atan2(way.X, way.Z);
+            step = way * enemy.WalkSpeed;
         }
         else
         {
@@ -1224,7 +1240,11 @@ internal sealed class EnemyField
             case AttackType.Lunge:
             {
                 var flat = enemy.AttackOrigin + (enemy.AttackTarget - enemy.AttackOrigin) * t;
-                enemy.Position = new Vector3D<float>(flat.X, groundAt(flat.X, flat.Z) ?? enemy.Position.Y, flat.Z);
+                if (groundAt(flat.X, flat.Z) is { } lungeGround)
+                {
+                    enemy.Position = new Vector3D<float>(flat.X, lungeGround, flat.Z);   // (a charge into rock stops at it)
+                }
+
                 Geometry.FlatDirection(enemy.Position, player.Feet, out float gap);
                 if (!enemy.AttackLanded && gap <= enemy.Kind.Radius + attack.HitWidth + PlayerRadius && MathF.Abs(enemy.Position.Y - player.Feet.Y) < enemy.Kind.Height)
                 {
@@ -1324,7 +1344,11 @@ internal sealed class EnemyField
                 var toward = Geometry.FlatDirection(enemy.Position, player.Feet, out float distance);
                 float step = MathF.Min(distance, enemy.WalkSpeed * attack.ProjectileSpeed * LastDelta);
                 var flat = enemy.Position + toward * step;
-                enemy.Position = new Vector3D<float>(flat.X, groundAt(flat.X, flat.Z) ?? enemy.Position.Y, flat.Z);
+                if (groundAt(flat.X, flat.Z) is { } spinGround)
+                {
+                    enemy.Position = new Vector3D<float>(flat.X, spinGround, flat.Z);
+                }
+
                 enemy.Yaw += WhirlwindTurn * LastDelta;
                 enemy.TickLeft -= LastDelta * enemy.AttackSpeed;
                 if (enemy.TickLeft <= 0f && distance <= attack.Reach + PlayerRadius && MathF.Abs(player.Feet.Y - enemy.Position.Y) < enemy.Kind.Height)

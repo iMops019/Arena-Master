@@ -20,6 +20,9 @@ public sealed partial class ArenaMasterContent
     private bool _underground;
     private IReadOnlyList<(Vector3D<float> At, Vector3D<float> Colour, float Radius)> _caveLights = Array.Empty<(Vector3D<float>, Vector3D<float>, float)>();
     private readonly HashSet<int> _caveLit = new();
+
+    /// <summary>The way to the player through the cave's tunnels, for the enemies (built with the cave).</summary>
+    private CaveFlow? _caveFlow;
     private (float Insects, float Animals)? _surfaceLife;
 
     /// <summary>Puts the cave's dressing in the world, once: the stalagmites (solid) and the tunnel's mouth with its braziers as props, the rest as crowds.</summary>
@@ -72,6 +75,7 @@ public sealed partial class ArenaMasterContent
         }
 
         _caveLights = CaveLayout.Lights(terrain);
+        _caveFlow = new CaveFlow(CaveLayout.Grid);
     }
 
     /// <summary>
@@ -99,6 +103,14 @@ public sealed partial class ArenaMasterContent
         window.GroundMist.Color = CaveMist;
         window.GroundMist.ReferenceHeight = CaveLayout.FloorHeight + 0.5f;
         window.WispAmount = 0.5f;
+        _enemyView.Brighten = MonsterBrighten;
+        if (_caveFlow is { } flow)
+        {
+            // Enemies come round the walls by the tunnels, and only spawn where there is a way to the player.
+            flow.Update(window.PlayerFeet, float.MaxValue);
+            _enemies.Steer = flow.Steer;
+            _enemies.SpawnFilter = (x, z) => flow.Distance(x, z) <= SpawnPathReach;
+        }
         _surfaceLife ??= (window.InsectAmount, window.AnimalAmount);
         window.InsectAmount = 0f;
         window.AnimalAmount = 0f;
@@ -119,6 +131,10 @@ public sealed partial class ArenaMasterContent
         }
 
         _underground = false;
+        _enemyView.Brighten = 0f;
+        window.RemovePointLight(PlayerLightId);
+        _enemies.Steer = null;
+        _enemies.SpawnFilter = null;
         window.Cave.Enabled = false;
         window.SetCrowd(CaveLayout.CeilingModel, ReadOnlySpan<CrowdInstance>.Empty);
 
@@ -152,6 +168,34 @@ public sealed partial class ArenaMasterContent
         window.Weather.Snowfall = 0f;
         window.Weather.Settle();
     }
+
+    /// <summary>An enemy spawns only where the way to the player along the floor is no longer than this (the spawn ring is 24-38 m straight out).</summary>
+    private const float SpawnPathReach = 55f;
+
+    /// <summary>Underground, each frame: the way through the tunnels follows the player, and the nearest lights are lit.</summary>
+    private void UpdateCave(EngineWindow window, float deltaSeconds)
+    {
+        if (!_underground)
+        {
+            return;
+        }
+
+        _caveFlow?.Update(window.PlayerFeet, deltaSeconds);
+        UpdateCaveLights(window, window.PlayerFeet);
+        window.SetPointLight(PlayerLightId, window.PlayerFeet + new Vector3D<float>(0f, 2.4f, 0f), PlayerLight, PlayerLightReach);
+    }
+
+    /// <summary>
+    /// The hero's own light underground, a pale warm glow that goes where they go: the floor round them, and the monsters coming at them, are always to be seen
+    /// (the user's call, 2026-09-29: a darker cave, the monsters still to be seen).
+    /// </summary>
+    private const int PlayerLightId = 7299;
+
+    private static readonly Vector3D<float> PlayerLight = new(0.5f, 0.46f, 0.38f);
+    private const float PlayerLightReach = 15f;
+
+    /// <summary>How much brighter than the dark round them the monsters are drawn underground (see <see cref="EnemyView.Brighten"/>).</summary>
+    private const float MonsterBrighten = 0.5f;
 
     /// <summary>Lights the cave's lights nearest <paramref name="from"/> (the player, or the Editor's camera), and puts out the ones left behind.</summary>
     private void UpdateCaveLights(EngineWindow window, Vector3D<float> from)
@@ -201,7 +245,11 @@ public sealed partial class ArenaMasterContent
     }
 
     /// <summary>Lights the cave's lights nearest <paramref name="from"/>, as a run does each frame round the player.</summary>
-    public void LightCave(EngineWindow window, Vector3D<float> from) => UpdateCaveLights(window, from);
+    public void LightCave(EngineWindow window, Vector3D<float> from)
+    {
+        UpdateCaveLights(window, from);
+        window.SetPointLight(PlayerLightId, from + new Vector3D<float>(0f, 2.4f, 0f), PlayerLight, PlayerLightReach);
+    }
 
     /// <summary>The Editor's look at the cave: turn the underground look on (building the cave if need be) and fly down to the tunnel's mouth.</summary>
     private void DrawCaveEditorExtras(EngineWindow window)

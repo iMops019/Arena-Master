@@ -184,7 +184,7 @@ public sealed partial class ArenaMasterContent : IGameContent
                 break;
         }
 
-        UpdateCaveLights(window, window.PlayerFeet);
+        UpdateCave(window, deltaSeconds);
     }
 
     /// <summary>The game's own screens, over the world, and over everything the fade between camp and a run.</summary>

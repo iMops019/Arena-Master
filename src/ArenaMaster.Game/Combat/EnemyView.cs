@@ -59,6 +59,12 @@ internal sealed class EnemyView
     private readonly Dictionary<string, List<CrowdInstance>> _blasts = new() { [BlastModel] = new(), [BombBurstModel] = new() };   // burst model -> this frame's
     private float _time;
 
+    /// <summary>
+    /// How much brighter every living enemy is drawn at the least (its flash never falls below this): in the dark of the cave, enough to stand out from the floor
+    /// round it (the user's call, 2026-09-29: a darker cave, the monsters still to be seen). 0 on the surface.
+    /// </summary>
+    public float Brighten { get; set; }
+
     public void Sync(EngineWindow window, EnemyField field, IEnumerable<Enemy> gone, float deltaSeconds, Func<float, float, float?> groundAt)
     {
         _time += deltaSeconds;
@@ -252,13 +258,13 @@ internal sealed class EnemyView
     /// An animated enemy's copy: its clip from <paramref name="motion"/>, and on top of it a quick swell and flinch back when hit, pale while frozen, and a sink
     /// into the ground over the second half of dying (the Die clip has it on the ground by then).
     /// </summary>
-    private static SkinnedCrowdInstance Animate(Enemy enemy, EnemyMotion.Pose motion)
+    private SkinnedCrowdInstance Animate(Enemy enemy, EnemyMotion.Pose motion)
     {
         var position = enemy.Position;
         bool fodder = enemy.Kind.Tier == EnemyTier.Fodder;
         float scale = (1f + 0.08f * enemy.HitFlash * (fodder ? 1f : 0.3f)) * enemy.Rarity.Size;
         float pitch = -0.2f * enemy.HitFlash * (fodder ? 1f : 0.2f);
-        float flash = enemy.IsFrozen ? MathF.Max(0.55f, enemy.HitFlash) : enemy.HitFlash;
+        float flash = MathF.Max(Brighten, enemy.IsFrozen ? MathF.Max(0.55f, enemy.HitFlash) : enemy.HitFlash);
         if (!enemy.IsAlive)
         {
             float t = Math.Clamp(enemy.DeadFor / EnemyField.DeathDuration, 0f, 1f);

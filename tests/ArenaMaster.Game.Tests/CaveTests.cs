@@ -1,3 +1,4 @@
+using ArenaMaster.Game.Combat;
 using ArenaMaster.Game.Camp;
 using ArenaMaster.Game.Delve;
 using ArenaMaster.Game.World;
@@ -51,22 +52,13 @@ public class CaveTests
     }
 
     [Fact]
-    public void TheCave_IsWalledIn_RoundTheEdge_AndFromCamp_WithWallsPastTheRoof()
+    public void TheCave_IsChambersAndTunnels_WithRockPastTheRoofBetweenThem()
     {
-        foreach (var (x, z) in new[] { (0f, 250f), (0f, -250f), (250f, 0f), (-250f, -60f), (250f, -250f) })
+        // The map's edge, the rock between the chambers, and camp's side of the rock.
+        foreach (var (x, z) in new[] { (0f, 250f), (0f, -250f), (250f, 0f), (-250f, -60f), (250f, -250f), (100f, 100f), (-100f, -100f), (-75f, 190f), (-190f, 90f) })
         {
-            Assert.True(CaveLayout.Blocked(x, z), $"no wall at ({x}, {z})");
-            Assert.True(Height(x, z) > CaveLayout.CeilingHeight + 5f, $"the wall at ({x}, {z}) is only {Height(x, z)} high");
-        }
-
-        // Between camp and the cave, all the way round: the ridge.
-        for (float a = 0f; a < MathF.Tau; a += 0.1f)
-        {
-            var ridge = CampLayout.Centre + new Vector2D<float>(MathF.Cos(a), MathF.Sin(a)) * (CaveLayout.RidgeRadius - 12f);
-            if (MathF.Abs(ridge.X) < 250f && MathF.Abs(ridge.Y) < 250f)
-            {
-                Assert.True(Height(ridge.X, ridge.Y) > CaveLayout.CeilingHeight, $"the ridge is low at {a:0.0}");
-            }
+            Assert.True(CaveLayout.Blocked(x, z), $"no rock at ({x}, {z})");
+            Assert.True(Height(x, z) > CaveLayout.CeilingHeight + 5f, $"the rock at ({x}, {z}) is only {Height(x, z)} high");
         }
 
         foreach (var (px, pz, _) in CaveLayout.Pillars)
@@ -74,6 +66,73 @@ public class CaveTests
             Assert.True(CaveLayout.Blocked(px, pz));
             Assert.True(Height(px, pz) > CaveLayout.CeilingHeight + 5f, "a pillar holds the roof up");
         }
+
+        // A tunnel is floor down its middle and rock either side.
+        foreach (var passage in CaveLayout.Passages)
+        {
+            var middle = (passage.From + passage.To) * 0.5f;
+            var across = Vector2D.Normalize(new Vector2D<float>(passage.To.Y - passage.From.Y, passage.From.X - passage.To.X));
+            Assert.False(CaveLayout.Blocked(middle.X, middle.Y), $"the tunnel at {middle} is blocked");
+            Assert.True(CaveLayout.Blocked(middle.X + across.X * (passage.HalfWidth * 2f + 10f), middle.Y + across.Y * (passage.HalfWidth * 2f + 10f))
+                || CaveLayout.ChamberAt(middle.X + across.X * (passage.HalfWidth * 2f + 10f), middle.Y + across.Y * (passage.HalfWidth * 2f + 10f)) is not null,
+                $"the tunnel at {middle} has no wall");
+        }
+    }
+
+    [Fact]
+    public void EveryChamber_CanBeReachedFromTheStart_AlongTheFloor()
+    {
+        var flow = new CaveFlow(CaveLayout.Grid);
+        var start = CampLayout.RunStart;
+        flow.Update(new Vector3D<float>(start.X, 0f, start.Y), 1f);
+        foreach (var chamber in CaveLayout.Chambers)
+        {
+            // Its middle, or near it (a pillar may stand in the middle).
+            float best = new[] { (0f, 0f), (12f, 0f), (-12f, 0f), (0f, 12f), (0f, -12f) }
+                .Min(o => flow.Distance(chamber.Centre.X + o.Item1, chamber.Centre.Y + o.Item2));
+            Assert.True(float.IsFinite(best), $"{chamber.Name} can't be reached");
+            Assert.True(best >= Vector2D.Distance(chamber.Centre, start) - 30f);   // along the floor, never shorter than straight
+        }
+
+        Assert.Equal("The Landing", CaveLayout.ChamberAt(start.X, start.Y)?.Name);
+        Assert.Equal("The Pit", CaveLayout.ChamberAt(BossArena.Centre.X, BossArena.Centre.Y)?.Name);
+    }
+
+    [Fact]
+    public void AnEnemyBehindARock_IsSteeredRoundIt_AndOneInTheOpenComesStraight()
+    {
+        var flow = new CaveFlow(CaveLayout.Grid);
+        var (px, pz, radius) = CaveLayout.Pillars[1];   // (-42, -32) in the Landing
+        var player = new Vector3D<float>(px + radius + 12f, 0f, pz);
+        flow.Update(player, 1f);
+
+        Assert.Null(flow.Steer(new Vector3D<float>(0f, 0f, 20f), new Vector3D<float>(10f, 0f, 20f)));   // a clear line: straight
+
+        var enemy = new Vector3D<float>(px - radius - 12f, 0f, pz);   // the pillar right between them
+        Assert.NotNull(flow.Steer(enemy, player));
+        for (int step = 0; step < 200 && flow.Steer(enemy, player) is { } way; step++)
+        {
+            enemy += way * 0.5f;
+            Assert.False(CaveLayout.Blocked(enemy.X, enemy.Z), "it walked into the rock");
+        }
+
+        Assert.True(CaveLayout.Grid.ClearLine(new Vector2D<float>(enemy.X, enemy.Z), new Vector2D<float>(player.X, player.Z)));   // round the pillar, in sight
+    }
+
+    [Fact]
+    public void TheWay_IsWorkedOutAgainOnlyWhenThePlayerChangesCell_AndNotTooOften()
+    {
+        var flow = new CaveFlow(CaveLayout.Grid);
+        flow.Update(new Vector3D<float>(0f, 0f, 10f), 1f);
+        Assert.Equal(1, flow.Refreshes);
+        flow.Update(new Vector3D<float>(0.3f, 0f, 10.2f), 0.01f);       // the same cell
+        Assert.Equal(1, flow.Refreshes);
+        flow.Update(new Vector3D<float>(8f, 0f, 10f), 0.05f);           // a new cell, too soon
+        Assert.Equal(1, flow.Refreshes);
+        flow.Update(new Vector3D<float>(8f, 0f, 10f), CaveFlow.RefreshSeconds);
+        Assert.Equal(2, flow.Refreshes);
+        Assert.Equal(0f, flow.Distance(8f, 10f));
+        Assert.True(float.IsPositiveInfinity(flow.Distance(100f, 100f)));   // in the rock
     }
 
     [Fact]
@@ -153,5 +212,50 @@ public class CaveTests
         {
             Assert.True(File.Exists(Path.Combine(models, file)), $"{file} is missing");
         }
+    }
+}
+
+/// <summary>The enemy field's hooks for walls: steering round them, and spawning only where there is a way to the player.</summary>
+public class EnemySteeringTests
+{
+    private static float? Flat(float x, float z) => 0f;
+
+    [Fact]
+    public void ASteeredEnemy_WalksTheWayItIsSteered_AndDoesNotAttackUntilItHasAClearLine()
+    {
+        var field = new EnemyField(new Random(1)) { TargetCount = 0, Steer = (_, _) => new Vector3D<float>(1f, 0f, 0f) };
+        var brute = field.Spawn(Vector3D<float>.Zero, EnemyKind.Brute);
+        brute.AttackCooldown = 0f;
+        var player = new PlayerHealth(1_000f);
+        var feet = new Vector3D<float>(0f, 0f, 6f);   // in reach of its lunge
+        for (int i = 0; i < 30; i++)
+        {
+            field.Update(1f / 60f, new PlayerTarget(feet, true, player, new PlayerCondition()), Flat);
+        }
+
+        Assert.Null(brute.Attack);
+        Assert.True(brute.Position.X > 1f && MathF.Abs(brute.Position.Z) < 0.2f);
+
+        field.Steer = (_, _) => null;   // a clear line: it comes at the player, and attacks
+        for (int i = 0; i < 30 && brute.Attack is null; i++)
+        {
+            field.Update(1f / 60f, new PlayerTarget(feet, true, player, new PlayerCondition()), Flat);
+        }
+
+        Assert.NotNull(brute.Attack);
+    }
+
+    [Fact]
+    public void Spawns_KeepToWhereTheFilterAllows()
+    {
+        var field = new EnemyField(new Random(2)) { TargetCount = 40, SpawnInterval = 0f, SpawnFilter = (x, _) => x > 0f };
+        var player = new PlayerHealth(1_000_000f);
+        for (int i = 0; i < 20; i++)
+        {
+            field.Update(1f / 60f, new PlayerTarget(Vector3D<float>.Zero, true, player, new PlayerCondition()), Flat);
+        }
+
+        Assert.True(field.Enemies.Count > 10);
+        Assert.All(field.Enemies, e => Assert.True(e.Position.X > 0f - 2f));   // (they may have taken a step since)
     }
 }

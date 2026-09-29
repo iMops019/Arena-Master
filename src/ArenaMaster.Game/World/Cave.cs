@@ -14,9 +14,16 @@ internal enum CaveThing
     Lantern,
 }
 
+/// <summary>A cave chamber: a hall of floor, roughly an ellipse <paramref name="RadiusX"/> by <paramref name="RadiusZ"/> round <paramref name="Centre"/>, its edge ragged.</summary>
+internal sealed record CaveChamber(string Name, Vector2D<float> Centre, float RadiusX, float RadiusZ);
+
+/// <summary>A tunnel of floor from <paramref name="From"/> to <paramref name="To"/>, <paramref name="HalfWidth"/> either side of the line, its walls ragged.</summary>
+internal sealed record CavePassage(Vector2D<float> From, Vector2D<float> To, float HalfWidth);
+
 /// <summary>
-/// The Delve's cave, the ghouls' lair (the user's, 2026-09-28: runs go underground, down a stairway at camp): all of the map but camp's corner, walled in by rock that
-/// rises past its roof - round the map's edge, and in a high ridge between camp's forest and the cave - with pillars of rock holding the roof up. Its floor is bare stone
+/// The Delve's cave, the ghouls' lair (the user's, 2026-09-28: runs go underground, down a stairway at camp): in all of the map but camp's corner, a set of chambers
+/// - big halls, medium ones and small grottos - joined by tunnels (the user's call, 2026-09-29: areas that lead into other areas, not one big square), everything else
+/// rock that rises past the roof, with pillars holding the roof up in the halls. Camp's side of the rock is a long mountainside over its forest. Its floor is bare stone
 /// (painted <see cref="TerrainPalette.CaveFloor"/>, so nothing grows on it and rubble gathers), and the roof (<see cref="CeilingModel"/>) is put up over it while the
 /// player is underground. Runs start at the mouth of the tunnel the stairs come down (<see cref="Tunnel"/>, at the middle of the map); the boss arena is in the
 /// far corner. It is lit by what glows in it: crystals, ghoul lanterns and the fires by the tunnel (see <see cref="Lights"/>). Pure: the shapes and the dressing are
@@ -36,7 +43,7 @@ internal static class CaveLayout
     /// <summary>The roof: drawn as a crowd of one that glows a little of its own (<see cref="CeilingGlow"/>), so the rock overhead shows faintly and fades into the dark.</summary>
     public const string CeilingModel = "cave_ceiling.glb";
 
-    public const float CeilingGlow = 0.32f;
+    public const float CeilingGlow = 0.14f;
     public const string StalagmiteModel = "cave_stalagmite.glb";
     public const string CrystalModel = "cave_crystals.glb";
     public const string BonesModel = "cave_bones.glb";
@@ -46,23 +53,53 @@ internal static class CaveLayout
     /// <summary>The steepest ground the player can walk up (rise over run): the walls and pillars are far steeper; the mounds and camp's hills are far gentler.</summary>
     public const float PlayerMaxSlope = 1.4f;
 
-    /// <summary>Round camp: its forest and hills, open to the sky, out to this far from camp's centre; then the ridge, whose far side is the cave's wall.</summary>
+    /// <summary>Round camp: its forest and hills, open to the sky, out to this far from camp's centre; the rock beyond rises from its valley as a mountainside.</summary>
     public const float SurfaceRadius = 88f;
 
-    public const float RidgeRadius = 120f;
-
-    /// <summary>How wide the rock is round the map's edge, before the noise that makes it ragged.</summary>
-    public const float RimWidth = 16f;
-
-    /// <summary>How far the walls' faces lean: the rock is all wall this far in from where it starts to rise.</summary>
+    /// <summary>How far the walls' faces lean: the rock is all wall this far out from the floor's edge.</summary>
     public const float FaceWidth = 7f;
 
-    /// <summary>The pillars of rock from the floor to the roof: (x, z, radius), each flaring out a few metres at its foot.</summary>
+    /// <summary>
+    /// The cave's chambers. The Landing (the biggest, where runs start at the tunnel's mouth) is at the middle of the map; the boss arena has a chamber of its own in
+    /// the south-east corner, the Pit.
+    /// </summary>
+    public static readonly CaveChamber[] Chambers =
+    {
+        new("The Landing", new(0f, 5f), 78f, 70f),
+        new("The Bone Hall", new(160f, 45f), 52f, 60f),
+        new("The Gnawing Hall", new(40f, 165f), 48f, 42f),
+        new("The Feasting Grotto", new(175f, 175f), 36f, 34f),
+        new("The Western Warren", new(-150f, -30f), 42f, 36f),
+        new("The Drip Grotto", new(-72f, 110f), 26f, 24f),
+        new("The Charnel Hall", new(-150f, -165f), 50f, 45f),
+        new("The Southern Warren", new(20f, -170f), 42f, 38f),
+        new("The Ossuary", new(100f, -95f), 26f, 26f),
+        new("The Pit", new(190f, -190f), 40f, 40f),
+    };
+
+    /// <summary>The tunnels between the chambers: some ways round, so the cave loops.</summary>
+    public static readonly CavePassage[] Passages =
+    {
+        new(new(60f, 20f), new(115f, 40f), 8f),          // the Landing to the Bone Hall
+        new(new(20f, 60f), new(35f, 128f), 7f),          // the Landing to the Gnawing Hall
+        new(new(85f, 170f), new(142f, 175f), 6f),        // the Gnawing Hall to the Feasting Grotto
+        new(new(165f, 100f), new(172f, 144f), 6f),       // the Bone Hall to the Feasting Grotto
+        new(new(-65f, -5f), new(-112f, -25f), 7f),       // the Landing to the Western Warren
+        new(new(-135f, 2f), new(-82f, 92f), 5f),         // the Western Warren to the Drip Grotto
+        new(new(-58f, 95f), new(-35f, 58f), 5f),         // the Drip Grotto back to the Landing
+        new(new(-150f, -62f), new(-150f, -125f), 6f),    // the Western Warren to the Charnel Hall
+        new(new(-102f, -168f), new(-20f, -170f), 7f),    // the Charnel Hall to the Southern Warren
+        new(new(5f, -62f), new(15f, -135f), 8f),         // the Landing to the Southern Warren
+        new(new(50f, -45f), new(82f, -78f), 6f),         // the Landing to the Ossuary
+        new(new(118f, -112f), new(160f, -162f), 7f),     // the Ossuary to the Pit
+        new(new(140f, -10f), new(112f, -75f), 5f),       // the Bone Hall to the Ossuary
+    };
+
+    /// <summary>The pillars of rock from the floor to the roof, in the halls: (x, z, radius), each flaring out a few metres at its foot.</summary>
     public static readonly (float X, float Z, float Radius)[] Pillars =
     {
-        (70f, -10f, 7f), (-62f, 22f, 9f), (22f, 72f, 6f), (-110f, -60f, 8f), (112f, 82f, 7f), (152f, -40f, 10f), (-30f, -150f, 8f), (62f, -120f, 6f),
-        (-150f, -10f, 7f), (140f, 172f, 9f), (205f, 40f, 8f), (-205f, -130f, 9f), (98f, -205f, 7f), (-60f, 115f, 6f), (10f, -210f, 8f), (-150f, -205f, 7f),
-        (35f, 170f, 7f), (-205f, 35f, 6f), (210f, 170f, 7f),
+        (45f, 30f, 6f), (-42f, -32f, 7f), (-35f, 40f, 5f), (48f, -38f, 5f), (160f, 45f, 8f), (145f, 5f, 4f), (40f, 168f, 6f), (-150f, -165f, 7f), (-165f, -135f, 4f),
+        (-150f, -30f, 5f), (25f, -175f, 5f), (175f, 175f, 4f),
     };
 
     /// <summary>
@@ -83,23 +120,38 @@ internal static class CaveLayout
 
     public const float BrazierFireHeight = 1.14f;
 
-    /// <summary>How much of the way a spot is to being wall, 0 (floor) to 1 (solid rock up to the roof and past it): the map's rim, camp's ridge, the pillars.</summary>
+    /// <summary>
+    /// How far a spot is from the cave's floor (its chambers and tunnels): negative on the floor, as deep in as it is; positive in the rock. The edges are ragged.
+    /// </summary>
+    public static float FloorDistance(float x, float z)
+    {
+        float best = float.MaxValue;
+        foreach (var chamber in Chambers)
+        {
+            float dx = (x - chamber.Centre.X) / chamber.RadiusX, dz = (z - chamber.Centre.Y) / chamber.RadiusZ;
+            float e = MathF.Sqrt(dx * dx + dz * dz);
+            float size = MathF.Min(chamber.RadiusX, chamber.RadiusZ);
+            best = MathF.Min(best, (e - 1f - 0.07f * Noise(x * 0.04f, z * 0.04f, chamber.Centre.X)) * size);
+        }
+
+        foreach (var passage in Passages)
+        {
+            float d = SegmentDistance(x, z, passage.From, passage.To);
+            best = MathF.Min(best, d - passage.HalfWidth * (1f + 0.25f * Noise(x * 0.09f, z * 0.09f, passage.From.Y)));
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    /// How much of the way a spot is to being wall, 0 (floor) to 1 (solid rock up to the roof and past it): everything off the chambers and tunnels, and the pillars.
+    /// On camp's side the rock rises as a long mountainside from its forest, not a cliff.
+    /// </summary>
     public static float Wall(float x, float z)
     {
-        float wall = 0f;
-
-        // Camp's side of anything: a long mountainside rising from its forest, not a cliff.
         float fromCamp = Vector2D.Distance(new Vector2D<float>(x, z), CampLayout.Centre);
         float campSide = Ramp(SurfaceRadius - 36f, SurfaceRadius, fromCamp);
-
-        // The rim: a ragged band of rock round the map's edge (only round the cave: camp's corner ends as it always did).
-        float edge = 256f - MathF.Max(MathF.Abs(x), MathF.Abs(z));
-        float rim = RimWidth + 6f * Noise(x * 0.03f, z * 0.03f, 1f);
-        wall = MathF.Max(wall, Ramp(rim, rim - FaceWidth, edge) * campSide);
-
-        // The ridge between camp and the cave: a wall on the cave's side.
-        float outer = RidgeRadius + 8f * Noise(x * 0.025f, z * 0.025f, 2f);
-        wall = MathF.Max(wall, Ramp(outer, outer - FaceWidth, fromCamp) * campSide);
+        float wall = Ramp(0f, FaceWidth, FloorDistance(x, z)) * campSide;
 
         foreach (var (px, pz, radius) in Pillars)
         {
@@ -120,8 +172,37 @@ internal static class CaveLayout
     /// <summary>Whether a spot is the cave's floor: not the surface, not in its walls (a little of a wall's foot counts, as the ground there is still walkable).</summary>
     public static bool IsFloor(float x, float z) => !OnSurface(x, z) && Wall(x, z) < 0.25f;
 
-    /// <summary>Whether a spot is too steep to walk: a wall, a pillar, the mound over the tunnel. Enemies, gems and crates keep off it.</summary>
-    public static bool Blocked(float x, float z) => Wall(x, z) >= 0.25f || Near(x, z, Mound, MoundFoot - 2f);
+    /// <summary>
+    /// Whether a spot is too steep to walk: a wall, a pillar, the mound over the tunnel (worked out once on a <see cref="GridCell"/> grid, as it is asked all the time).
+    /// Enemies, gems and crates keep off it.
+    /// </summary>
+    public static bool Blocked(float x, float z) => !Grid.Walkable(x, z);
+
+    /// <summary>The same worked out from the shapes (what the grid is made from).</summary>
+    public static bool BlockedAt(float x, float z) => OnSurface(x, z) || Wall(x, z) >= 0.25f || Near(x, z, Mound, MoundFoot - 2f);
+
+    /// <summary>The walkable grid's cell, in metres.</summary>
+    public const float GridCell = 2f;
+
+    /// <summary>Which spots of the cave can be walked on, a cell each (<see cref="GridCell"/>): what <see cref="Blocked"/> reads, and what enemies find their way through.</summary>
+    public static CaveGrid Grid => _grid ??= CaveGrid.Build(GridCell, BlockedAt);
+
+    private static CaveGrid? _grid;
+
+    /// <summary>The chamber a spot is in (among those whose ellipse it is inside, the one whose middle is nearest), or null in a tunnel or the rock.</summary>
+    public static CaveChamber? ChamberAt(float x, float z) =>
+        Chambers.Where(c => Square((x - c.Centre.X) / c.RadiusX) + Square((z - c.Centre.Y) / c.RadiusZ) <= 1f)
+            .OrderBy(c => Vector2D.Distance(c.Centre, new Vector2D<float>(x, z))).FirstOrDefault();
+
+    private static float Square(float v) => v * v;
+
+    private static float SegmentDistance(float x, float z, Vector2D<float> a, Vector2D<float> b)
+    {
+        var ab = b - a;
+        var p = new Vector2D<float>(x, z);
+        float t = Math.Clamp(Vector2D.Dot(p - a, ab) / MathF.Max(1e-6f, ab.LengthSquared), 0f, 1f);
+        return Vector2D.Distance(p, a + ab * t);
+    }
 
     /// <summary>
     /// Raises the walls and the pillars out of the ground, and the mound the tunnel comes out of; paints everything underground the cave's stone, so nothing grows
