@@ -215,7 +215,7 @@ internal static class CaveLayout
             float wall = Wall(x, z);
             float raised = wall > 0f ? height + (FloorHeight + WallHeight - height) * Smooth(wall) : height;
             float hill = MoundHeight * Smooth(Ramp(MoundFoot, MoundTop, Vector2D.Distance(new Vector2D<float>(x, z), Mound)));
-            return MathF.Max(raised, height + hill);
+            return MathF.Max(raised, height + hill) - CaveLife.PoolDip(x, z);
         });
 
         terrain.PaintShape((x, z) => !OnSurface(x, z), TerrainPalette.CaveFloor);
@@ -243,7 +243,7 @@ internal static class CaveLayout
                 {
                     float x = cx + ScatterCell * Hash(cx, cz, 1 + k * 7);
                     float z = cz + ScatterCell * Hash(cx, cz, 2 + k * 7);
-                    if (!IsFloor(x, z) || Wall(x, z) > 0.02f || Near(x, z, CampLayout.RunStart, 14f) || Near(x, z, Mound, MoundFoot + 2f)
+                    if (!IsFloor(x, z) || Wall(x, z) > 0.02f || Near(x, z, CampLayout.RunStart, 14f) || Near(x, z, Mound, MoundFoot + 2f) || CaveLife.NearPool(x, z, 3f)
                         || Near(x, z, BossArena.Centre, BossArena.Radius + 6f))
                     {
                         continue;
@@ -266,7 +266,10 @@ internal static class CaveLayout
         return things;
     }
 
-    /// <summary>What lights the cave: every crystal cluster and lantern, and the fires by the tunnel and in the arena - (where, colour, reach). The nearest few are lit.</summary>
+    /// <summary>
+    /// What lights the cave: every crystal cluster and lantern, the fungus and the pools (faintly), and the fires by the tunnel and in the arena - (where, colour,
+    /// reach). The nearest few are lit.
+    /// </summary>
     public static IReadOnlyList<(Vector3D<float> At, Vector3D<float> Colour, float Radius)> Lights(Terrain terrain)
     {
         var lights = new List<(Vector3D<float>, Vector3D<float>, float)>();
@@ -280,6 +283,16 @@ internal static class CaveLayout
             {
                 lights.Add((Ground(terrain, at) + new Vector3D<float>(0f, 1.9f, 0f), LanternLight, 11f));
             }
+        }
+
+        foreach (var (at, _, scale) in CaveLife.Fungus())
+        {
+            lights.Add((Ground(terrain, at) + new Vector3D<float>(0f, 0.5f, 0f), FungusLight, 4f + 2f * scale));
+        }
+
+        foreach (var (at, radius) in CaveLife.Pools)
+        {
+            lights.Add((new Vector3D<float>(at.X, CaveLife.WaterHeight + 1f, at.Y), PoolLight, radius + 5f));
         }
 
         foreach (var (offset, _) in Braziers)
@@ -298,6 +311,8 @@ internal static class CaveLayout
     public static readonly Vector3D<float> CrystalLight = new(0.55f, 0.36f, 1.1f);
     public static readonly Vector3D<float> LanternLight = new(0.3f, 1.05f, 0.45f);
     public static readonly Vector3D<float> FireLight = new(1.25f, 0.62f, 0.25f);
+    public static readonly Vector3D<float> FungusLight = new(0.12f, 0.55f, 0.5f);
+    public static readonly Vector3D<float> PoolLight = new(0.14f, 0.3f, 0.16f);
 
     /// <summary>How many of the cave's lights are lit at once, the nearest ones (the engine lights at most 32, some of them its own: the wisps' and the shots').</summary>
     public const int LitAtOnce = 22;

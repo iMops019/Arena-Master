@@ -74,6 +74,19 @@ public sealed partial class ArenaMasterContent
             window.AddFire(fireId, at + new Vector3D<float>(0f, CaveLayout.BrazierFireHeight, 0f), scale: 0.6f);
         }
 
+        // What lives here that stays put: the pools, faintly glowing with the scum on them, and the glowing fungus.
+        window.SetCrowd(CaveLife.PoolModel, CaveLife.Pools.Select(p => new CrowdInstance(new Vector3D<float>(p.At.X, CaveLife.WaterHeight, p.At.Y),
+            Vector2D.Distance(p.At, Vector2D<float>.Zero) * 0.1f, p.Radius)).ToArray());
+        window.SetCrowd(CaveLife.FungusModel, CaveLife.Fungus().Select(f => new CrowdInstance(CaveLayout.Ground(terrain, f.At), f.Yaw, f.Scale)).ToArray());
+        window.SetCrowdGlow(CaveLife.PoolModel, 0.14f);
+        window.SetCrowdGlow(CaveLife.FungusModel, 0.9f);
+        window.SetCrowdGlow(CaveLife.DropModel, 0.6f);
+        window.SetCrowdGlow(CaveLife.RippleModel, 0.8f);
+        window.SetCrowdGlow(CaveLife.WispModel, 1.6f);
+        window.SetCrowdGlow(CaveLife.VioletWispModel, 1.6f);
+        window.SetCrowdGlow(CaveLife.BatUpModel, 0.6f);
+        window.SetCrowdGlow(CaveLife.BatDownModel, 0.6f);
+
         _caveLights = CaveLayout.Lights(terrain);
         _caveFlow = new CaveFlow(CaveLayout.Grid);
     }
@@ -102,7 +115,7 @@ public sealed partial class ArenaMasterContent
         window.GroundMist.Amount = 0.35f;
         window.GroundMist.Color = CaveMist;
         window.GroundMist.ReferenceHeight = CaveLayout.FloorHeight + 0.5f;
-        window.WispAmount = 0.5f;
+        window.WispAmount = 1f;   // the engine's own few, round the player, on top of the cave's (CaveLife.Wisps)
         _enemyView.Brighten = MonsterBrighten;
         if (_caveFlow is { } flow)
         {
@@ -164,6 +177,7 @@ public sealed partial class ArenaMasterContent
         window.GroundMist.Color = mist * 0.2f;
         window.GroundMist.Amount = 0.2f + 0.3f * band.Mist;
         window.Cave.FogColor = CaveFog + mist * 0.02f;
+        window.WispAmount = 1f;   // the band's wisps and then some: the cave has its own too
         window.Weather.Rain = 0f;
         window.Weather.Snowfall = 0f;
         window.Weather.Settle();
@@ -182,6 +196,7 @@ public sealed partial class ArenaMasterContent
 
         _caveFlow?.Update(window.PlayerFeet, deltaSeconds);
         UpdateCaveLights(window, window.PlayerFeet);
+        AnimateCaveLife(window, deltaSeconds);
         window.SetPointLight(PlayerLightId, window.PlayerFeet + new Vector3D<float>(0f, 2.4f, 0f), PlayerLight, PlayerLightReach);
     }
 
@@ -196,6 +211,34 @@ public sealed partial class ArenaMasterContent
 
     /// <summary>How much brighter than the dark round them the monsters are drawn underground (see <see cref="EnemyView.Brighten"/>).</summary>
     private const float MonsterBrighten = 0.5f;
+
+    private float _caveTime;
+    private readonly List<CrowdInstance> _drops = new();
+    private readonly List<CrowdInstance> _ripples = new();
+    private readonly List<CrowdInstance> _batsUp = new();
+    private readonly List<CrowdInstance> _batsDown = new();
+    private readonly List<CrowdInstance> _greenWisps = new();
+    private readonly List<CrowdInstance> _violetWisps = new();
+
+    /// <summary>The cave's moving life, this frame: the drops and ripples, the bats, the wisps.</summary>
+    private void AnimateCaveLife(EngineWindow window, float deltaSeconds)
+    {
+        if (window.Terrain is not { } terrain)
+        {
+            return;
+        }
+
+        _caveTime += deltaSeconds;
+        CaveLife.Drops(_caveTime, _drops, _ripples);
+        CaveLife.Bats(_caveTime, _batsUp, _batsDown);
+        CaveLife.Wisps(_caveTime, (x, z) => terrain.TryGetHeight(x, z, out float h) ? h : CaveLayout.FloorHeight, _greenWisps, _violetWisps);
+        window.SetCrowd(CaveLife.DropModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_drops));
+        window.SetCrowd(CaveLife.RippleModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_ripples));
+        window.SetCrowd(CaveLife.BatUpModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_batsUp));
+        window.SetCrowd(CaveLife.BatDownModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_batsDown));
+        window.SetCrowd(CaveLife.WispModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_greenWisps));
+        window.SetCrowd(CaveLife.VioletWispModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_violetWisps));
+    }
 
     /// <summary>Lights the cave's lights nearest <paramref name="from"/> (the player, or the Editor's camera), and puts out the ones left behind.</summary>
     private void UpdateCaveLights(EngineWindow window, Vector3D<float> from)
@@ -245,9 +288,10 @@ public sealed partial class ArenaMasterContent
     }
 
     /// <summary>Lights the cave's lights nearest <paramref name="from"/>, as a run does each frame round the player.</summary>
-    public void LightCave(EngineWindow window, Vector3D<float> from)
+    public void LightCave(EngineWindow window, Vector3D<float> from, float seconds = 0f)
     {
         UpdateCaveLights(window, from);
+        AnimateCaveLife(window, seconds);
         window.SetPointLight(PlayerLightId, from + new Vector3D<float>(0f, 2.4f, 0f), PlayerLight, PlayerLightReach);
     }
 
@@ -271,6 +315,7 @@ public sealed partial class ArenaMasterContent
         if (_underground && window.Camera is { } eye)
         {
             UpdateCaveLights(window, eye.Position);
+            AnimateCaveLife(window, ImGui.GetIO().DeltaTime);
         }
     }
 }

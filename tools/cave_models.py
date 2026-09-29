@@ -8,6 +8,14 @@
   cave_lantern.glb      a ghoul lantern: a bone pole driven into the ground, a skull on it, a cage hanging from its crook
   cave_lantern_fire.glb the lantern's green fire in its cage and the skull's eyes, drawn glowing (EngineWindow.SetCrowdGlow) over the lantern
   cave_tunnel.glb       the mouth of the tunnel the stairs come down: a stone face with a dark arch, rocks piled over it (where a run starts)
+  cave_pool.glb         a pool of brackish water, radius about 1: murky green, a paler scum at its ragged edge (scaled to each pool, drawn faintly glowing)
+  cave_ripple.glb       a thin ring of radius 1 on the water, spreading where a drop falls in
+  cave_drop.glb         a drop of water, about 0.2 m long, falling from the roof
+  cave_fungus.glb       a cluster of glowing teal mushrooms on pale stems, about 0.6 m across (drawn glowing)
+  cave_bat_up.glb, cave_bat_down.glb
+                        a bat, wings up and wings down (drawn in turn as it flaps), about 0.7 m across
+  cave_wisp.glb, cave_wisp_violet.glb
+                        a wisp: a small bright orb in a paler halo, green and violet (drawn glowing, drifting through the chambers)
   camp_descent.glb      the way down at camp, where the gate was: a stair cut going down between stone walls to the tunnel's mouth, set in the palisade
 """
 
@@ -200,7 +208,104 @@ def build_descent():
     return m
 
 
+def build_cave_pool():
+    """A pool of brackish water, radius about 1: a murky middle and a paler ring of scum round its ragged edge, flat on y = 0."""
+    m = Mesh()
+    up = (0.0, 1.0, 0.0)
+    sides = 20
+    rim = [0.86 + 0.14 * _unit_noise(i, 11.0) for i in range(sides)]
+    for i in range(sides):
+        a0, a1 = math.tau * i / sides, math.tau * (i + 1) / sides
+        r0, r1 = rim[i], rim[(i + 1) % sides]
+        inner0, inner1 = (math.cos(a0) * r0 * 0.8, 0.0, math.sin(a0) * r0 * 0.8), (math.cos(a1) * r1 * 0.8, 0.0, math.sin(a1) * r1 * 0.8)
+        outer0, outer1 = (math.cos(a0) * r0, 0.0, math.sin(a0) * r0), (math.cos(a1) * r1, 0.0, math.sin(a1) * r1)
+        m.facing([(0.0, 0.0, 0.0), inner0, inner1], up, "brackish")
+        m.facing([inner0, outer0, outer1, inner1], up, "brackish_light")
+    return m
+
+
+def build_cave_ripple():
+    """A ring spreading on the water: thin, radius 1."""
+    m = Mesh()
+    up = (0.0, 1.0, 0.0)
+    for i in range(24):
+        a0, a1 = math.tau * i / 24, math.tau * (i + 1) / 24
+        m.facing([(math.cos(a0) * 0.9, 0.0, math.sin(a0) * 0.9), (math.cos(a0), 0.0, math.sin(a0)), (math.cos(a1), 0.0, math.sin(a1)),
+                  (math.cos(a1) * 0.9, 0.0, math.sin(a1) * 0.9)], up, "brackish_light")
+    return m
+
+
+def build_cave_drop():
+    """A drop of water, falling point-first: a thin double cone about 0.2 m long along Y."""
+    m = Mesh()
+    _cone(m, 0.0, 0.0, 0.05, -0.12, 0.035, "ice_light", sides=5)
+    _cone(m, 0.0, 0.0, 0.05, 0.1, 0.035, "ice_light", sides=5)
+    return m
+
+
+def build_cave_fungus():
+    """A cluster of glowing mushrooms: pale stems and broad teal caps of different sizes, about 0.6 m across."""
+    m = Mesh()
+    for i, (x, z, h, r) in enumerate(((0.0, 0.0, 0.34, 0.16), (0.2, 0.08, 0.22, 0.11), (-0.16, 0.12, 0.26, 0.12), (0.06, -0.2, 0.18, 0.09),
+                                      (-0.22, -0.14, 0.12, 0.07), (0.26, -0.16, 0.1, 0.06))):
+        m.prism(x, z, r * 0.22, 0.0, h, "bone", sides=5)
+        colour = "fungus_light" if i % 2 == 0 else "fungus"
+        _cone(m, x, z, h, h + r * 0.55, r, colour, sides=7, turn=i * 0.4)
+        _cone(m, x, z, h, h - r * 0.12, r, colour, sides=7, turn=i * 0.4)
+    return m
+
+
+def _bat(wing_lift):
+    m = Mesh()
+    m.box(-0.05, -0.04, -0.12, 0.05, 0.05, 0.1, "bat")                       # body
+    m.box(-0.035, 0.0, 0.1, 0.035, 0.06, 0.16, "bat")                         # head
+    m.box(-0.03, 0.05, 0.15, -0.01, 0.1, 0.16, "bat")                         # ears
+    m.box(0.01, 0.05, 0.15, 0.03, 0.1, 0.16, "bat")
+    m.box(-0.025, 0.02, 0.16, -0.01, 0.035, 0.165, "ghoul_eye")               # red eyes
+    m.box(0.01, 0.02, 0.16, 0.025, 0.035, 0.165, "ghoul_eye")
+    for side in (-1, 1):                                                      # the wings: a leathery triangle each, lifted or dropped at the tips
+        root_front, root_back = (side * 0.05, 0.02, 0.08), (side * 0.05, 0.02, -0.1)
+        tip = (side * 0.38, 0.02 + wing_lift, -0.02)
+        mid = (side * 0.22, 0.02 + wing_lift * 0.5, -0.16)
+        m.facing([root_front, tip, root_back], (0.0, 1.0, 0.0), "bat")
+        m.facing([root_front, root_back, tip], (0.0, -1.0, 0.0), "bat")
+        m.facing([root_back, tip, mid], (0.0, 1.0, 0.0), "bat")
+        m.facing([root_back, mid, tip], (0.0, -1.0, 0.0), "bat")
+    return m
+
+
+def build_cave_bat_up():
+    return _bat(0.22)
+
+
+def build_cave_bat_down():
+    return _bat(-0.18)
+
+
+def _wisp(core, halo):
+    """A wisp: a bright core with a larger, paler halo round it, radius about 0.25."""
+    m = Mesh()
+    for size, colour, turn in ((0.25, halo, 0.0), (0.13, core, math.pi / 4)):
+        top, bottom = (0.0, size, 0.0), (0.0, -size, 0.0)
+        ring = [(math.cos(turn + k * math.pi / 3) * size, 0.0, math.sin(turn + k * math.pi / 3) * size) for k in range(6)]
+        for i in range(6):
+            a, b = ring[i], ring[(i + 1) % 6]
+            m.facing([a, b, top], ((a[0] + b[0]) / 2, size / 3, (a[2] + b[2]) / 2), colour)
+            m.facing([b, a, bottom], ((a[0] + b[0]) / 2, -size / 3, (a[2] + b[2]) / 2), colour)
+    return m
+
+
+def build_cave_wisp():
+    return _wisp("ghost_eye", "fungus")
+
+
+def build_cave_wisp_violet():
+    return _wisp("crystal_light", "crystal")
+
+
 CAVE_MODELS = (("cave_ceiling.glb", build_cave_ceiling), ("cave_stalagmite.glb", build_cave_stalagmite), ("cave_crystals.glb", build_cave_crystals),
                ("cave_bones.glb", build_cave_bones), ("cave_lantern.glb", build_cave_lantern),
                ("cave_lantern_fire.glb", build_cave_lantern_fire), ("cave_tunnel.glb", build_cave_tunnel),
-               ("camp_descent.glb", build_descent))
+               ("camp_descent.glb", build_descent), ("cave_pool.glb", build_cave_pool), ("cave_ripple.glb", build_cave_ripple),
+               ("cave_drop.glb", build_cave_drop), ("cave_fungus.glb", build_cave_fungus), ("cave_bat_up.glb", build_cave_bat_up),
+               ("cave_bat_down.glb", build_cave_bat_down), ("cave_wisp.glb", build_cave_wisp), ("cave_wisp_violet.glb", build_cave_wisp_violet))

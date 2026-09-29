@@ -169,11 +169,11 @@ public class CaveTests
     }
 
     [Fact]
-    public void TheCavesLights_AreItsCrystalsLanternsAndFires_AndTheNearestFewAreLit()
+    public void TheCavesLights_AreItsCrystalsLanternsFungusPoolsAndFires_AndTheNearestFewAreLit()
     {
         var lights = CaveLayout.Lights(World.Value);
         int glowing = CaveLayout.Things().Count(t => t.Thing is CaveThing.Crystals or CaveThing.Lantern);
-        Assert.Equal(glowing + CaveLayout.Braziers.Length + BossArena.Fires().Count(), lights.Count);
+        Assert.Equal(glowing + CaveLife.Fungus().Count + CaveLife.Pools.Length + CaveLayout.Braziers.Length + BossArena.Fires().Count(), lights.Count);
 
         var start = CaveLayout.Ground(World.Value, CampLayout.RunStart);
         var lit = CaveLayout.Nearest(lights, start, CaveLayout.LitAtOnce);
@@ -257,5 +257,76 @@ public class EnemySteeringTests
 
         Assert.True(field.Enemies.Count > 10);
         Assert.All(field.Enemies, e => Assert.True(e.Position.X > 0f - 2f));   // (they may have taken a step since)
+    }
+}
+
+/// <summary>What lives in the cave (World/CaveLife): pools and their drips, fungus, bats and wisps.</summary>
+public class CaveLifeTests
+{
+    [Fact]
+    public void ThePools_LieInDipsOnTheFloor_AndTheDropsFallIntoThem_ThenRipple()
+    {
+        foreach (var (at, radius) in CaveLife.Pools)
+        {
+            Assert.True(CaveLayout.IsFloor(at.X, at.Y), $"a pool at {at} is off the floor");
+            Assert.True(CaveLife.PoolDip(at.X, at.Y) > 0.8f);
+            Assert.Equal(0f, CaveLife.PoolDip(at.X + radius + 2f, at.Y));
+            Assert.False(CaveLayout.Things().Any(t => Vector2D.Distance(t.At, at) < radius + 2f), "something stands in a pool");
+        }
+
+        var drips = CaveLife.Drips();
+        Assert.True(drips.Count >= CaveLife.Pools.Length * 2);
+        Assert.All(drips, d => Assert.True(CaveLife.Pools.Any(p => Vector2D.Distance(d.At, p.At) < p.Radius)));
+
+        // A drop falls, lands on the water, and a ripple spreads where it landed.
+        var (spot, period, offset) = drips[0];
+        float start = period - offset;   // when this drop starts to fall
+        var drops = new List<CrowdInstance>();
+        var ripples = new List<CrowdInstance>();
+        CaveLife.Drops(start + 0.05f, drops, ripples);
+        var drop = drops.Single(d => MathF.Abs(d.Position.X - spot.X) < 1e-3f && MathF.Abs(d.Position.Z - spot.Y) < 1e-3f);
+        Assert.True(drop.Position.Y > CaveLife.WaterHeight + CaveLife.DropHeight - 0.5f);
+
+        CaveLife.Drops(start + CaveLife.FallSeconds + 0.3f, drops, ripples);
+        Assert.DoesNotContain(drops, d => MathF.Abs(d.Position.X - spot.X) < 1e-3f && MathF.Abs(d.Position.Z - spot.Y) < 1e-3f);
+        Assert.Contains(ripples, r => MathF.Abs(r.Position.X - spot.X) < 1e-3f && r.Scale > 0.3f);
+    }
+
+    [Fact]
+    public void TheFungus_GrowsWhereTheFloorMeetsTheRock()
+    {
+        var fungus = CaveLife.Fungus();
+        Assert.True(fungus.Count > 50);
+        Assert.All(fungus, f =>
+        {
+            Assert.InRange(CaveLayout.FloorDistance(f.At.X, f.At.Y), -2.5f, 0.2f);
+            Assert.False(CaveLayout.OnSurface(f.At.X, f.At.Y));
+        });
+    }
+
+    [Fact]
+    public void TheBats_CircleInTheBigHalls_UnderTheRoof_AndTheWispsDriftThroughEveryChamber()
+    {
+        var up = new List<CrowdInstance>();
+        var down = new List<CrowdInstance>();
+        CaveLife.Bats(12.3f, up, down);
+        Assert.Equal(CaveLayout.Chambers.Sum(CaveLife.BatsIn), up.Count + down.Count);
+        Assert.True(up.Count > 0 && down.Count > 0);   // flapping, not all in step
+        Assert.All(up.Concat(down), b =>
+        {
+            Assert.True(b.Position.Y < CaveLayout.CeilingHeight - 6f);
+            Assert.NotNull(CaveLayout.ChamberAt(b.Position.X, b.Position.Z) ?? (CaveLayout.Blocked(b.Position.X, b.Position.Z) ? null : CaveLayout.Chambers[0]));
+        });
+
+        var green = new List<CrowdInstance>();
+        var violet = new List<CrowdInstance>();
+        CaveLife.Wisps(40f, (_, _) => CaveLayout.FloorHeight, green, violet);
+        Assert.Equal(CaveLayout.Chambers.Sum(CaveLife.WispsIn), green.Count + violet.Count);
+        Assert.True(green.Count + violet.Count >= 30);
+        Assert.True(violet.Count > 0);
+        foreach (var chamber in CaveLayout.Chambers)
+        {
+            Assert.True(CaveLife.WispsIn(chamber) >= 1, $"no wisps in {chamber.Name}");
+        }
     }
 }

@@ -176,6 +176,11 @@ PALETTE = {
     "cave_rock_light": (86, 80, 78),
     "crystal": (128, 84, 250),
     "crystal_light": (214, 192, 255),
+    "brackish": (40, 58, 42),
+    "brackish_light": (86, 110, 66),
+    "fungus": (40, 200, 190),
+    "fungus_light": (150, 255, 235),
+    "bat": (78, 62, 70),
 }
 COLOURS = list(PALETTE)
 
