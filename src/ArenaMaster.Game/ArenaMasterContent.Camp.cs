@@ -344,6 +344,7 @@ public sealed partial class ArenaMasterContent
     {
         _mode = GameMode.Camp;
         _plan = Delve.RunPlan.Classic;
+        LeaveCave(window);
         RestoreCampLook(window);
         _hero.ReturnToCamp();
         _hero.UseTree(_tree.Save.Ranks);

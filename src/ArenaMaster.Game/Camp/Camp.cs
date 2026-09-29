@@ -12,7 +12,7 @@ internal enum CampStation
     /// <summary>The archery target: the passive tree.</summary>
     Tree,
 
-    /// <summary>The departure gate: choose a loadout and start a run.</summary>
+    /// <summary>The stairs down to the Delve (where the departure gate was): the Delve chart, then a loadout, then a run.</summary>
     Gate,
 
     /// <summary>The bounty board: the one-time challenges, done and still to do.</summary>
@@ -33,9 +33,10 @@ internal enum CampStation
 
 /// <summary>
 /// Where camp is and what is in it: a clearing of packed earth in a corner of the map (painted with the engine's bed colour, which keeps trees and plants off it),
-/// walled in by a palisade (<see cref="CampWalls"/>) with the departure gate set in it, a fire in the middle, the stations, the quartermaster behind his stall,
-/// and the camp's dressing (<see cref="Decor"/>). Low hills ring it outside the wall, so it sits in a hollow of its own. Runs are played around the middle of the
-/// map, far off: travelling between the two goes through a fade to black (<c>Ui/ScreenFade</c>), so camp reads as its own small place.
+/// walled in by a palisade (<see cref="CampWalls"/>) with the stairs down to the Delve set in it (<see cref="Descent"/>; the departure gate until 2026-09-28), a fire
+/// in the middle, the stations, the quartermaster behind his stall, and the camp's dressing (<see cref="Decor"/>). Low hills ring it outside the wall, so it sits in a
+/// hollow of its own, and beyond them the rock of the cave's ridge (<c>World/CaveLayout</c>). Runs are played underground, in the cave: going down and coming back
+/// up goes through a fade to black (<c>Ui/ScreenFade</c>), so camp reads as its own small place.
 /// </summary>
 internal static class CampLayout
 {
@@ -49,7 +50,7 @@ internal static class CampLayout
 
     public const int FireId = 7001;
 
-    /// <summary>Where runs start: the middle of the map.</summary>
+    /// <summary>Where runs start: the middle of the map, in the cave, in front of the tunnel the stairs come down (<c>CaveLayout.Tunnel</c>).</summary>
     public static readonly Vector2D<float> RunStart = new(0f, 0f);
 
     /// <summary>Where the player stands on arriving at camp, a few steps from the fire, facing it (camera yaw in degrees).</summary>
@@ -60,7 +61,7 @@ internal static class CampLayout
     {
         (CampStation.Stash, "camp_stash.glb", new(-6.5f, 2f), "Open the item chest"),
         (CampStation.Tree, "camp_target.glb", new(6.5f, 2f), "Passive tree"),
-        (CampStation.Gate, "camp_gate.glb", new(0f, CampWalls.Apothem), "The Delve chart: choose where to go"),
+        (CampStation.Gate, Descent.Model, new(0f, CampWalls.Apothem), "The stairs down to the Delve: choose where to go"),
         (CampStation.Bounties, "camp_board.glb", new(8.5f, -5f), "Read the bounty board"),
         (CampStation.Quartermaster, "camp_stall.glb", new(-9.5f, -3f), "Visit the quartermaster"),
         (CampStation.Classes, "camp_rack.glb", new(4f, -10f), "Choose your class"),
@@ -111,11 +112,11 @@ internal static class CampLayout
         ("camp_lantern.glb", new(6.2f, -9.8f), -60f, PropCollision.Cylinder),
         ("camp_lantern.glb", new(-5.2f, 4.4f), 120f, PropCollision.Cylinder),
 
-        // The gate: a banner either side, and braziers lighting the way
+        // The stairs down: a banner either side, and braziers lighting the way at the top of them
         ("camp_banner.glb", new(-5.2f, 14.6f), 180f, PropCollision.Cylinder),
         ("camp_banner.glb", new(5.2f, 14.6f), 180f, PropCollision.Cylinder),
-        ("camp_brazier.glb", new(-2.6f, 14.4f), 0f, PropCollision.Cylinder),
-        ("camp_brazier.glb", new(2.6f, 14.4f), 0f, PropCollision.Cylinder),
+        ("camp_brazier.glb", new(-3.5f, 11.8f), 0f, PropCollision.Cylinder),
+        ("camp_brazier.glb", new(3.5f, 11.8f), 0f, PropCollision.Cylinder),
         ("camp_brazier.glb", new(-12.4f, 3.6f), 0f, PropCollision.Cylinder),
         ("camp_brazier.glb", new(13.4f, -4.2f), 0f, PropCollision.Cylinder),
     };
@@ -165,7 +166,8 @@ internal static class CampLayout
     {
         foreach (var (_, model, offset, _) in Stations)
         {
-            yield return Place(terrain, model, offset, FacingFire(offset), PropCollision.Box);
+            // The stairs are walked down: nothing of them is solid (the dug ground is the way down, the palisade either side the wall).
+            yield return Place(terrain, model, offset, FacingFire(offset), model == Descent.Model ? PropCollision.None : PropCollision.Box);
         }
 
         yield return Place(terrain, "camp_firepit.glb", Vector2D<float>.Zero, 0f, PropCollision.None);
@@ -201,6 +203,7 @@ internal static class CampLayout
             terrain.ApplyBrush(Centre.X + MathF.Cos(angle) * distance, Centre.Y + MathF.Sin(angle) * distance, radius, height);
         }
 
+        Descent.DigGround(terrain);
         terrain.PaintShape((x, z) => InClearing(x, z), TerrainPalette.Bed);
         terrain.PaintShape((x, z) => OnPath(x - Centre.X, z - Centre.Y), TerrainPalette.BeachSand);
     }
@@ -227,7 +230,47 @@ internal static class CampLayout
 }
 
 /// <summary>
-/// The palisade round camp: an octagon of wall pieces with a thick post at each corner and the departure gate filling the middle of its north side (the one the
+/// The stairs down to the Delve, where camp's gate was (the user's, 2026-09-28): a stair cut going <see cref="Drop"/> down between stone walls toward the north wall,
+/// ending in the stone face of a tunnel's mouth that fills the palisade's gap, a mound of earth over it outside. The ground is dug to follow the stairs, so the player
+/// walks down them; at the foot, by the tunnel, is where the Delve chart is opened. The sizes are the model's own (<c>DESCENT_*</c> in <c>tools/cave_models.py</c>).
+/// </summary>
+internal static class Descent
+{
+    public const string Model = "camp_descent.glb";
+
+    /// <summary>How far down the stairs go, and how far back from the tunnel's mouth (toward the fire) they start.</summary>
+    public const float Drop = 3.5f;
+    public const float Run = 8f;
+
+    /// <summary>From the middle of the stairs to the dug ground's edge, under the stone walls either side.</summary>
+    public const float HalfWidth = 2f;
+
+    /// <summary>Where the tunnel's mouth is, off the camp's centre: in the palisade's gap, on the north side.</summary>
+    public static Vector2D<float> Mouth => new(0f, CampWalls.Apothem);
+
+    /// <summary>How far below camp's ground the dug stairs are at a spot (offset from camp's centre), 0 off them: all the way down at the mouth, rising to nothing at the top.</summary>
+    public static float Depth(float x, float z)
+    {
+        float back = Mouth.Y - z;   // how far from the mouth toward the fire
+        if (MathF.Abs(x) > HalfWidth || back < -2f || back > Run + 0.6f)   // on into the tunnel, under its face, so the dark of it is clear of the ground
+        {
+            return 0f;
+        }
+
+        return Drop * Math.Clamp(1f - (back - 0.6f) / Run, 0f, 1f);
+    }
+
+    /// <summary>Digs the stairs into the ground, and heaps a mound of earth outside the palisade over the tunnel.</summary>
+    public static void DigGround(Terrain terrain)
+    {
+        var mound = CampLayout.Centre + Mouth + new Vector2D<float>(0f, 7.5f);
+        terrain.ApplyBrush(mound.X, mound.Y, 6.5f, 5f);
+        terrain.Reshape((x, z, height) => height - Depth(x - CampLayout.Centre.X, z - CampLayout.Centre.Y));
+    }
+}
+
+/// <summary>
+/// The palisade round camp: an octagon of wall pieces with a thick post at each corner and the stairs down to the Delve filling the middle of its north side (the one the
 /// spawn faces). Every piece faces into camp. The piece and gate sizes are the models' own (<c>WALL_SEGMENT</c> and <c>GATE_WIDTH</c> in
 /// <c>tools/make_placeholder_models.py</c>).
 /// </summary>
@@ -237,7 +280,7 @@ internal static class CampWalls
     public const int PiecesPerSide = 4;
     public const float PieceLength = 3.5f;
 
-    /// <summary>The gate takes the place of this many pieces in the middle of its side.</summary>
+    /// <summary>The tunnel's mouth at the foot of the stairs down takes the place of this many pieces in the middle of its side.</summary>
     public const int GatePieces = 2;
 
     public const string PieceModel = "camp_wall.glb";
@@ -251,10 +294,10 @@ internal static class CampWalls
     /// <summary>From the centre to a corner post.</summary>
     public static readonly float Circumradius = SideLength / 2f / MathF.Sin(MathF.PI / Sides);
 
-    /// <summary>The direction (angle from +X toward +Z) of side <paramref name="side"/>'s middle; side 0 is north (+Z), where the gate is.</summary>
+    /// <summary>The direction (angle from +X toward +Z) of side <paramref name="side"/>'s middle; side 0 is north (+Z), where the stairs down are.</summary>
     public static float SideAngle(int side) => MathF.PI / 2f + MathF.Tau * side / Sides;
 
-    /// <summary>Every piece of wall and every corner post, as (model, offset from the centre, yaw, collision). The gate itself is a station, placed with those.</summary>
+    /// <summary>Every piece of wall and every corner post, as (model, offset from the centre, yaw, collision). The stairs down are a station, placed with those.</summary>
     public static IEnumerable<(string Model, Vector2D<float> Offset, float Yaw, PropCollision Collision)> Pieces()
     {
         for (int side = 0; side < Sides; side++)

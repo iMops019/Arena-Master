@@ -293,8 +293,7 @@ public sealed partial class ArenaMasterContent
     /// <summary>Lights and weathers the world for a floor's band, keeping camp's own to put back afterwards.</summary>
     private void ApplyLook(EngineWindow window, DelveBand band)
     {
-        _campLook ??= new CampLook(window.TimeOfDay, window.AutoDayCycle, window.GroundMist.Amount, window.GroundMist.Color, window.GroundMist.ReferenceHeight,
-            window.Weather.Fog, window.Weather.Cloud, window.Weather.Rain, window.Weather.Snowfall, window.Weather.Warmth, window.WispAmount);
+        RememberCampLook(window);
 
         window.TimeOfDay = band.TimeOfDay;
         window.GroundMist.Amount = band.Mist;
@@ -307,7 +306,13 @@ public sealed partial class ArenaMasterContent
         window.Weather.Warmth = band.Warmth;
         window.Weather.Settle();
         window.WispAmount = band.Wisps;
+        TintCave(window, band);
     }
+
+    /// <summary>Camp's sky and weather, kept before a run changes them (once: a run that has already kept them keeps what it kept).</summary>
+    private void RememberCampLook(EngineWindow window) =>
+        _campLook ??= new CampLook(window.TimeOfDay, window.AutoDayCycle, window.GroundMist.Amount, window.GroundMist.Color, window.GroundMist.ReferenceHeight,
+            window.Weather.Fog, window.Weather.Cloud, window.Weather.Rain, window.Weather.Snowfall, window.Weather.Warmth, window.WispAmount);
 
     /// <summary>Camp's sky and weather back, as they were before the run (and warm enough that any snow a run left melts away).</summary>
     private void RestoreCampLook(EngineWindow window)

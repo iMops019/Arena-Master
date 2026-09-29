@@ -167,7 +167,7 @@ internal sealed class ItemChestScreen : GameScreen
         ItemGrid.Draw(all, i => profile.CountOf(i.Id), i => profile.CountOf(i.Id) > 0 ? ItemGrid.CardLook.Owned : ItemGrid.CardLook.Unfound,
             ImGui.GetContentRegionAvail().Y - buttonHeight - 16f * UiTheme.Scale);
 
-        bool close = Footer("Items found in a run come here when you pick them up. Choose which to bring at the departure gate.", buttonHeight);
+        bool close = Footer("Items found in a run come here when you pick them up. Choose which to bring at the stairs down.", buttonHeight);
         UiTheme.EndScreen();
         if (close || ClosedByKey(ImGuiKey.E))
         {
@@ -190,7 +190,7 @@ internal sealed class ItemChestScreen : GameScreen
 }
 
 /// <summary>
-/// The loadout screen at the departure gate: pick up to <see cref="Loadout.Limit"/> different items from the chest to bring on the run, each with every copy
+/// The loadout screen at the stairs down: pick up to <see cref="Loadout.Limit"/> different items from the chest to bring on the run, each with every copy
 /// owned, then begin. The choice is remembered for next time.
 /// </summary>
 internal sealed class LoadoutScreen : GameScreen
@@ -213,7 +213,7 @@ internal sealed class LoadoutScreen : GameScreen
         MarkDrawn();
         float scale = UiTheme.Scale;
         UiTheme.BeginScreen("##loadout", 0.78f, 0.84f);
-        UiTheme.Header($"Camp · Departure gate · {destination} as the {className}", "Choose your loadout", $"{profile.Loadout.Count} / {Loadout.Limit(profile)} items");
+        UiTheme.Header($"Camp · The stairs down · {destination} as the {className}", "Choose your loadout", $"{profile.Loadout.Count} / {Loadout.Limit(profile)} items");
 
         DrawSlots(profile);
 

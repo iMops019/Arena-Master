@@ -81,10 +81,12 @@ public sealed partial class ArenaMasterContent
         }
     }
 
-    /// <summary>Sets out from the gate on <paramref name="plan"/>: a fresh run with the loadout's items, the gear, the tree's bonuses, full health, at the run start.</summary>
+    /// <summary>Sets out down the stairs on <paramref name="plan"/>: a fresh run with the loadout's items, the gear, the tree's bonuses, full health, at the run start.</summary>
     private void BeginRun(EngineWindow window, Delve.RunPlan plan)
     {
         _plan = plan;
+        RememberCampLook(window);
+        EnterCave(window);   // every run is played underground
         _hero.UseTree(_tree.Save.Ranks);
         _items.Begin(Loadout.ItemsToBring(_profile));   // the loadout as it stands now: finds made on this run won't join it
         WearGear();

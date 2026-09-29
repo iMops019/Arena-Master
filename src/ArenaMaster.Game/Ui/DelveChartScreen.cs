@@ -67,7 +67,7 @@ internal sealed class DelveChartScreen : GameScreen
 
         float scale = UiTheme.Scale;
         UiTheme.BeginScreen("##delve", 0.86f, 0.88f);
-        UiTheme.Header("Camp · Departure gate", "The Delve", $"Deepest: depth {save.Deepest}   ·   {save.Marks:N0} Delve Marks");
+        UiTheme.Header("Camp · The stairs down", "The Delve", $"Deepest: depth {save.Deepest}   ·   {save.Marks:N0} Delve Marks");
 
         float width = ImGui.GetContentRegionAvail().X;
         float buttonHeight = 44f * scale;

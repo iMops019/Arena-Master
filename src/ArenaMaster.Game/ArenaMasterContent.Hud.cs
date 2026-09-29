@@ -67,7 +67,7 @@ public sealed partial class ArenaMasterContent
         else
         {
             hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -120f),
-                "Chest, quartermaster and armour stand on the right, tree target and bounty board on the left, class rack behind you, the gate ahead opens the Delve",
+                "Chest, quartermaster and armour stand on the right, tree target and bounty board on the left, class rack behind you, the stairs down ahead lead to the Delve",
                 new Vector4D<float>(1f, 1f, 1f, 0.6f), 0.8f);
         }
 

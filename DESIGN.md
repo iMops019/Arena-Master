@@ -14,7 +14,7 @@ Items marked **(draft)** are proposals the user hasn't confirmed yet. Items mark
 
 ## The core loop
 
-0. At **camp**, choose a class at the weapon rack, check the item chest, wear gear at the armour stand, spend passive tree points, read the bounty board, buy upgrades from the quartermaster with silver, and at the departure gate pick where to go on the **Delve chart** (or a classic run) and a loadout of up to 5 items (more with Bigger Pack).
+0. At **camp**, choose a class at the weapon rack, check the item chest, wear gear at the armour stand, spend passive tree points, read the bounty board, buy upgrades from the quartermaster with silver, and at the foot of the stairs down pick where to go on the **Delve chart** (or a classic run) and a loadout of up to 5 items (more with Bigger Pack).
 1. Start a run as a class: a Delve node (about 10 minutes, one boss, a cache at the end; see "The Delve"), or a classic 30-minute run.
 2. Move and aim. Attacks fire automatically in the direction the camera faces (Megabonk-style), so positioning and aim matter but you never click to attack.
 3. Kill monsters, which drop XP. Collect it to level up.
@@ -264,20 +264,31 @@ The user's brief (2026-09-26): a Priest whose first tree is **Unholy**, with a d
 
 ## Camp (built)
 
-- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle, walled in by a palisade (an octagon of sharpened logs, `CampWalls`) with the departure gate set in it as a gatehouse, and ringed outside by low wooded hills. Going to a run and coming back is a fade to black with the place's name on it (`Ui/ScreenFade`), so camp reads as its own small place. The camp is dressed (`CampLayout.Decor`: tents and bedrolls, benches round the fire, a cooking fire, braziers, banners, lanterns, a well, a supply cart, crates, barrels and sacks, a practice yard with dummies and straw bales, a woodpile), and the **quartermaster** stands behind his stall, idling (a skinned model with a looping clip: he breathes, looks about, strokes his moustache). He is only for looks. A fire, and seven stations; walk up and press E:
+- A clearing in a corner of the map (`Camp/Camp.cs`), well away from the run area in the middle, walled in by a palisade (an octagon of sharpened logs, `CampWalls`) with the stairs down to the Delve set in it (until 2026-09-28 the departure gate, a gatehouse; see "The cave"), and ringed outside by low wooded hills and a mountainside beyond. Going to a run and coming back is a fade to black with the place's name on it (`Ui/ScreenFade`), so camp reads as its own small place. The camp is dressed (`CampLayout.Decor`: tents and bedrolls, benches round the fire, a cooking fire, braziers, banners, lanterns, a well, a supply cart, crates, barrels and sacks, a practice yard with dummies and straw bales, a woodpile), and the **quartermaster** stands behind his stall, idling (a skinned model with a looping clip: he breathes, looks about, strokes his moustache). He is only for looks. A fire, and seven stations; walk up and press E:
   - **Weapon rack** (behind the spawn) -> choose the class: the Ranger, the Paladin, the Mage, the Shaman or the Warrior. Each keeps its own tree; the item chest, silver and upgrades are shared.
   - **Stash chest** -> Item Chest: every item, how many owned, and which are still undiscovered.
   - **Archery target** -> the chosen class's passive tree (the in-game version of the mockup).
   - **Bounty board** -> the bounties, done and to do.
   - **Quartermaster's stall** -> upgrades for silver.
   - **Armour stand** (by the stash) -> Gear: the seven places gear is worn, and every copy owned for each (see "Gear").
-  - **Departure gate** -> the Delve chart (pick a node, or a classic run), then the loadout (pick up to 5 items, more if bought), then Begin run.
+  - **The stairs down** (where the departure gate was) -> the Delve chart (pick a node, or a classic run), then the loadout (pick up to 5 items, more if bought), then Begin run.
 - Progress is saved to `%AppData%/ArenaMaster/profile.json` (stash, loadout, trees, silver, upgrades, bounties, lifetime totals, the Delve's progress and Delve Marks, gear owned and worn). It saves on every change at camp, every 20 s in a run, when the tree levels, and at the end of a run.
+
+## The cave (built 2026-09-28, an experiment; not yet played)
+
+The user's call: the game is Delve-themed, so runs go underground - a cave, deep under the camp, a **ghoul lair**: rock, no trees, its own look and dressing, as open as the old test map. Camp stays on the surface. The first map made for it; the user wants to experiment with it.
+- **Where** (`World/CaveLayout`, `ArenaMasterContent.Cave.cs`): all of the map but camp's corner. Camp's forest sits in a valley, a long mountainside rising round it; beyond is the cave, walled in by rock round the map's edge and a ridge between it and camp, with **pillars of rock** holding up the roof. Walls and pillars rise past the roof (34 m over the floor); the player can't walk up them (the engine's steepest walkable slope), and enemies, gems and crates keep off them. The floor is bare stone (nothing grows; rubble and boulders lie about), with the old hills as mounds of rock. **Every run starts** at the mouth of the tunnel the stairs come down, at the middle of the map (a stone face in a steep mound, a lit brazier either side); the **boss arena** is in the cave's far corner.
+- **The way down**: at camp, where the departure gate was, **stairs** go down between stone walls to a tunnel's mouth set in the palisade; the Delve chart opens at the foot of them. The trip down is the same fade to black, now "into the dark".
+- **The look** (the engine's new cave mode, `EngineWindow.Cave`): no sky or sun, a dark cold fog about 140 m out, a dim blue-grey light with a faint glow from above to shape the rock, stone-grey ground. The **roof** is a model of lumpy dark rock hung with stalactites, glowing faintly so it shows overhead and fades into the dark. It is lit by what glows in it: **violet crystal clusters**, **ghoul lanterns** (a bone pole, a skull, a cage of green fire) and the fires - the nearest 22 of them light the ground round them as the player moves. A low dark mist, drifting wisps; no birds or insects.
+- **Dressing** (scattered over the floor the same every time): stalagmites (solid), crystal clusters, heaps of bones, ghoul lanterns - about 500 things.
+- **Delve floors**: a floor's band tints the cave (its mist colour, darkened, and the air's) and keeps its wisps; no rain, snow or daylight reach down. The bands' names (the Greenwood, the Amber Hollows, ...) are still the surface ones, for the user to rename if the cave stays.
+- **In the Editor**: the toolbar has "Underground look" (the roof, the dark, the lights) and "Fly to the tunnel's mouth", to look round the cave without a run.
+- Open: whether the cave stays; how dark is right to fight in (the lights' and ambient's numbers are a first guess); a real layout (chambers, tunnels, a lake?) rather than one open cavern; cave-only fauna and flora (glowing fungus, bats, dripping water); the Delve bands' names and looks underground; the camp mountainside's look.
 
 ## The Delve (built, first pass)
 
 Added content, not a replacement: the classic 30-minute run is still there, a button on the Delve chart. Inspired by Path of Exile's Delve. All numbers are a first guess.
-- **The chart** (the departure gate, `Ui/DelveChartScreen`): floors going down from depth 1, drawn as rows of nodes joined to the floor below. Each floor has **5 nodes**, the same every time (seeded by depth, `Delve/DelveMap`): **2 or 3 King nodes** of different kinds and the rest **Descents** (no King), mixed along the row (the user's call, 2026-09-26: more nodes, more normal ones, King nodes kept for variety). There are no Armoury or Boss nodes any more (2026-09-27, see "The boss hunt"): the Delve is for going down, and gear comes from the boss hunt. **Clearing any node opens the floor below**; the floor's other nodes stay open to come back to. A cleared node is done. Floors not open yet are shown dark, two ahead.
+- **The chart** (the stairs down, `Ui/DelveChartScreen`): floors going down from depth 1, drawn as rows of nodes joined to the floor below. Each floor has **5 nodes**, the same every time (seeded by depth, `Delve/DelveMap`): **2 or 3 King nodes** of different kinds and the rest **Descents** (no King), mixed along the row (the user's call, 2026-09-26: more nodes, more normal ones, King nodes kept for variety). There are no Armoury or Boss nodes any more (2026-09-27, see "The boss hunt"): the Delve is for going down, and gear comes from the boss hunt. **Clearing any node opens the floor below**; the floor's other nodes stay open to come back to. A cleared node is done. Floors not open yet are shown dark, two ahead.
 - **Node kinds and what their cache pays** (`DelveRules.Reward`; base silver is 80 + 30 per depth):
   - *Descent* (no King): the base silver and 400 + 100 per depth tree experience. A Brute at 5:00; at 10:00 the cache turns up a few steps from the player. The swarm holds at its 10:00 strength until it is opened.
   - *Currency:* four times the base silver.
@@ -396,6 +407,7 @@ Each step should be playable before the next one starts. **[engine]** means the 
 12. *(Built, first pass; not yet played.)* **The Delve, Boss nodes and gear:** the Delve chart, 10-minute Delve runs with a boss and a cache, depth scaling and floor looks, the Hollow King Unbound in his arena (boss stages, chained attacks, fire from the sky), Delve Marks, 12 gear uniques at a new armour stand, 19 Delve bounties. [game] *(2026-09-27: the Boss nodes became the boss hunt, a fight of its own, and gear rolls; see "The boss hunt" and "Gear".)*
 13. *(Built, first pass.)* **Class #5, the Warrior, and its Berserker tree:** the Cleave's rolling waves, rage. [game]
 14. *(Built, first pass; not yet played.)* **Class #6, the Priest, and its Unholy tree:** the Plague Skull, stacking Plague, rot on the ground, Death and Decay, Pestilence, Rotting Step, the death and decay look, nine Priest items and three gear pieces. [game]
+15. *(Built 2026-09-28, an experiment; not yet played.)* **The cave:** runs go underground into a ghouls' lair under camp, down a stairway where the gate was. [engine: a cave mode (no sky or sun, dark fog, stone ground), `Terrain.Reshape`, a cave floor nothing grows on, glowing crowds, 32 point lights, the player's steepest slope, frame capture] [game: the cave's walls, pillars, roof and dressing, its lights, the stairs]
 14. Play the five classes and the Delve, and tune them: the Ranger, the Paladin (how much standing still should pay), the Mage (how hard standing still should punish), the Shaman (how much the trees give); the Delve's pace, rewards and the Unbound King's health. Then what Delve Marks buy, more enemies, or second trees.
 
 ## Open questions
@@ -404,7 +416,7 @@ Each step should be playable before the next one starts. **[engine]** means the 
 
 - Should item experience bonuses (Old Tome) also speed up the passive tree? (Left for later; currently they don't.)
 - Meta progression numbers (silver rates, prices, which items are locked behind which bounty) are a first guess.
-- The real map: size, layout and look (the hybrid: bounded, mid-to-large).
+- The real map: size, layout and look (the hybrid: bounded, mid-to-large). Since 2026-09-28 runs are in the cave (see "The cave"), an experiment.
 - Respec is free for now. Keep it free, or give it a cost later?
 - **What Delve Marks buy** (the user is designing a system for them).
 - **Boss hunt tiers and more bosses** (the user's, for later): see "The boss hunt".

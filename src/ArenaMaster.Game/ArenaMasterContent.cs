@@ -114,6 +114,7 @@ public sealed partial class ArenaMasterContent : IGameContent
             terrain.ApplyBrush(hill.X, hill.Z, hill.Radius, hill.Height);
         }
 
+        World.CaveLayout.ShapeGround(terrain);
         CampLayout.ShapeGround(terrain);
         Delve.BossArena.ShapeGround(terrain);
         return terrain;
@@ -140,9 +141,7 @@ public sealed partial class ArenaMasterContent : IGameContent
 
     public float? WaterLevel => null;
 
-    public void DrawEditorExtras(EngineWindow window)
-    {
-    }
+    public void DrawEditorExtras(EngineWindow window) => DrawCaveEditorExtras(window);
 
     public void Update(EngineWindow window, float deltaSeconds)
     {
@@ -157,7 +156,7 @@ public sealed partial class ArenaMasterContent : IGameContent
             Start(window, terrain);
         }
 
-        float? GroundAt(float x, float z) => terrain.TryGetHeight(x, z, out float height) ? height : null;
+        var groundAt = Walkable(terrain);
 
         if (_newGameRequested)
         {
@@ -181,9 +180,11 @@ public sealed partial class ArenaMasterContent : IGameContent
                 UpdateCamp(window, deltaSeconds);
                 break;
             case GameMode.Run:
-                UpdateRun(window, deltaSeconds, GroundAt);
+                UpdateRun(window, deltaSeconds, groundAt);
                 break;
         }
+
+        UpdateCaveLights(window, window.PlayerFeet);
     }
 
     /// <summary>The game's own screens, over the world, and over everything the fade between camp and a run.</summary>
@@ -245,6 +246,7 @@ public sealed partial class ArenaMasterContent : IGameContent
         window.ThirdPerson = true;
         BuildCamp(window, terrain);
         BuildArena(window, terrain);
+        BuildCave(window, terrain);
         window.AddPauseMenuButton("Return to Camp", () =>
         {
             if (_mode == GameMode.Run)

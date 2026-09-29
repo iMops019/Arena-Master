@@ -36,7 +36,7 @@ internal sealed record RunPlan(RunKind Kind, DelveNode? Node, HuntBoss? Boss = n
     {
         RunKind.Arena => $"The Arena  ·  {HuntBoss.Name}",
         _ when Node is { } node => $"Depth {node.Depth}  ·  {DelveBands.For(node.Depth).Name}",
-        _ => "Into the Wilds",
+        _ => "Into the Dark",   // down the stairs, into the cave
     };
 
     /// <summary>Where the loadout screen says the run is going.</summary>

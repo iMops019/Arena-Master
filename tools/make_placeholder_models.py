@@ -19,6 +19,9 @@
   (+ ghoul_tactician_bomb.glb), brute.glb, hollow_king.glb, hollow_king_unbound.glb, marauder_unbound.glb, fiend.glb (+ fiend_crossbow.glb)
                           the enemies, skinned and animated (idle, walk, die and their attacks), with their held crossbow, flame and bomb: see
                           tools/enemy_models.py
+  cave_*.glb, camp_descent.glb
+                          the Delve's cave (its roof, stalagmites, crystals, bones, ghoul lanterns, the tunnel's mouth) and the stairs down to it at camp: see
+                          tools/cave_models.py
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
   ghoul_bolt.glb          a Crossbow Ghoul's bolt: a dark shaft with a glowing head, centred on its middle, pointing +Z
   ghoul_fireball.glb      a Ghoul Mage's fireball: a fiery orb with a bright core, centred on its middle
@@ -169,6 +172,10 @@ PALETTE = {
     "bomb_black": (34, 34, 40),
     "potion": (222, 40, 96),
     "cork": (172, 132, 82),
+    "cave_rock": (52, 48, 50),
+    "cave_rock_light": (86, 80, 78),
+    "crystal": (128, 84, 250),
+    "crystal_light": (214, 192, 255),
 }
 COLOURS = list(PALETTE)
 
@@ -1622,6 +1629,12 @@ if __name__ == "__main__":
         clips = hero.clips()
         write_skinned_glb(mesh, MODELS / hero.file, hero.rig.gltf_joints(), clips)
         print(f"Wrote {MODELS / hero.file} ({len(mesh.positions)} vertices, {len(hero.rig.names)} joints, clips {', '.join(clips)})")
+
+    import cave_models
+    for name, build in cave_models.CAVE_MODELS:
+        mesh = build()
+        write_glb(mesh, MODELS / name)
+        print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")
 
     import enemy_models
     for enemy in enemy_models.ENEMIES.values():
