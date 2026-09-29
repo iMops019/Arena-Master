@@ -94,6 +94,25 @@ internal enum AttackType
     /// after. Keep running.
     /// </summary>
     Whirlwind,
+
+    /// <summary>
+    /// A slam where it stands, on a short wind-up: everything within <see cref="AttackSpec.Reach"/> of it is hit as the blow comes, a circle round it filling
+    /// through the wind-up. Get out of the circle (the Fiend's, at the end of his charge).
+    /// </summary>
+    Stomp,
+
+    /// <summary>
+    /// A leap back to where it stood when it began the attack this one follows on from (its <see cref="Enemy.Home"/>), arcing <see cref="AttackSpec.LeapHeight"/>
+    /// high; or, with a <see cref="AttackSpec.Reach"/>, a leap that far away from the player (kept inside the field's <c>Arena</c>). Harmless: it is getting
+    /// back into position to shoot.
+    /// </summary>
+    Retreat,
+
+    /// <summary>
+    /// A long aim down a thin lane <see cref="AttackSpec.Reach"/> long, following the player for its <see cref="AttackSpec.Tracking"/> and then locking; then
+    /// one very fast shot straight down it. Get out of the lane once it locks.
+    /// </summary>
+    Snipe,
 }
 
 /// <summary>
@@ -102,19 +121,28 @@ internal enum AttackType
 /// </summary>
 /// <param name="MinRange">It only starts this attack with the player at least this far away...</param>
 /// <param name="MaxRange">...and no further than this.</param>
-/// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls. Shoot: how far the bolt flies. Barrage: how far from the player the fireballs spread. Lob: unused.</param>
-/// <param name="HitWidth">Lunge: how close to the charging body counts as hit. Shockwave: half the ring's width. Shoot, Lob: the shot's radius. Unused otherwise.</param>
-/// <param name="LeapHeight">LeapSlam: the top of the arc, above the straight line from take-off to landing.</param>
-/// <param name="ProjectileSpeed">Shoot: how fast the shot flies - slow enough to sidestep once it is loosed. Whirlwind: its speed as a share of its walk.</param>
+/// <param name="Reach">Lunge: how far the charge goes. LeapSlam: the landing's radius. Shockwave: how far the ring spreads. Summon: how many it calls. Shoot: how far the bolt flies. Barrage: how far from the player the fireballs spread. Lob: how far round the player a salvo's other bombs are aimed. Stomp: its radius. Snipe: the lane's length. Retreat: 0 to leap back to where it stood, more to leap that far away from the player.</param>
+/// <param name="HitWidth">Lunge: how close to the charging body counts as hit. Shockwave: half the ring's width. Shoot, Lob, Snipe: the shot's radius. Unused otherwise.</param>
+/// <param name="LeapHeight">LeapSlam, Retreat: the top of the arc, above the straight line from take-off to landing.</param>
+/// <param name="ProjectileSpeed">Shoot, Snipe: how fast the shot flies - slow enough to sidestep once it is loosed. Whirlwind: its speed as a share of its walk.</param>
 /// <param name="Splash">Shoot: 0 for a bolt that has to hit the player; more for a fireball that bursts where it lands, hurting anyone within this far. Lob: the bomb's blast.</param>
-/// <param name="ProjectileModel">Shoot, Barrage, Lob: the model the shot is drawn with.</param>
+/// <param name="ProjectileModel">Shoot, Barrage, Lob, Snipe: the model the shot is drawn with.</param>
 /// <param name="Count">Barrage: how many fireballs fall. Lob: how many times the bomb bounces before it rolls. LineSlam: how many rifts at once (1 if 0).</param>
 /// <param name="Chain">How many times more it goes straight into the same attack once one ends (a double or triple leap, rolling shockwaves), each with half the wind-up.</param>
 /// <param name="Tracking">Lunge: for this many seconds of the wind-up the lane keeps turning to follow the player; then it locks, and stepping out of it is the answer.</param>
 /// <param name="Pattern">Barrage: where the fireballs fall (see <see cref="BarragePattern"/>).</param>
 /// <param name="Tick">Whirlwind: seconds between its hits while it spins.</param>
-/// <param name="Spread">LineSlam: the angle between its rifts (radians), fanned either side of the one aimed at the player.</param>
-/// <param name="FollowUp">An attack it goes straight into as this one's blow ends (no recovery in between): the Marauder's rifts off his jump slam.</param>
+/// <param name="Spread">LineSlam: the angle between its rifts (radians), fanned either side of the one aimed at the player. Shoot: the angle between a salvo's bolts.</param>
+/// <param name="FollowUp">
+/// An attack it goes straight into as this one's blow ends (no recovery in between): the Marauder's rifts off his jump slam, the Fiend's charge off his grenades.
+/// </param>
+/// <param name="Salvo">
+/// Shoot: how many bolts at once, fanned <paramref name="Spread"/> apart with the middle one at the player. Lob: how many bombs at once, one at the player and
+/// the rest at spots round them <paramref name="Reach"/> away. 1 if 0.
+/// </param>
+/// <param name="StopAtPlayer">Lunge: the charge ends at the player (where they are when its lane locks) instead of running its whole reach.</param>
+/// <param name="MarkModel">Shoot, Barrage: what marks a splash shot's landing spot (a fireball's burning ring if null).</param>
+/// <param name="BurstModel">Shoot, Barrage: what a splash shot bursts in (a ring of fire if null).</param>
 internal sealed record AttackSpec(
     AttackType Type,
     float MinRange,
@@ -137,7 +165,11 @@ internal sealed record AttackSpec(
     BarragePattern Pattern = BarragePattern.Scatter,
     float Tick = 0f,
     float Spread = 0f,
-    AttackSpec? FollowUp = null);
+    AttackSpec? FollowUp = null,
+    int Salvo = 0,
+    bool StopAtPlayer = false,
+    string? MarkModel = null,
+    string? BurstModel = null);
 
 /// <summary>
 /// A boss's next stage, once its health falls to <paramref name="Below"/> of its most (0 to 1): a new set of attacks, a shorter breather between them, a faster walk,
@@ -192,6 +224,14 @@ internal sealed record EnemyKind(
 
     /// <summary>A ranged kind stops walking closer once the player is this near (0: it walks right up).</summary>
     public float StandOff { get; init; }
+
+    /// <summary>Where its shots leave from: this high above its feet (a ghoul's crossbow; the Fiend's, much higher), and this far in front.</summary>
+    public float ShotHeight { get; init; } = EnemyField.ShotHeight;
+
+    public float ShotForward { get; init; } = EnemyField.ShotForward;
+
+    /// <summary>How high above its feet a bomb it lobs leaves its hand.</summary>
+    public float LobHeight { get; init; } = EnemyField.LobHeight;
 
     /// <summary>A boss's later stages, from the first reached to the last (see <see cref="BossPhase"/>). Empty for everything else.</summary>
     public IReadOnlyList<BossPhase> Phases { get; init; } = Array.Empty<BossPhase>();
@@ -414,10 +454,13 @@ internal sealed record EnemyKind(
     public static readonly IReadOnlyList<EnemyKind> Foes = new[]
     {
         Ghoul, CrossbowGhoul, GhoulMage, BeastRider, GhoulTactician, GhoulBeast, Brute, HollowKing, DelveBosses.HollowKingUnbound, DelveBosses.MarauderUnbound,
+        DelveBosses.Fiend,
     };
 }
 
-/// <summary>The boss hunts' bosses, each fought alone in the arena: the Hollow King Unbound, and a tier up from him, the Marauder Unbound.</summary>
+/// <summary>
+/// The boss hunts' bosses, each fought alone in the arena: the Hollow King Unbound, a tier up from him the Marauder Unbound, and a tier up again, the Fiend.
+/// </summary>
 internal static class DelveBosses
 {
     private const string Fireball = "ghoul_fireball.glb";
@@ -542,6 +585,125 @@ internal static class DelveBosses
                 DamageBoost = 1.2f,
                 AttackSpeedBoost = 1.3f,
                 Rage = 20,
+            },
+        },
+    };
+
+    // The Fiend's crossbow work. The volley, the three shots in a row and the grenades-charge-slam-retreat-shot are the user's (2026-09-28); the kick, the fan of
+    // bolts, the Deadeye, the strafing row and the cage of bolts are Claude's, to fill out his stages.
+
+    private const string FiendBolt = "fiend_bolt.glb";
+    private const string BoltMark = "fiend_bolt_mark.glb";
+    private const string BoltBurst = "fiend_bolt_burst.glb";
+
+    /// <summary>One heavy bolt straight at the player: sidestep it as it is loosed.</summary>
+    private static AttackSpec Shot(float windUp = 0.45f) => new(AttackType.Shoot, MinRange: 0f, MaxRange: 40f, WindUp: windUp, Active: 0.1f, Recover: 0.8f,
+        Damage: 24f, Reach: 45f, HitWidth: 0.3f, Knockback: 6f, ProjectileSpeed: 32f, ProjectileModel: FiendBolt);
+
+    /// <summary>Three shots one after another (the user's), each aimed afresh at where the player is: keep moving.</summary>
+    private static AttackSpec Triple() => Shot(0.75f) with { MinRange = MeleeRange, MaxRange = 28f, Recover = 0.6f, Chain = 2 };
+
+    /// <summary>
+    /// The volley (the user's): bolts loosed high into the air to rain down round where the player stands, the first right on them, each landing spot marked.
+    /// Small bursts; keep moving.
+    /// </summary>
+    private static AttackSpec Volley(int count, float spread) => new(AttackType.Barrage, MinRange: MeleeRange, MaxRange: 40f, WindUp: 1f, Active: 0.2f, Recover: 0.7f,
+        Damage: 22f, Reach: spread, Knockback: 5f, ProjectileSpeed: 24f, Splash: 1.3f, ProjectileModel: FiendBolt, Count: count, MarkModel: BoltMark,
+        BurstModel: BoltBurst);
+
+    /// <summary>
+    /// The grenades (the user's): a salvo of bombs lobbed at the player and round them, then at once the rest of it - a charge straight at the player, a slam the
+    /// moment he gets there, a leap back to where he threw from, and a shot from there (see <see cref="Charge"/>).
+    /// </summary>
+    private static AttackSpec Grenades(int salvo) => new(AttackType.Lob, MinRange: 6f, MaxRange: 22f, WindUp: 0.8f, Active: 0.2f, Recover: 0.6f,
+        Damage: 26f, Reach: 7f, HitWidth: 0.2f, Knockback: 8f, Splash: 2.6f, ProjectileModel: "ghoul_bomb.glb", Count: 1, Salvo: salvo, FollowUp: Charge());
+
+    /// <summary>Off the grenades: a charge down a lane at the player that stops on them (quick to come, tracking a moment, then locked).</summary>
+    private static AttackSpec Charge() => new(AttackType.Lunge, MinRange: 0f, MaxRange: 40f, WindUp: 0.4f, Active: 0.45f, Recover: 0.3f,
+        Damage: 22f, Reach: 20f, HitWidth: 0.5f, Knockback: 4f, Tracking: 0.25f, StopAtPlayer: true, FollowUp: Stomp());
+
+    /// <summary>The moment the charge ends: a slam where he stands, almost at once (a circle 4.2 m round him, 0.3 s to get out of it).</summary>
+    private static AttackSpec Stomp() => new(AttackType.Stomp, MinRange: 0f, MaxRange: 40f, WindUp: 0.3f, Active: 0.15f, Recover: 0.2f,
+        Damage: 30f, Reach: 4.2f, Knockback: 13f, Stun: 0.5f, FollowUp: Fallback());
+
+    /// <summary>Back to where he threw the grenades from, in one leap, and a shot from there.</summary>
+    private static AttackSpec Fallback() => new(AttackType.Retreat, MinRange: 0f, MaxRange: 40f, WindUp: 0.12f, Active: 0.55f, Recover: 0.1f,
+        Damage: 0f, Reach: 0f, LeapHeight: 2.5f, FollowUp: Shot());
+
+    /// <summary>
+    /// Within this of the player he is in melee range: he only kicks or leaps away (the user's call, 2026-09-28: he gets away from players in melee), and his
+    /// shots and volleys wait until he is clear.
+    /// </summary>
+    private const float MeleeRange = 5f;
+
+    /// <summary>Claude's: too close, and he kicks the player away in a wedge in front of him, leaps back from them and shoots.</summary>
+    private static AttackSpec Kick() => new(AttackType.Swing, MinRange: 0f, MaxRange: 4.2f, WindUp: 0.4f, Active: 0.15f, Recover: 0.3f,
+        Damage: 16f, Reach: 3.8f, HitWidth: 1f, Knockback: 16f, Tracking: 0.2f, FollowUp: Disengage());
+
+    /// <summary>
+    /// The user's (2026-09-28): in melee range he jumps backwards 9 m away from the player (kept inside the arena), and shoots from there. Also what the kick
+    /// goes into.
+    /// </summary>
+    private static AttackSpec Disengage() => new(AttackType.Retreat, MinRange: 0f, MaxRange: MeleeRange, WindUp: 0.2f, Active: 0.6f, Recover: 0.1f,
+        Damage: 0f, Reach: 9f, LeapHeight: 3f, FollowUp: Shot());
+
+    /// <summary>Claude's: five bolts at once in a fan, the middle one at the player - step into a gap, or out of the fan.</summary>
+    private static AttackSpec Fan(int chain) => new(AttackType.Shoot, MinRange: MeleeRange, MaxRange: 26f, WindUp: 0.85f, Active: 0.1f, Recover: 0.7f,
+        Damage: 20f, Reach: 40f, HitWidth: 0.3f, Knockback: 6f, ProjectileSpeed: 28f, ProjectileModel: FiendBolt, Chain: chain, Salvo: 5, Spread: 0.2f);
+
+    /// <summary>
+    /// Claude's: the Deadeye. A long aim down a thin lane across the arena that follows the player, locks 0.4 s before the shot, and one bolt down it very fast and
+    /// very hard. Out of the lane once it locks.
+    /// </summary>
+    private static AttackSpec Deadeye() => new(AttackType.Snipe, MinRange: 6f, MaxRange: 45f, WindUp: 1.5f, Active: 0.1f, Recover: 0.9f,
+        Damage: 55f, Reach: 50f, HitWidth: 0.5f, Knockback: 15f, ProjectileSpeed: 80f, ProjectileModel: FiendBolt, Tracking: 1.1f);
+
+    /// <summary>Claude's: a row of bolts from the sky from him through the player and on past, landing outward from him - step aside.</summary>
+    private static AttackSpec Strafe(int chain) => new(AttackType.Barrage, MinRange: MeleeRange, MaxRange: 30f, WindUp: 0.9f, Active: 0.2f, Recover: 0.8f,
+        Damage: 24f, Reach: 10f, Knockback: 6f, ProjectileSpeed: 26f, Splash: 1.3f, ProjectileModel: FiendBolt, Chain: chain, Pattern: BarragePattern.Line,
+        MarkModel: BoltMark, BurstModel: BoltBurst);
+
+    /// <summary>Claude's, for his last stage: a ring of bolts from the sky round the player with one gap in it, and one on the player - out through the gap.</summary>
+    private static AttackSpec Cage() => new(AttackType.Barrage, MinRange: MeleeRange, MaxRange: 40f, WindUp: 1.1f, Active: 0.2f, Recover: 0.9f,
+        Damage: 28f, Reach: 4.5f, Knockback: 6f, ProjectileSpeed: 22f, Splash: 1.4f, ProjectileModel: FiendBolt, Count: 14, Pattern: BarragePattern.Ring,
+        MarkModel: BoltMark, BurstModel: BoltBurst);
+
+    /// <summary>
+    /// The Fiend (the user's, 2026-09-28): a tier up from the Marauder Unbound, and unlocked by slaying him. A giant ghoul hunter about 3.4 m tall with a great
+    /// crossbow, who keeps his distance. He rains volleys of bolts down on the player, fires three shots one after another, and lobs a salvo of grenades then
+    /// charges, slams the moment he arrives, leaps back to where he threw from and shoots again. Too close and he kicks the player away or jumps back from them,
+    /// and shoots. Below 65% he takes aim:
+    /// a fan of five bolts, the Deadeye down a locked lane, a strafing row of bolts. Below 30% he is cornered: quicker and harder, a cage of bolts round the player,
+    /// and more grenades.
+    /// </summary>
+    public static readonly EnemyKind Fiend = new(
+        Name: "The Fiend",
+        Model: "fiend.glb",
+        Tier: EnemyTier.Boss,
+        MaxHealth: 36000f,
+        Speed: 4.4f,
+        Radius: 1f,
+        Height: 3.4f,
+        ContactDamage: 26f,
+        ContactInterval: 0.9f,
+        Experience: 300)
+    {
+        AttackCooldown = 1f,
+        StandOff = 10f,
+        HeldModel = "fiend_crossbow.glb",
+        ShotHeight = 2.4f,
+        ShotForward = 2.2f,
+        LobHeight = 3.2f,
+        Attacks = new[] { Triple(), Volley(16, 6f), Grenades(5), Kick(), Disengage() },
+        Phases = new[]
+        {
+            new BossPhase(0.65f, new[] { Triple(), Volley(20, 7f), Grenades(5), Kick(), Disengage(), Fan(0), Deadeye(), Strafe(0) }, AttackCooldown: 0.85f,
+                SpeedMultiplier: 1.1f, "The Fiend takes aim!"),
+            new BossPhase(0.3f, new[] { Triple(), Volley(24, 8f), Grenades(7), Kick(), Disengage(), Fan(1), Deadeye(), Strafe(1), Cage() }, AttackCooldown: 0.7f,
+                SpeedMultiplier: 1.2f, "The Fiend is cornered, and shoots wild!")
+            {
+                DamageBoost = 1.1f,
+                AttackSpeedBoost = 1.2f,
             },
         },
     };

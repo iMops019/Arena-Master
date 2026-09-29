@@ -99,6 +99,7 @@ public sealed partial class ArenaMasterContent
         _enemies.TargetCount = 0;
         _enemies.Mix = Array.Empty<(EnemyKind, float)>();
         _enemies.Scaling = hunt.Scaling;
+        _enemies.Arena = (BossArena.Centre, BossArena.LeapRadius);
         var boss = _enemies.Spawn(BossArena.Ground(terrain, BossArena.BossStart), hunt.Kind);
         boss.Yaw = MathF.PI;   // facing the way in
         boss.AttackCooldown = ArenaGrace;

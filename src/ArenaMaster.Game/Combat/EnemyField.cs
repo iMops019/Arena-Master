@@ -152,6 +152,9 @@ internal sealed class Enemy
     /// <summary>Where the attack is aimed: the lunge's end, the leap's landing spot.</summary>
     public Vector3D<float> AttackTarget { get; set; }
 
+    /// <summary>Where it stood when it chose its attack (not a chained one or a follow-up): where a <see cref="AttackType.Retreat"/> takes it back to.</summary>
+    public Vector3D<float> Home { get; set; }
+
     /// <summary>A stalker's mood: stalking (circling, waiting for an opening) or fleeing, and how long a flight lasts yet.</summary>
     public StalkMood Mood { get; set; }
 
@@ -205,6 +208,11 @@ internal sealed class EnemyBolt
     public Vector3D<float> Target { get; init; }
 
     public float Splash { get; init; }
+
+    /// <summary>What marks a splash shot's landing spot while it flies, and what it bursts in.</summary>
+    public string MarkModel { get; init; } = EnemyView.LandingModel;
+
+    public string BurstModel { get; init; } = EnemyView.BlastModel;
 
     public Vector3D<float> Position { get; set; }
 
@@ -364,6 +372,12 @@ internal sealed class EnemyField
     /// <c>EngineWindow.TouchesObstacle</c>; null for none.
     /// </summary>
     public Func<Vector3D<float>, float, bool>? Obstacles { get; set; }
+
+    /// <summary>
+    /// The ground a leap away from the player must land on (the boss arena inside its walls: a flat centre and radius), or null for anywhere. Set by a boss
+    /// hunt.
+    /// </summary>
+    public (Vector2D<float> Centre, float Radius)? Arena { get; set; }
 
     /// <summary>How long a burst lasts, for the view.</summary>
     public const float BlastSeconds = 0.35f;
@@ -898,6 +912,7 @@ internal sealed class EnemyField
             if (pounce is not null && enemy.AttackCooldown <= 0f && MayStart(enemy, pounce))
             {
                 enemy.Yaw = MathF.Atan2(toPlayer.X, toPlayer.Z);
+                enemy.Home = enemy.Position;
                 StartAttack(enemy, pounce, player, groundAt);
                 Started(enemy, pounce);
                 enemy.ChainLeft = pounce.Chain;
@@ -1031,6 +1046,7 @@ internal sealed class EnemyField
         }
 
         var attack = usable[_random.Next(usable.Count)];
+        enemy.Home = enemy.Position;
         StartAttack(enemy, attack, player, groundAt);
         Started(enemy, attack);
         enemy.ChainLeft = attack.Chain;
@@ -1038,10 +1054,8 @@ internal sealed class EnemyField
     }
 
     /// <summary>Begins <paramref name="attack"/>'s wind-up, fixing where it is aimed.</summary>
-    private static void StartAttack(Enemy enemy, AttackSpec attack, PlayerTarget player, Func<float, float, float?> groundAt)
+    private void StartAttack(Enemy enemy, AttackSpec attack, PlayerTarget player, Func<float, float, float?> groundAt)
     {
-        var toPlayer = Geometry.FlatDirection(enemy.Position, player.Feet, out _);
-
         enemy.Attack = attack;
         enemy.AttackPhase = AttackPhase.WindUp;
         enemy.PhaseTime = 0f;
@@ -1050,14 +1064,70 @@ internal sealed class EnemyField
         enemy.AttackOrigin = enemy.Position;
         enemy.AttackTarget = attack.Type switch
         {
-            // The lane is fixed the moment it is shown: the charge goes where the lane points, not where the player has moved to. A swing's wedge and a rift's
-            // lane likewise (after any tracking).
-            AttackType.Lunge or AttackType.Swing or AttackType.Cleave or AttackType.LineSlam => enemy.Position + toPlayer * attack.Reach,
+            // The lane is fixed the moment it is shown: the charge goes where the lane points, not where the player has moved to. A swing's wedge, a rift's
+            // lane and a sniper's line likewise (after any tracking).
+            _ when Aimed(attack.Type) => LaneEnd(enemy, attack, player.Feet),
 
             // The landing spot is where the player stood when the circle appeared - so the circle is the warning, and leaving it is the answer.
             AttackType.LeapSlam => new Vector3D<float>(player.Feet.X, groundAt(player.Feet.X, player.Feet.Z) ?? player.Feet.Y, player.Feet.Z),
+            AttackType.Retreat when attack.Reach > 0f => LeapAway(enemy, attack.Reach, player.Feet),
+            AttackType.Retreat => enemy.Home,
             _ => enemy.Position,
         };
+    }
+
+    /// <summary>
+    /// Where a leap <paramref name="reach"/> away from the player lands: straight away from them if that stays in the <see cref="Arena"/>, otherwise the way
+    /// (turned up to 100 degrees either side) that lands furthest from them inside it; if none does, the arena's edge straight away from them.
+    /// </summary>
+    public Vector3D<float> LeapAway(Enemy enemy, float reach, Vector3D<float> feet)
+    {
+        var away = Geometry.FlatDirection(feet, enemy.Position, out _);
+        if (away == Vector3D<float>.Zero)
+        {
+            away = new Vector3D<float>(-MathF.Sin(enemy.Yaw), 0f, -MathF.Cos(enemy.Yaw));   // right on top of it: back the way it faces
+        }
+
+        if (Arena is not { } arena)
+        {
+            return enemy.Position + away * reach;
+        }
+
+        bool Inside(Vector3D<float> p) => Vector2D.Distance(new Vector2D<float>(p.X, p.Z), arena.Centre) <= arena.Radius;
+        Vector3D<float>? best = null;
+        float furthest = -1f;
+        for (int step = 0; step <= 8; step++)
+        {
+            float turn = (step - 4) * 25f * MathF.PI / 180f;
+            var landing = enemy.Position + Turned(away, turn) * reach;
+            Geometry.FlatDirection(feet, landing, out float from);
+            if (Inside(landing) && from > furthest)
+            {
+                best = landing;
+                furthest = from;
+            }
+        }
+
+        if (best is { } found)
+        {
+            return found;
+        }
+
+        // Cornered against the wall: as far as it can go toward the way away, on the arena's edge.
+        var wanted = enemy.Position + away * reach;
+        var outward = Vector2D.Normalize(new Vector2D<float>(wanted.X, wanted.Z) - arena.Centre) * arena.Radius + arena.Centre;
+        return new Vector3D<float>(outward.X, enemy.Position.Y, outward.Y);
+    }
+
+    /// <summary>
+    /// Where an aimed attack's lane (or wedge) ends, aimed from where the attack began at <paramref name="feet"/>: its whole reach, or for a charge that stops at
+    /// the player, only as far as their edge.
+    /// </summary>
+    private static Vector3D<float> LaneEnd(Enemy enemy, AttackSpec attack, Vector3D<float> feet)
+    {
+        var way = Geometry.FlatDirection(enemy.AttackOrigin, feet, out float distance);
+        float length = attack.StopAtPlayer ? Math.Clamp(distance - enemy.Kind.Radius - PlayerRadius, 0f, attack.Reach) : attack.Reach;
+        return enemy.AttackOrigin + way * length;
     }
 
     private void RunAttack(Enemy enemy, float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
@@ -1072,7 +1142,7 @@ internal sealed class EnemyField
                 if (Aimed(attack.Type) && enemy.PhaseTime < attack.Tracking)
                 {
                     // The lane (or wedge) still follows the player; it locks once the tracking is over.
-                    enemy.AttackTarget = enemy.AttackOrigin + Geometry.FlatDirection(enemy.AttackOrigin, player.Feet, out _) * attack.Reach;
+                    enemy.AttackTarget = LaneEnd(enemy, attack, player.Feet);
                 }
 
                 FaceAttack(enemy, player);
@@ -1095,6 +1165,10 @@ internal sealed class EnemyField
                     else if (attack.Type == AttackType.Lob)
                     {
                         Lob(enemy, attack, player, groundAt);
+                    }
+                    else if (attack.Type == AttackType.Snipe)
+                    {
+                        Snipe(enemy, attack, player);
                     }
                 }
 
@@ -1223,6 +1297,27 @@ internal sealed class EnemyField
                 break;
             }
 
+            case AttackType.Stomp when !enemy.AttackLanded:
+            {
+                enemy.AttackLanded = true;   // the slam comes down at the start of the blow
+                var away = Geometry.FlatDirection(enemy.Position, player.Feet, out float gap);
+                if (gap <= attack.Reach + PlayerRadius && MathF.Abs(player.Feet.Y - enemy.Position.Y) < enemy.Kind.Height)
+                {
+                    Hit(enemy, attack, player, away == Vector3D<float>.Zero ? new Vector3D<float>(MathF.Sin(enemy.Yaw), 0f, MathF.Cos(enemy.Yaw)) : away);
+                }
+
+                break;
+            }
+
+            case AttackType.Retreat:
+            {
+                // An arcing leap back to where it stood.
+                var flat = enemy.AttackOrigin + (enemy.AttackTarget - enemy.AttackOrigin) * t;
+                float from = enemy.AttackOrigin.Y, to = groundAt(enemy.AttackTarget.X, enemy.AttackTarget.Z) ?? enemy.AttackTarget.Y;
+                enemy.Position = new Vector3D<float>(flat.X, from + (to - from) * t + 4f * attack.LeapHeight * t * (1f - t), flat.Z);
+                break;
+            }
+
             case AttackType.Whirlwind:
             {
                 // Spinning after the player, faster than it walks, hitting whatever is in reach every tick.
@@ -1323,8 +1418,8 @@ internal sealed class EnemyField
         return true;
     }
 
-    /// <summary>Whether an attack of <paramref name="type"/> is aimed along a locked line: a lunge's lane, a swing's or cleave's wedge, a rift.</summary>
-    public static bool Aimed(AttackType type) => type is AttackType.Lunge or AttackType.Swing or AttackType.Cleave or AttackType.LineSlam;
+    /// <summary>Whether an attack of <paramref name="type"/> is aimed along a locked line: a lunge's lane, a swing's or cleave's wedge, a rift, a sniper's line.</summary>
+    public static bool Aimed(AttackType type) => type is AttackType.Lunge or AttackType.Swing or AttackType.Cleave or AttackType.LineSlam or AttackType.Snipe;
 
     /// <summary>Turns toward what the attack is aimed at: the lane, the wedge or the landing spot while they are shown, otherwise the player.</summary>
     private static void FaceAttack(Enemy enemy, PlayerTarget player)
@@ -1346,31 +1441,76 @@ internal sealed class EnemyField
 
     /// <summary>
     /// Looses a shot from <paramref name="shooter"/>'s weapon where the player stands now - a bolt at their middle, a splash shot at the ground under them. Moving
-    /// after the glow peaks is how to dodge it.
+    /// after the glow peaks is how to dodge it. A salvo looses its other bolts at the same time, fanned out either side of the first.
     /// </summary>
     private void Shoot(Enemy shooter, AttackSpec attack, PlayerTarget player, Func<float, float, float?> groundAt)
     {
         var facing = new Vector3D<float>(MathF.Sin(shooter.Yaw), 0f, MathF.Cos(shooter.Yaw));
-        var from = shooter.Position + new Vector3D<float>(0f, ShotHeight, 0f) + facing * ShotForward;
+        var from = Muzzle(shooter, facing);
         var at = attack.Splash > 0f
             ? new Vector3D<float>(player.Feet.X, groundAt(player.Feet.X, player.Feet.Z) ?? player.Feet.Y, player.Feet.Z)
             : player.Feet + new Vector3D<float>(0f, PlayerHeight * 0.5f, 0f);
         var toward = at - from;
         var direction = toward.LengthSquared > 1e-6f ? Vector3D.Normalize(toward) : facing;
+        int salvo = Math.Max(1, attack.Salvo);
+        for (int i = 0; i < salvo; i++)
+        {
+            float turn = (i - (salvo - 1) / 2f) * attack.Spread;
+            Loose(shooter, attack, from, Turned(direction, turn), at, attack.Reach / attack.ProjectileSpeed);
+        }
+    }
+
+    /// <summary>
+    /// The Snipe's shot, as its wind-up ends: straight down the locked lane (whatever the player has done since), dipping only to meet the player's middle where
+    /// they are along it.
+    /// </summary>
+    private void Snipe(Enemy shooter, AttackSpec attack, PlayerTarget player)
+    {
+        var way = Geometry.FlatDirection(shooter.AttackOrigin, shooter.AttackTarget, out _);
+        if (way == Vector3D<float>.Zero)
+        {
+            way = new Vector3D<float>(MathF.Sin(shooter.Yaw), 0f, MathF.Cos(shooter.Yaw));
+        }
+
+        var from = Muzzle(shooter, way);
+        float along = MathF.Max(5f, (player.Feet.X - from.X) * way.X + (player.Feet.Z - from.Z) * way.Z);
+        var at = new Vector3D<float>(from.X + way.X * along, player.Feet.Y + PlayerHeight * 0.5f, from.Z + way.Z * along);
+        Loose(shooter, attack, from, Vector3D.Normalize(at - from), at, attack.Reach / attack.ProjectileSpeed);
+    }
+
+    /// <summary>Where a shooter's shots leave its weapon, facing <paramref name="facing"/>.</summary>
+    private static Vector3D<float> Muzzle(Enemy shooter, Vector3D<float> facing) =>
+        shooter.Position + new Vector3D<float>(0f, shooter.Kind.ShotHeight, 0f) + facing * shooter.Kind.ShotForward;
+
+    /// <summary><paramref name="direction"/> turned <paramref name="angle"/> radians round the upright.</summary>
+    private static Vector3D<float> Turned(Vector3D<float> direction, float angle)
+    {
+        if (angle == 0f)
+        {
+            return direction;
+        }
+
+        float c = MathF.Cos(angle), s = MathF.Sin(angle);
+        return new Vector3D<float>(direction.X * c + direction.Z * s, direction.Y, direction.Z * c - direction.X * s);
+    }
+
+    /// <summary>One of <paramref name="attack"/>'s shots, flying from <paramref name="from"/> along <paramref name="direction"/> for <paramref name="flight"/> seconds.</summary>
+    private void Loose(Enemy shooter, AttackSpec attack, Vector3D<float> from, Vector3D<float> direction, Vector3D<float> target, float flight) =>
         _bolts.Add(new EnemyBolt
         {
             Shooter = shooter,
             Model = attack.ProjectileModel ?? "ghoul_bolt.glb",
-            Target = at,
+            Target = target,
             Splash = attack.Splash,
+            MarkModel = attack.MarkModel ?? EnemyView.LandingModel,
+            BurstModel = attack.BurstModel ?? EnemyView.BlastModel,
             Position = from,
             Velocity = direction * attack.ProjectileSpeed,
-            FlightLeft = attack.Reach / attack.ProjectileSpeed,
+            FlightLeft = flight,
             Damage = attack.Damage * shooter.DamageScale * RangedDamageTaken,
             Radius = attack.HitWidth,
             Knockback = attack.Knockback,
         });
-    }
 
     /// <summary>How high above its landing spot a barrage's fireball starts to fall.</summary>
     public const float BarrageHeight = 16f;
@@ -1462,6 +1602,8 @@ internal sealed class EnemyField
                 Model = attack.ProjectileModel ?? "ghoul_fireball.glb",
                 Target = target,
                 Splash = attack.Splash,
+                MarkModel = attack.MarkModel ?? EnemyView.LandingModel,
+                BurstModel = attack.BurstModel ?? EnemyView.BlastModel,
                 Position = from,
                 Velocity = Vector3D.Normalize(fall) * speed,
                 FlightLeft = fall.Length / speed + 1f,
@@ -1492,7 +1634,7 @@ internal sealed class EnemyField
             {
                 if (bolt.Splash > 0f)
                 {
-                    Burst(bolt.Shooter, from + (to - from) * along, bolt.Splash, bolt.Damage, bolt.Knockback, bolt.Velocity, EnemyView.BlastModel, player, bottom, top);
+                    Burst(bolt.Shooter, from + (to - from) * along, bolt.Splash, bolt.Damage, bolt.Knockback, bolt.Velocity, bolt.BurstModel, player, bottom, top);
                 }
                 else if (Strike(bolt.Shooter, bolt.Damage, player, out bool blocked) && !blocked)
                 {
@@ -1507,7 +1649,7 @@ internal sealed class EnemyField
             {
                 if (bolt.Splash > 0f)
                 {
-                    Burst(bolt.Shooter, new Vector3D<float>(to.X, ground, to.Z), bolt.Splash, bolt.Damage, bolt.Knockback, bolt.Velocity, EnemyView.BlastModel, player, bottom, top);
+                    Burst(bolt.Shooter, new Vector3D<float>(to.X, ground, to.Z), bolt.Splash, bolt.Damage, bolt.Knockback, bolt.Velocity, bolt.BurstModel, player, bottom, top);
                 }
 
                 _bolts.RemoveAt(i);
@@ -1566,21 +1708,43 @@ internal sealed class EnemyField
 
     /// <summary>
     /// Lobs a bomb from <paramref name="thrower"/>'s raised hand in a high arc that first lands <see cref="LobShort"/> of the way to where the player stands
-    /// now, so it bounces on toward them.
+    /// now, so it bounces on toward them. A salvo lobs its other bombs at the same time at spots round the player, evenly spaced <see cref="AttackSpec.Reach"/>
+    /// from them.
     /// </summary>
     private void Lob(Enemy thrower, AttackSpec attack, PlayerTarget player, Func<float, float, float?> groundAt)
     {
+        int salvo = Math.Max(1, attack.Salvo);
+        float turn = salvo > 1 ? (float)_random.NextDouble() * MathF.Tau : 0f;
+        for (int i = 0; i < salvo; i++)
+        {
+            // The rest round the player, evenly, each between most of the reach and all of it so they don't sit in a neat ring.
+            float angle = turn + MathF.Tau * i / MathF.Max(1, salvo - 1);
+            float distance = attack.Reach * (0.7f + 0.3f * (float)_random.NextDouble());
+            var aim = i == 0 ? player.Feet : player.Feet + new Vector3D<float>(MathF.Sin(angle), 0f, MathF.Cos(angle)) * distance;
+            LobAt(thrower, attack, aim, player.Feet.Y, groundAt, salvo > 1 ? SalvoShort : LobShort);
+        }
+    }
+
+    /// <summary>
+    /// A salvo's bombs first land this share of the way to their spots, nearer than a lone bomb does, so they come down spread out round the player rather than
+    /// bunched up short of them (the user's call, 2026-09-28).
+    /// </summary>
+    public const float SalvoShort = 0.85f;
+
+    /// <summary>One bomb lobbed at <paramref name="aim"/>, landing <paramref name="landShare"/> of the way there and bouncing on.</summary>
+    private void LobAt(Enemy thrower, AttackSpec attack, Vector3D<float> aim, float fallbackY, Func<float, float, float?> groundAt, float landShare)
+    {
         var facing = new Vector3D<float>(MathF.Sin(thrower.Yaw), 0f, MathF.Cos(thrower.Yaw));
-        var from = thrower.Position + new Vector3D<float>(0f, LobHeight, 0f) + facing * LobForward;
-        var toward = Geometry.FlatDirection(from, player.Feet, out float distance);
+        var from = thrower.Position + new Vector3D<float>(0f, thrower.Kind.LobHeight, 0f) + facing * LobForward;
+        var toward = Geometry.FlatDirection(from, aim, out float distance);
         if (toward == Vector3D<float>.Zero)
         {
             toward = facing;
         }
 
-        float along = distance * LobShort;
+        float along = distance * landShare;
         var land = from + toward * along;
-        float landY = (groundAt(land.X, land.Z) ?? player.Feet.Y) + attack.HitWidth;
+        float landY = (groundAt(land.X, land.Z) ?? fallbackY) + attack.HitWidth;
         float flight = 0.75f + 0.02f * distance;
         float up = (landY - from.Y + 0.5f * BombGravity * flight * flight) / flight;
         _bombs.Add(new EnemyBomb

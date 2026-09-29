@@ -283,6 +283,7 @@ internal sealed class StatsScreen : GameScreen
             new("Hunts", $"{stats.BossHunts:N0}"),
             new("Hollow King Unbound", $"{delve.BossesSlain:N0}", "times slain"),
             new("Marauder Unbound", $"{delve.MaraudersSlain:N0}", "times slain"),
+            new("Fiend", $"{delve.FiendsSlain:N0}", "times slain"),
             new("Fastest kill", stats.FastestBossKill > 0f ? Clock(stats.FastestBossKill) : "-"),
             new("Delve Marks", $"{delve.Marks:N0}", "held"),
         });

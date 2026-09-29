@@ -100,9 +100,10 @@ internal sealed class DelveChartScreen : GameScreen
 
         var start = ImGui.GetCursorScreenPos();
         float classicWidth = 250f * scale;
-        float huntWidth = 290f * scale;
         float gap = 12f * scale;
         float closeWidth = 150f * scale;
+        int hunts = BossHunt.All.Count;
+        float huntWidth = MathF.Min(290f * scale, (width - classicWidth - closeWidth - gap * (hunts + 1)) / hunts);   // as many as there are, in a row
         if (UiTheme.Button("Classic run  ·  30 minutes", new Vector2(classicWidth, buttonHeight)))
         {
             choice = Choice.Classic;

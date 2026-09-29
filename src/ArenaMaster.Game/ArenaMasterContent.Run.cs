@@ -96,6 +96,7 @@ public sealed partial class ArenaMasterContent
         _enemies.HealthBonus = bonuses.EnemyHealth;
         _enemies.RangedDamageTaken = bonuses.RangedDamageTaken;
         _enemies.Obstacles = (centre, radius) => window.TouchesObstacle(centre, radius, out _, out _);
+        _enemies.Arena = null;   // a boss hunt sets its own
         _itemEffects.Begin();
         BeginCrates();
         _health.DamageTaken = _hero.DamageTaken * Armour.Cut(ArmourNow);

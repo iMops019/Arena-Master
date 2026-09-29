@@ -19,6 +19,9 @@ internal static class BossArena
     /// <summary>The bare ground: out past the wall, so nothing grows against it.</summary>
     public const float ClearingRadius = Radius + 4f;
 
+    /// <summary>How far from the centre a boss leaping away from the player may land: well inside the braziers (at 22 m) and the wall.</summary>
+    public const float LeapRadius = Radius - 6f;
+
     public const int FireIdBase = 7101;
 
     /// <summary>Where the player stands on arriving, and where the King waits.</summary>

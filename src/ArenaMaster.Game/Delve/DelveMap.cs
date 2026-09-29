@@ -111,6 +111,9 @@ internal sealed class DelveSave
     /// <summary>How many times the Marauder Unbound has been slain.</summary>
     public int MaraudersSlain { get; set; }
 
+    /// <summary>How many times the Fiend has been slain.</summary>
+    public int FiendsSlain { get; set; }
+
     /// <summary>Node kind -> how many of that kind have been cleared.</summary>
     public Dictionary<string, int> ClearedByKind { get; set; } = new();
 }
@@ -172,6 +175,9 @@ internal sealed record HuntBoss(string Id, Combat.EnemyKind Kind, Combat.EnemySc
 {
     public string Name => Kind.Name;
 
+    /// <summary>The boss who must be slain once before this one can be hunted (null: open from the start).</summary>
+    public HuntBoss? After { get; init; }
+
     public float Health => Kind.MaxHealth * Scaling.Health;
 
     /// <summary>Whether this kill's cache holds gear: pure luck, every kill its own roll.</summary>
@@ -183,7 +189,8 @@ internal sealed record HuntBoss(string Id, Combat.EnemyKind Kind, Combat.EnemySc
 /// <summary>
 /// The boss hunts: a boss alone in his arena, a fight of its own, taken from the departure gate as often as the player likes - the way to hunt for gear (the
 /// user's call, 2026-09-27: finding gear in Armoury and Boss nodes deep in the Delve was too rare and too hard). The Hollow King Unbound is open from the start;
-/// the Marauder Unbound, a tier up (the user's, 2026-09-28), opens once the King has been slain. Each is always the same fight, for now. Pure.
+/// the Marauder Unbound, a tier up (the user's, 2026-09-28), opens once the King has been slain, and the Fiend, a tier up again (the user's, 2026-09-28), once
+/// the Marauder has. Each is always the same fight, for now. Pure.
 /// </summary>
 internal static class BossHunt
 {
@@ -201,19 +208,37 @@ internal static class BossHunt
     /// </summary>
     public static readonly HuntBoss Marauder = new("marauder", Combat.DelveBosses.MarauderUnbound, new(2.5f, 1.35f, 1f), StartLevel: 21,
         GearChance: 0.35f, ItemChance: 0.10f, Silver: 250, Marks: 2, LookDepth: 5,
-        "A giant with a two-handed axe: swings, a quick cleave to dash out of, slams, a rift across the arena and a whirlwind. At 35% he roars (nothing hurts him) and fights on in a Frenzied Rage.");
+        "A giant with a two-handed axe: swings, a quick cleave to dash out of, slams, a rift across the arena and a whirlwind. At 35% he roars (nothing hurts him) and fights on in a Frenzied Rage.")
+    {
+        After = HollowKing,
+    };
 
-    public static readonly IReadOnlyList<HuntBoss> All = new[] { HollowKing, Marauder };
+    /// <summary>
+    /// The Fiend, a tier up again (the user's, 2026-09-28): 108,000 health, hitting 40% harder, from level 26 (five more picks than the Marauder). A 45% chance of
+    /// gear a kill, and more silver and marks. Fought by night (the Night Hollows' sky).
+    /// </summary>
+    public static readonly HuntBoss Fiend = new("fiend", Combat.DelveBosses.Fiend, new(3f, 1.4f, 1f), StartLevel: 26,
+        GearChance: 0.45f, ItemChance: 0.10f, Silver: 350, Marks: 3, LookDepth: 15,
+        "A giant ghoul hunter with a great crossbow, who keeps his distance: volleys of bolts from the sky, three shots in a row, and grenades then a charge, a slam, a leap back and a shot. Below 65% he takes aim (a fan of bolts, the Deadeye down a locked lane); below 30% he is cornered, quicker and harder.")
+    {
+        After = Marauder,
+    };
+
+    public static readonly IReadOnlyList<HuntBoss> All = new[] { HollowKing, Marauder, Fiend };
 
     public static HuntBoss? Find(string id) => All.FirstOrDefault(b => b.Id == id);
 
     /// <summary>How many times <paramref name="boss"/> has been slain.</summary>
-    public static int Slain(DelveSave save, HuntBoss boss) => boss == Marauder ? save.MaraudersSlain : save.BossesSlain;
+    public static int Slain(DelveSave save, HuntBoss boss) => boss == Fiend ? save.FiendsSlain : boss == Marauder ? save.MaraudersSlain : save.BossesSlain;
 
     /// <summary>Counts a kill of <paramref name="boss"/>.</summary>
     public static void CountKill(DelveSave save, HuntBoss boss)
     {
-        if (boss == Marauder)
+        if (boss == Fiend)
+        {
+            save.FiendsSlain++;
+        }
+        else if (boss == Marauder)
         {
             save.MaraudersSlain++;
         }
@@ -223,9 +248,13 @@ internal static class BossHunt
         }
     }
 
-    /// <summary>Whether <paramref name="boss"/> can be hunted: the King always, the Marauder once the King has been slain.</summary>
-    public static bool IsOpen(DelveSave save, HuntBoss boss) => boss != Marauder || save.BossesSlain >= 1;
+    /// <summary>Whether <paramref name="boss"/> can be hunted: the King always, the Marauder once the King has been slain, the Fiend once the Marauder has.</summary>
+    public static bool IsOpen(DelveSave save, HuntBoss boss) => boss.After is not { } before || Slain(save, before) >= 1;
 
     /// <summary>Why <paramref name="boss"/> can't be hunted yet, or null if he can.</summary>
-    public static string? WhyLocked(DelveSave save, HuntBoss boss) => IsOpen(save, boss) ? null : "Locked: slay the Hollow King Unbound first.";
+    public static string? WhyLocked(DelveSave save, HuntBoss boss) =>
+        IsOpen(save, boss) || boss.After is not { } before ? null : $"Locked: slay {LowerThe(before.Name)} first.";
+
+    /// <summary>A name as it reads mid-sentence: "The Hollow King Unbound" becomes "the Hollow King Unbound".</summary>
+    private static string LowerThe(string name) => name.StartsWith("The ", StringComparison.Ordinal) ? "the " + name[4..] : name;
 }

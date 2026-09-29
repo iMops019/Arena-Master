@@ -11,13 +11,13 @@ public class EnemyModelTests
     public static readonly TheoryData<string> Kinds = new()
     {
         EnemyKind.Ghoul.Name, EnemyKind.CrossbowGhoul.Name, EnemyKind.GhoulMage.Name, EnemyKind.BeastRider.Name, EnemyKind.GhoulBeast.Name, EnemyKind.GhoulTactician.Name,
-        EnemyKind.Brute.Name, EnemyKind.HollowKing.Name, DelveBosses.HollowKingUnbound.Name, DelveBosses.MarauderUnbound.Name,
+        EnemyKind.Brute.Name, EnemyKind.HollowKing.Name, DelveBosses.HollowKingUnbound.Name, DelveBosses.MarauderUnbound.Name, DelveBosses.Fiend.Name,
     };
 
     private static readonly EnemyKind[] All =
     {
         EnemyKind.Ghoul, EnemyKind.CrossbowGhoul, EnemyKind.GhoulMage, EnemyKind.BeastRider, EnemyKind.GhoulBeast, EnemyKind.GhoulTactician, EnemyKind.Brute, EnemyKind.HollowKing,
-        DelveBosses.HollowKingUnbound, DelveBosses.MarauderUnbound,
+        DelveBosses.HollowKingUnbound, DelveBosses.MarauderUnbound, DelveBosses.Fiend,
     };
 
     private static EnemyKind Kind(string name) => All.Single(k => k.Name == name);

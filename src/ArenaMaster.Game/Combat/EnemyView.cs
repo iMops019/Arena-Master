@@ -11,7 +11,8 @@ namespace ArenaMaster.Game.Combat;
 /// faint to bright as a shot winds up. A prop (a crate) is a plain crowd. The shots in flight are crowds too; a fireball's landing spot is marked with a
 /// burning ring while it flies, and it bursts in a ring of fire; a bomb tumbles, a ghostly ring on the ground under it showing its blast and pulsing faster as
 /// it slows, and goes off in a ring of green. Attacks show their telegraphs on the ground, as crowds too (so dozens at once cost what one does): a red lane for
-/// a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave; a red wedge filling up for a swing or a cleave, a strip of squares down a rift (the eruption eating it up as it runs out), a ring round a whirlwind's reach. A Magic,
+/// a lunge, a red circle filling up for a leap slam's landing, a ring spreading out for a shockwave; a red wedge filling up for a swing or a cleave, a strip of squares down a rift (the eruption eating it up as it runs out), a ring round a whirlwind's reach, a circle filling round a stomp, a thin line down a sniper's lane (bright once it locks). A shot can have
+/// its own landing mark and burst (the Fiend's bolts from the sky). A Magic,
 /// Rare or Legendary enemy is drawn a little bigger, over a slowly turning ring in its rarity's colour. A boss roaring into a rage (the Marauder) has red motes
 /// swirling up round it and a fire ring pulsing under it; enraged, fewer, for the rest of the fight.
 /// </summary>
@@ -49,7 +50,7 @@ internal sealed class EnemyView
     private readonly Dictionary<string, IReadOnlyDictionary<string, float>> _clips = new();   // model -> its clips' lengths
     private readonly EnemyMotion _motion = new();
     private readonly Dictionary<string, List<CrowdInstance>> _shots = new();   // shot model -> this frame's copies
-    private readonly List<CrowdInstance> _landings = new();
+    private readonly Dictionary<string, List<CrowdInstance>> _landings = new() { [LandingModel] = new() };   // landing mark model -> this frame's
     private readonly List<CrowdInstance> _bombMarks = new();
     private readonly Dictionary<string, List<CrowdInstance>> _rings = new()   // rarity ring model -> this frame's
     {
@@ -142,7 +143,11 @@ internal sealed class EnemyView
             list.Clear();
         }
 
-        _landings.Clear();
+        foreach (var list in _landings.Values)
+        {
+            list.Clear();
+        }
+
         foreach (var bolt in field.Bolts)
         {
             if (!_shots.TryGetValue(bolt.Model, out var shots))
@@ -155,7 +160,8 @@ internal sealed class EnemyView
             shots.Add(new CrowdInstance(bolt.Position, yaw, 1f, pitch, Flash: 0.4f));
             if (bolt.Splash > 0f)
             {
-                _landings.Add(new CrowdInstance(Lift(bolt.Target, 0.07f), _time * 1.5f, bolt.Splash, Flash: 0.3f + 0.3f * MathF.Abs(MathF.Sin(_time * 12f))));
+                Copies(_landings, bolt.MarkModel).Add(new CrowdInstance(Lift(bolt.Target, 0.07f), _time * 1.5f, bolt.Splash,
+                    Flash: 0.3f + 0.3f * MathF.Abs(MathF.Sin(_time * 12f))));
             }
         }
 
@@ -188,7 +194,11 @@ internal sealed class EnemyView
             window.SetCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(shots));
         }
 
-        window.SetCrowd(LandingModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_landings));
+        foreach (var (model, landings) in _landings)
+        {
+            window.SetCrowd(model, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(landings));
+        }
+
         window.SetCrowd(BombMarkModel, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_bombMarks));
         foreach (var (model, blasts) in _blasts)
         {
@@ -202,7 +212,7 @@ internal sealed class EnemyView
     /// </summary>
     public static float Glow(Enemy enemy)
     {
-        if (!enemy.IsAlive || enemy.Attack is not { Type: AttackType.Shoot or AttackType.Lob })
+        if (!enemy.IsAlive || enemy.Attack is not { Type: AttackType.Shoot or AttackType.Lob or AttackType.Snipe })
         {
             return 0f;
         }
@@ -360,7 +370,8 @@ internal sealed class EnemyView
             {
                 var direction = enemy.AttackTarget - enemy.AttackOrigin;
                 float yaw = MathF.Atan2(direction.X, direction.Z);
-                _telegraphs[LaneModel].Add(new CrowdInstance(Lift(enemy.AttackOrigin, 0.06f), yaw, attack.Reach / LaneLength));   // a longer charge, a longer (and wider) lane
+                float length = attack.StopAtPlayer ? direction.Length : attack.Reach;   // a charge that stops at the player: as far as it goes
+                _telegraphs[LaneModel].Add(new CrowdInstance(Lift(enemy.AttackOrigin, 0.06f), yaw, MathF.Max(0.3f, length) / LaneLength));   // a longer charge, a longer (and wider) lane
                 break;
             }
 
@@ -430,6 +441,32 @@ internal sealed class EnemyView
                         var burst = enemy.AttackOrigin + way * front;
                         _telegraphs[ShockwaveModel].Add(new CrowdInstance(Lift(Ground(burst, groundAt), 0.2f), 0f, attack.HitWidth * 1.3f));
                     }
+                }
+
+                break;
+            }
+
+            case AttackType.Stomp when enemy.AttackPhase == AttackPhase.WindUp:
+            {
+                // The ring round it, filling as the slam comes.
+                var at = Ground(enemy.Position, groundAt);
+                _telegraphs[RingModel].Add(new CrowdInstance(Lift(at, 0.08f), 0f, attack.Reach));
+                _telegraphs[DiscModel].Add(new CrowdInstance(Lift(at, 0.05f), 0f, MathF.Max(0.05f, attack.Reach * enemy.WindUpProgress)));
+                break;
+            }
+
+            case AttackType.Snipe when enemy.AttackPhase == AttackPhase.WindUp:
+            {
+                // A thin line of squares down the lane: faint while it follows the player, bright and flickering once it locks.
+                var way = Geometry.FlatDirection(enemy.AttackOrigin, enemy.AttackTarget, out _);
+                float yaw = MathF.Atan2(way.X, way.Z);
+                float side = 2f * attack.HitWidth;
+                bool locked = enemy.PhaseTime >= attack.Tracking;
+                float flash = locked ? 0.55f + 0.45f * MathF.Abs(MathF.Sin(_time * 18f)) : 0.1f + 0.2f * enemy.WindUpProgress;
+                for (float along = enemy.Kind.Radius + side * 0.5f; along < attack.Reach; along += side)
+                {
+                    var centre = enemy.AttackOrigin + way * along;
+                    _telegraphs[SquareModel].Add(new CrowdInstance(Lift(Ground(centre, groundAt), 0.06f), yaw, side, Flash: flash));
                 }
 
                 break;

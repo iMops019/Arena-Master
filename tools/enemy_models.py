@@ -6,9 +6,9 @@ Every enemy has
     Walk      one stride, as many seconds long as it is metres, so the game moves it on by the ground the enemy covers and a planted foot stays put
     Die       falling, 1 s, held at the end
 and a clip for each attack it has, named after its AttackType (Shoot, Lob, Lunge, LeapSlam, Shockwave, Summon, Barrage, Swing, Cleave,
-LineSlam, Whirlwind), one second long (and a boss that roars into a stage, the Marauder, a Roar played over the roar): the wind-up over the
+LineSlam, Whirlwind, Stomp, Retreat, Snipe), one second long (and a boss that roars into a stage, the Marauder, a Roar played over the roar): the wind-up over the
 first WINDUP_END of it, the blow (the attack's active time) up to ACTIVE_END, the recovery after. The game maps each phase's progress onto its stretch.
-A held model (the Crossbow Ghoul's crossbow, the Ghoul Mage's flame, the Ghoul Tactician's bomb) is a model of its own on the same skeleton with the same clips, drawn in the same pose.
+A held model (the Crossbow Ghoul's crossbow, the Ghoul Mage's flame, the Ghoul Tactician's bomb, the Fiend's crossbow) is a model of its own on the same skeleton with the same clips, drawn in the same pose.
 """
 
 import math
@@ -1334,6 +1334,280 @@ def marauder_poses(s, gait):
 MARAUDER_UNBOUND = EnemyModel("marauder_unbound.glb", MARAUDER_RIG, MARAUDER_GAIT, lambda rig: build_marauder(rig, MARAUDER_SCALE),
                               marauder_poses(MARAUDER_SCALE, MARAUDER_GAIT))
 
+# =========================================================================================================================================================
+# The Fiend (the user's, 2026-09-28): a ghoul hunter grown by FIEND_SCALE (about 3.4 m), gaunt and stooped, crimson-skinned, in a dark hooded cloak, horns
+# sweeping back out of the hood, burning eyes in a bone mask, a bandolier of the Tacticians' bombs across the chest and a quiver of great bolts on the back.
+# His great crossbow is a joint of its own under the root (posed in every clip, like the Marauder's axe: the grip's place and which way it points), both hands
+# reached to it by IK (only the right while he throws). It, and a bomb in his left hand (shown only as he throws it), are the held model, fiend_crossbow.glb,
+# which glows as a shot winds up. His clips: the shot, the volley loosed high, the Deadeye (Snipe), the grenades (Lob), the charge (Lunge), the slam where he
+# stands (Stomp, the crossbow's butt driven into the ground), the leap back (Retreat) and the kick (Swing).
+
+FIEND_SCALE = 2.3
+FIEND_BOW_REST = (0.14, 0.86, 0.3)      # the crossbow's origin (the right fist's grip) at rest, before scaling
+FIEND_BOMB_AT = (-0.27, 0.46, 0.08)     # the bomb in the left fist, before scaling
+HIDDEN = (0.01, 0.01, 0.01)
+
+
+def ghoul_rig(s, extra=()):
+    return r.HeroRig(hip_y=0.64 * s, spine_y=0.72 * s, chest_y=0.8 * s, neck_y=1.2 * s, shoulder=(0.27 * s, 1.14 * s), elbow_y=0.86 * s, wrist_y=0.58 * s,
+                     leg_x=0.13 * s, knee_y=0.35 * s, ankle_y=0.08 * s, toe=0.14 * s, heel=0.06 * s, extra=extra)
+
+
+FIEND_RIG = ghoul_rig(FIEND_SCALE, extra=(("cloak", "chest", (0.0, 1.16 * FIEND_SCALE, -0.15 * FIEND_SCALE)),
+                                          ("crossbow", "root", tuple(c * FIEND_SCALE for c in FIEND_BOW_REST)),
+                                          ("grenade", "hand_l", tuple(c * FIEND_SCALE for c in FIEND_BOMB_AT))))
+FIEND_GAIT = r.Gait(cycle=1.25 * FIEND_SCALE, stance=0.5, lift=0.12 * FIEND_SCALE, bob=0.03, hip_drop=0.13 * FIEND_SCALE, width=0.13 * FIEND_SCALE,
+                    lean=10.0)
+
+
+def build_fiend(rig, s):
+    m = Mesh()
+    j = rig.index
+
+    def box(x0, y0, z0, x1, y1, z1, colour):
+        m.box(x0 * s, y0 * s, z0 * s, x1 * s, y1 * s, z1 * s, colour)
+
+    def spike(x0, y0, z0, x1, z1, tip, colour):
+        m.pyramid(x0 * s, y0 * s, z0 * s, x1 * s, y0 * s, z1 * s, tuple(c * s for c in tip), colour)
+
+    for side in ("l", "r"):
+        sx = -1.0 if side == "l" else 1.0
+        for prefix, a, b, y0, z0, y1, z1, colour in (("foot", 0.06, 0.2, 0.0, -0.06, 0.1, 0.15, "brute_hide"),
+                                                     ("shin", 0.07, 0.18, 0.08, -0.055, 0.38, 0.055, "leather"),
+                                                     ("thigh", 0.065, 0.185, 0.32, -0.06, 0.66, 0.06, "hood_dark"),
+                                                     ("upper_arm", 0.21, 0.33, 0.84, -0.06, 1.16, 0.06, "hood_dark"),
+                                                     ("forearm", 0.215, 0.325, 0.56, -0.055, 0.88, 0.055, "ghoul_robe"),
+                                                     ("hand", 0.21, 0.33, 0.45, -0.05, 0.58, 0.06, "ghoul_robe")):
+            x0, x1 = sorted((sx * a, sx * b))
+            m.joint = j[f"{prefix}_{side}"]
+            box(x0, y0, z0, x1, y1, z1, colour)
+        m.joint = j[f"forearm_{side}"]
+        x0, x1 = sorted((sx * 0.205, sx * 0.335))
+        box(x0, 0.6, -0.065, x1, 0.76, 0.065, "leather")                     # bracers
+        m.joint = j[f"hand_{side}"]
+        for dx in (0.23, 0.27, 0.31):                                          # claws
+            x0, x1 = sorted((sx * (dx - 0.012), sx * (dx + 0.012)))
+            box(x0, 0.4, 0.0, x1, 0.46, 0.03, "bone")
+        m.joint = j[f"shin_{side}"]
+        x0, x1 = sorted((sx * 0.065, sx * 0.185))
+        box(x0, 0.3, -0.06, x1, 0.36, 0.06, "iron")                            # boot tops
+    m.joint = j["upper_arm_l"]                                                 # an iron pauldron on the left shoulder, a bone spike on it
+    box(-0.36, 1.06, -0.1, -0.18, 1.22, 0.1, "iron")
+    spike(-0.3, 1.22, -0.04, -0.24, 0.04, (-0.34, 1.36, 0.0), "bone")
+    m.joint = j["hips"]
+    box(-0.22, 0.52, -0.12, 0.22, 0.74, 0.12, "hood_dark")
+    box(-0.23, 0.6, -0.13, 0.23, 0.66, 0.13, "leather")                        # the belt
+    box(-0.04, 0.59, 0.13, 0.04, 0.67, 0.14, "iron")
+    m.joint = j["chest"]
+    box(-0.24, 0.72, -0.12, 0.24, 1.18, 0.14, "ghoul_robe")
+    box(-0.08, 0.84, -0.16, 0.08, 1.16, -0.12, "bone")                         # the spine ridge
+    box(-0.26, 1.08, -0.14, 0.26, 1.2, 0.15, "hood_dark")                     # the cloak's shoulders
+    for i in range(6):                                                         # the bandolier, shoulder to hip, bombs in it
+        t = i / 5.0
+        x, y = 0.19 - 0.36 * t, 1.13 - 0.38 * t
+        box(x - 0.04, y - 0.035, 0.14, x + 0.04, y + 0.035, 0.17, "leather")
+        if i % 2 == 0:
+            box(x - 0.035, y - 0.035, 0.17, x + 0.035, y + 0.035, 0.23, "bomb_black")
+            box(x - 0.037, y - 0.008, 0.17, x + 0.037, y + 0.008, 0.235, "ghost_eye")
+    box(-0.2, 0.78, -0.3, -0.06, 1.24, -0.18, "leather")                       # the quiver, great bolts in it
+    for x in (-0.17, -0.13, -0.09):
+        box(x - 0.012, 1.24, -0.26, x + 0.012, 1.36, -0.22, "iron")
+        box(x - 0.022, 1.36, -0.27, x + 0.022, 1.42, -0.21, "bolt_glow")
+    m.joint = j["cloak"]
+    box(-0.27, 0.36, -0.2, 0.27, 1.16, -0.15, "hood_dark")
+    box(-0.27, 0.36, -0.2, 0.27, 0.42, -0.14, "ghoul_robe")                    # its ragged crimson hem
+    m.joint = j["head"]
+    box(-0.13, 1.18, -0.1, 0.13, 1.44, 0.14, "ghoul_robe")
+    box(-0.12, 1.24, 0.14, 0.12, 1.42, 0.16, "bone")                           # the bone mask
+    box(-0.1, 1.31, 0.16, -0.03, 1.36, 0.165, "fire")                          # burning eyes
+    box(0.03, 1.31, 0.16, 0.1, 1.36, 0.165, "fire")
+    box(-0.1, 1.14, -0.04, 0.1, 1.2, 0.14, "bone")                             # the jaw
+    box(-0.16, 1.16, -0.16, 0.16, 1.5, -0.08, "hood_dark")                     # the hood
+    box(-0.16, 1.42, -0.16, 0.16, 1.5, 0.17, "hood_dark")
+    box(-0.165, 1.16, -0.08, -0.13, 1.44, 0.15, "hood_dark")
+    box(0.13, 1.16, -0.08, 0.165, 1.44, 0.15, "hood_dark")
+    spike(-0.15, 1.44, -0.06, -0.07, 0.04, (-0.3, 1.66, -0.28), "horn")      # horns sweeping back out of the hood
+    spike(0.07, 1.44, -0.06, 0.15, 0.04, (0.3, 1.66, -0.28), "horn")
+    return m
+
+
+def build_fiend_crossbow(rig, s):
+    """The great crossbow on its own joint (its origin the grip, pointing +Z): a dark stock, iron limbs with burning tips, the drawn string, a loaded bolt and a
+    skull on the fore-end; and a bomb in the left fist, shown only while he throws."""
+    m = Mesh()
+    m.joint = rig.index["crossbow"]
+    gx, gy, gz = FIEND_BOW_REST
+
+    def part(x0, y0, z0, x1, y1, z1, colour):
+        m.box((gx + x0) * s, (gy + y0) * s, (gz + z0) * s, (gx + x1) * s, (gy + y1) * s, (gz + z1) * s, colour)
+
+    part(-0.045, -0.05, -0.3, 0.045, 0.035, 0.7, "chest_dark")                # the stock
+    part(-0.055, -0.12, -0.36, 0.055, 0.04, -0.2, "chest_dark")               # its butt
+    part(-0.025, -0.14, -0.03, 0.025, -0.05, 0.03, "wood")                    # the grip
+    part(-0.46, -0.01, 0.56, 0.46, 0.045, 0.62, "iron")                       # the limbs
+    part(-0.52, -0.03, 0.52, -0.44, 0.065, 0.66, "bolt_glow")                 # burning tips
+    part(0.44, -0.03, 0.52, 0.52, 0.065, 0.66, "bolt_glow")
+    part(-0.45, 0.018, 0.22, 0.45, 0.028, 0.24, "fletching")                  # the drawn string
+    part(-0.012, 0.035, 0.22, 0.012, 0.06, 0.8, "iron")                       # the loaded bolt
+    part(-0.03, 0.03, 0.8, 0.03, 0.068, 0.88, "bolt_glow")
+    part(-0.07, -0.11, 0.62, 0.07, 0.02, 0.74, "bone")                        # a skull on the fore-end
+    part(-0.05, -0.06, 0.74, -0.015, -0.03, 0.745, "fire")
+    part(0.015, -0.06, 0.74, 0.05, -0.03, 0.745, "fire")
+    m.joint = rig.index["grenade"]
+    x, y, z = rig.bind["grenade"]
+    ghoul_bomb(m, x, y, z, 0.2)
+    return m
+
+
+def fiend_poses(s, gait):
+    """The Fiend's clips at size <s>. Every clip poses the crossbow (so every frame gives it a translation) and hides the bomb in his left fist, but the throw."""
+    def p(v):
+        return (v[0] * s, v[1] * s, v[2] * s)
+
+    def bow(pose, grip, aim, left=0.4, two_handed=True):
+        """The crossbow's grip at <grip> (unscaled), pointing along <aim>; the right fist on the grip, and the left under the fore-end <left> along it."""
+        aim = r.v_norm(aim)
+        rotation = r.q_look(aim)
+        at = p(grip)
+        pose.set("crossbow", rotation, at)
+        r.arm_ik(pose, "r", r.v_add(at, (0.0, 0.07 * s, -0.02 * s)), elbow_pole=(1.0, -0.6, -0.4))
+        face(pose, "hand_r", aim, tilt=-10.0)
+        if two_handed:
+            fore = r.v_add(at, r.q_rotate(rotation, (0.0, -0.06 * s, left * s)))
+            r.arm_ik(pose, "l", r.v_add(fore, (0.0, 0.02 * s, 0.0)), elbow_pole=(-1.0, -0.6, -0.3))
+            face(pose, "hand_l", aim, tilt=60.0)
+
+    def pitched(degrees, yaw=0.0):
+        """Ahead (+Z) tipped up <degrees> and turned <yaw> toward +X."""
+        a, b = math.radians(degrees), math.radians(yaw)
+        return (math.cos(a) * math.sin(b), math.sin(a), math.cos(a) * math.cos(b))
+
+    def cloak(pose, degrees):
+        """The cloak hanging from the shoulders, swung back <degrees> from straight down (whatever the stoop)."""
+        pose.set_world("cloak", r.q_euler(x=degrees))
+
+    def legs(pose, crouch, weight=0.0, width=0.18):
+        r.stand_legs(pose, 0.0, weight, width=width * s, crouch=crouch * s)
+
+    rest = FIEND_BOW_REST
+
+    def idle(pose, u):
+        t = u * IDLE_SECONDS
+        breath = math.sin(2 * math.pi * t / 1.6)
+        r.stand_legs(pose, breath, 0.4 * math.sin(2 * math.pi * t / IDLE_SECONDS), width=0.18 * s, crouch=0.05 * s)
+        hunch(pose, 22.0 + 2.0 * breath, head=-10.0, head_turn=14.0 * math.sin(2 * math.pi * t / IDLE_SECONDS))
+        cloak(pose, 4.0 + 1.5 * breath)
+        bow(pose, (rest[0], rest[1] + 0.01 * breath, rest[2]), pitched(-14.0))
+
+    def walk(pose, u):
+        _, swing = r.run_legs(pose, gait, u, 0.0)
+        bob = math.cos(4 * math.pi * u)
+        hunch(pose, 26.0 + 2.0 * bob, head=-14.0, turn=-4.0 * swing)
+        cloak(pose, 12.0 + 3.0 * bob)
+        bow(pose, (rest[0], rest[1] + 0.02 * bob, rest[2]), pitched(-16.0 + 3.0 * swing))
+
+    def shoot(pose, u):
+        """Brought up to the shoulder and aimed through the wind-up, kicking up as it looses, lowered again after."""
+        legs(pose, 0.06, weight=0.2, width=0.2)
+        hunch(pose, keyed(u, 22.0, 6.0, 2.0, settle=10.0), head=keyed(u, -10.0, 4.0, -2.0))
+        cloak(pose, keyed(u, 4.0, 6.0, 10.0))
+        grip = keyed(u, rest, (0.1, 1.02, 0.26), (0.1, 1.06, 0.18), settle=(0.1, 0.98, 0.22))
+        bow(pose, grip, pitched(keyed(u, -14.0, 0.0, 18.0, settle=4.0)))
+
+    def barrage(pose, u):
+        """The volley: leaning back with the crossbow pointed high into the sky, the kick of the loose, and down again."""
+        legs(pose, keyed(u, 0.05, 0.08, 0.1), weight=-0.2, width=0.22)
+        hunch(pose, keyed(u, 22.0, -8.0, -14.0, settle=4.0), head=keyed(u, -10.0, -40.0, -46.0, settle=-20.0))
+        cloak(pose, keyed(u, 4.0, 2.0, 8.0))
+        grip = keyed(u, rest, (0.1, 1.08, 0.2), (0.1, 1.14, 0.12), settle=(0.12, 1.0, 0.24))
+        bow(pose, grip, pitched(keyed(u, -14.0, 62.0, 78.0, settle=30.0)))
+
+    def snipe(pose, u):
+        """The Deadeye: dropped into a low stance, the crossbow held dead level at the eye through the long aim, a great kick as it looses."""
+        legs(pose, keyed(u, 0.05, 0.12, 0.1), weight=0.3, width=0.24)
+        hunch(pose, keyed(u, 22.0, 12.0, 0.0, settle=12.0), head=keyed(u, -10.0, 8.0, -6.0))
+        cloak(pose, keyed(u, 4.0, 8.0, 14.0))
+        grip = keyed(u, rest, (0.08, 0.98, 0.3), (0.08, 1.04, 0.16), settle=(0.1, 0.96, 0.24))
+        bow(pose, grip, pitched(keyed(u, -14.0, -1.0, 24.0, settle=6.0)), left=0.46)
+
+    def lob(pose, u):
+        """The grenades: the crossbow dropped to the right hip in one hand while the left pulls a bomb from the bandolier, draws it back over the shoulder and
+        hurls it high; the bomb is gone once thrown."""
+        name, k = stage(u)
+        legs(pose, 0.06, weight=keyed(u, 0.0, 0.7, -0.8), width=0.2)
+        hunch(pose, keyed(u, 22.0, 4.0, 30.0, settle=24.0), head=keyed(u, -10.0, -16.0, -4.0), turn=keyed(u, 0.0, 16.0, -14.0))
+        cloak(pose, keyed(u, 4.0, 8.0, 16.0))
+        bow(pose, (0.3, 0.72, 0.22), pitched(-30.0, 8.0), two_handed=False)
+        r.arm_ik(pose, "l", p(keyed(u, (-0.2, 0.8, 0.26), (-0.34, 1.46, -0.28), (-0.2, 1.3, 0.5), settle=(-0.14, 0.8, 0.24))), elbow_pole=(-1.0, -0.2, -0.8))
+        face(pose, "hand_l", (0.0, 0.0, 1.0), tilt=keyed(u, 30.0, -50.0, 80.0, settle=60.0))
+        size = {"windup": r.ease(k / 0.3), "active": 1.0 - r.ease(min(1.0, k * 4.0)), "recover": 0.0}[name]
+        size = max(0.01, size)
+        return {"grenade": (size, size, size)}
+
+    def lunge(pose, u):
+        """The charge: gathered low with the crossbow across the chest, then running headlong at the player, then pulling up."""
+        name, k = stage(u)
+        if name == "active":
+            r.run_legs(pose, gait, k * 1.5, 0.0)
+        else:
+            legs(pose, keyed(u, 0.05, 0.14, 0.1, settle=0.08), width=0.22)
+        hunch(pose, keyed(u, 22.0, 38.0, 48.0, settle=30.0), head=keyed(u, -10.0, -30.0, -40.0))
+        cloak(pose, keyed(u, 4.0, 10.0, 40.0, settle=20.0))
+        bow(pose, keyed(u, rest, (0.22, 0.92, 0.24), (0.22, 0.92, 0.28)), keyed(u, pitched(-14.0), pitched(20.0, -70.0), pitched(20.0, -70.0)), left=0.34)
+
+    def stomp(pose, u):
+        """The slam where he stands: the crossbow hoisted high in both hands, its butt driven down into the ground in front of him, crouched over it."""
+        legs(pose, keyed(u, 0.05, 0.02, 0.2, settle=0.14), width=0.26)
+        hunch(pose, keyed(u, 22.0, -6.0, 52.0, settle=34.0), head=keyed(u, -10.0, -34.0, -30.0))
+        cloak(pose, keyed(u, 4.0, 2.0, 30.0))
+        grip = keyed(u, rest, (0.06, 1.42, 0.12), (0.06, 0.42, 0.62), settle=(0.08, 0.6, 0.5))
+        bow(pose, grip, keyed(u, pitched(-14.0), pitched(80.0), pitched(84.0), settle=pitched(60.0)), left=0.3)   # butt first: its butt in the ground
+
+    def retreat(pose, u):
+        """The leap back: crouched to spring, in the air leaning back with the crossbow held across, landing crouched."""
+        name, k = stage(u)
+        if name == "active":
+            r.airborne_legs(pose, tuck=1.1 * s)
+        else:
+            legs(pose, keyed(u, 0.05, 0.14, 0.14, settle=0.12), width=0.22)
+        hunch(pose, keyed(u, 22.0, 30.0, -12.0, settle=24.0), head=keyed(u, -10.0, -20.0, 0.0))
+        cloak(pose, keyed(u, 4.0, 6.0, 30.0, settle=10.0))
+        bow(pose, keyed(u, rest, (0.18, 0.9, 0.26), (0.18, 1.0, 0.24)), keyed(u, pitched(-14.0), pitched(10.0, -60.0), pitched(20.0, -60.0)), left=0.34)
+
+    def kick(pose, u):
+        """The kick: the crossbow lifted out of the way, the right knee drawn up, the foot driven out ahead, and back down."""
+        name, k = stage(u)
+        legs(pose, 0.04, weight=-0.4, width=0.18)
+        foot = {"windup": r.v_lerp((0.13, 0.08, 0.02), (0.13, 0.36, 0.14), r.ease(k)),
+                "active": r.v_lerp((0.13, 0.36, 0.14), (0.1, 0.46, 0.7), r.ease(min(1.0, k * 2.5))),
+                "recover": r.v_lerp((0.1, 0.46, 0.7), (0.13, 0.08, 0.02), r.ease(k))}[name]
+        r.leg_ik(pose, "r", p(foot), (0.0, 0.0, 1.0), keyed(u, 0.0, -30.0, -10.0), (0.0, 0.0, 1.0))
+        hunch(pose, keyed(u, 22.0, 10.0, -6.0, settle=14.0), head=keyed(u, -10.0, -4.0, 0.0))
+        cloak(pose, keyed(u, 4.0, 10.0, 24.0))
+        bow(pose, keyed(u, rest, (0.2, 1.02, 0.18), (0.2, 1.06, 0.14)), keyed(u, pitched(-14.0), pitched(35.0), pitched(40.0)))
+
+    def die(pose, u):
+        collapse(pose, u, 22.0, 0.56 * s)
+        cloak(pose, 10.0 * u)
+        k = r.ease(min(1.0, u / 0.6))
+        aim = r.v_norm(r.v_lerp(pitched(-14.0), (1.0, 0.0, 0.25), k))
+        pose.set("crossbow", r.q_look(aim), p(r.v_lerp(rest, (0.5, 0.08, 0.5), k)))   # the crossbow falls from his hands to lie on the ground
+
+    def hiding(fn):
+        def clip(pose, u):
+            scales = {"grenade": HIDDEN}
+            scales.update(fn(pose, u) or {})
+            return scales
+        return clip
+
+    clips = {"Idle": (IDLE_SECONDS, idle), "Walk": (gait.cycle, walk), "Die": (DIE_SECONDS, die), "Shoot": (1.0, shoot), "Barrage": (1.0, barrage),
+             "Snipe": (1.0, snipe), "Lob": (1.0, lob), "Lunge": (1.0, lunge), "Stomp": (1.0, stomp), "Retreat": (1.0, retreat), "Swing": (1.0, kick)}
+    return {name: (seconds, fn if name == "Lob" else hiding(fn)) for name, (seconds, fn) in clips.items()}
+
+
+FIEND = EnemyModel("fiend.glb", FIEND_RIG, FIEND_GAIT, lambda rig: build_fiend(rig, FIEND_SCALE), fiend_poses(FIEND_SCALE, FIEND_GAIT),
+                   held=(("fiend_crossbow.glb", lambda rig: build_fiend_crossbow(rig, FIEND_SCALE)),), scaled=("grenade",))
+
 ENEMIES = {"ghoul": GHOUL, "crossbow_ghoul": CROSSBOW_GHOUL, "ghoul_mage": GHOUL_MAGE, "beast_rider": BEAST_RIDER, "ghoul_beast": GHOUL_BEAST, "ghoul_tactician": GHOUL_TACTICIAN,
            "brute": BRUTE, "hollow_king": HOLLOW_KING, "hollow_king_unbound": HOLLOW_KING_UNBOUND,
-           "marauder_unbound": MARAUDER_UNBOUND}
+           "marauder_unbound": MARAUDER_UNBOUND, "fiend": FIEND}

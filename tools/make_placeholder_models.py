@@ -16,12 +16,15 @@
   aegis_burst.glb         a flat pale-gold ring of radius 1, scaled as the Aegis of the Dawn's burst spreads (an item's, any class)
   thunderstone_bolt.glb   one piece of the Thunderstone's bolt from the sky: a thin bright bar 1 m long along Z (an item's, any class)
   ghoul.glb, crossbow_ghoul.glb (+ ghoul_crossbow.glb), ghoul_mage.glb (+ ghoul_flame.glb), beast_rider.glb, ghoul_tactician.glb
-  (+ ghoul_tactician_bomb.glb), brute.glb, hollow_king.glb, hollow_king_unbound.glb
+  (+ ghoul_tactician_bomb.glb), brute.glb, hollow_king.glb, hollow_king_unbound.glb, marauder_unbound.glb, fiend.glb (+ fiend_crossbow.glb)
                           the enemies, skinned and animated (idle, walk, die and their attacks), with their held crossbow, flame and bomb: see
                           tools/enemy_models.py
   arrow_placeholder.glb   an arrow, centred on its middle, pointing +Z
   ghoul_bolt.glb          a Crossbow Ghoul's bolt: a dark shaft with a glowing head, centred on its middle, pointing +Z
   ghoul_fireball.glb      a Ghoul Mage's fireball: a fiery orb with a bright core, centred on its middle
+  fiend_bolt.glb          the Fiend's heavy bolt: an iron shaft with a glowing barbed head and dark vanes, about 1.1 m, centred on its middle, pointing +Z
+  fiend_bolt_mark.glb     a flat red target of radius 1 (a ring and four ticks pointing in), marking where one of the Fiend's bolts from the sky will land
+  fiend_bolt_burst.glb    a flat ring of orange splinters of radius 1, scaled as a bolt from the sky strikes the ground
   fireball_mark.glb       a flat burning ring of radius 1 with flames on it, marking where a fireball will land
   fireball_burst.glb      a flat ring of fire of radius 1, scaled as a fireball bursts
   ghoul_bomb.glb          a Ghoul Tactician's bomb: a black iron ball with a ghostly green band and a green-lit fuse, radius 0.2, centred on its middle
@@ -468,6 +471,43 @@ def build_ghoul_bolt():
         m.tri(left, right, top, "bolt_glow")
     m.box(-0.003, -0.05, -0.30, 0.003, 0.05, -0.18, "ghoul_rags")
     m.box(-0.05, -0.003, -0.30, 0.05, 0.003, -0.18, "ghoul_rags")
+    return m
+
+
+def build_fiend_bolt():
+    """The Fiend's heavy crossbow bolt pointing +Z, centred on its middle: an iron shaft, a glowing barbed head, dark vanes."""
+    m = Mesh()
+    m.box(-0.035, -0.035, -0.55, 0.035, 0.035, 0.4, "iron")
+    tip, left, right = (0.0, 0.0, 0.62), (-0.1, 0.0, 0.38), (0.1, 0.0, 0.38)
+    for y in (0.04, -0.04):
+        top = (0.0, y, 0.4)
+        m.tri(left, top, tip, "bolt_glow")
+        m.tri(top, right, tip, "bolt_glow")
+        m.tri(left, right, top, "bolt_glow")
+    m.box(-0.13, -0.012, 0.3, 0.13, 0.012, 0.36, "bolt_glow")                   # the barbs
+    m.box(-0.006, -0.1, -0.55, 0.006, 0.1, -0.32, "ghoul_robe")                 # the vanes
+    m.box(-0.1, -0.006, -0.55, 0.1, 0.006, -0.32, "ghoul_robe")
+    return m
+
+
+def build_fiend_bolt_mark():
+    """Where one of the Fiend's bolts from the sky will land: a red ring of radius 1 and four ticks pointing in, like a sight's."""
+    m = build_ring(0.85, 1.0, "warn")
+    up = (0, 1, 0)
+    for x0, z0, x1, z1 in ((-0.06, 0.45, 0.06, 0.86), (-0.06, -0.86, 0.06, -0.45), (0.45, -0.06, 0.86, 0.06), (-0.86, -0.06, -0.45, 0.06)):
+        m.quad((x0, 0.0, z1), (x1, 0.0, z1), (x1, 0.0, z0), (x0, 0.0, z0), up, "warn")
+    m.quad((-0.08, 0.0, 0.08), (0.08, 0.0, 0.08), (0.08, 0.0, -0.08), (-0.08, 0.0, -0.08), up, "warn_dark")
+    return m
+
+
+def build_fiend_bolt_burst():
+    """A bolt from the sky striking the ground: a flat ring of orange with splinters flung out from it, radius 1."""
+    import math
+    m = build_ring(0.7, 0.9, "bolt_glow")
+    for i in range(10):
+        a = 2 * math.pi * (i + 0.5) / 10
+        x, z = math.cos(a), math.sin(a)
+        m.pyramid(x * 0.82 - 0.05, 0.0, z * 0.82 - 0.05, x * 0.82 + 0.05, 0.0, z * 0.82 + 0.05, (x * 1.05, 0.12, z * 1.05), "fire_light")
     return m
 
 
@@ -1537,6 +1577,7 @@ if __name__ == "__main__":
                         ("arrow_placeholder.glb", build_arrow), ("ghoul_bolt.glb", build_ghoul_bolt),
                         ("ghoul_fireball.glb", build_ghoul_fireball), ("fireball_mark.glb", build_fireball_mark),
                         ("fireball_burst.glb", lambda: build_ring(0.75, 1.0, "fire")), ("ghoul_bomb.glb", build_ghoul_bomb),
+                        ("fiend_bolt.glb", build_fiend_bolt), ("fiend_bolt_mark.glb", build_fiend_bolt_mark), ("fiend_bolt_burst.glb", build_fiend_bolt_burst),
                         ("ghoul_bomb_mark.glb", build_ghoul_bomb_mark), ("ghoul_bomb_burst.glb", lambda: build_ring(0.7, 1.0, "ghost_eye")),
                         ("rarity_magic.glb", lambda: build_rarity_ring("rare", "rare_light", 0, 0.0)),
                         ("rarity_rare.glb", lambda: build_rarity_ring("holy", "holy_light", 6, 0.15)),
