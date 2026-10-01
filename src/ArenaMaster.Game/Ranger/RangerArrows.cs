@@ -59,7 +59,9 @@ internal readonly record struct ArrowHit(Enemy Enemy, Vector3D<float> Position, 
 
 /// <summary>
 /// The Ranger's arrows in flight: they fly straight (no drop, for now), hit enemies in their path (passing through as many as their pierce allows, then jumping on
-/// to another enemy as many times as they can chain), and stick in the ground briefly when they miss. Pure simulation - <see cref="RangerBow"/> fires them and draws them.
+/// to another enemy as many times as they can chain), and stick in the ground briefly when they miss. With the Trapper tree, <see cref="Kit"/> has its say on every
+/// hit: how much more the enemy takes, the poison the arrow leaves, and whether it passes through for nothing. Pure simulation - <see cref="RangerBow"/> fires them
+/// and draws them.
 /// </summary>
 internal sealed class RangerArrows
 {
@@ -97,6 +99,9 @@ internal sealed class RangerArrows
     private readonly Random _random;
 
     public RangerArrows(Random random) => _random = random;
+
+    /// <summary>The Trapper tree's traps, venom and hawk, which every hit tells (Venom Tips) and asks (Hawk's Mark, Blight Arrows); null for none.</summary>
+    public TrapperKit? Kit { get; set; }
 
     public IReadOnlyList<Arrow> Arrows => _arrows;
 
@@ -213,12 +218,18 @@ internal sealed class RangerArrows
         {
             var at = from + (to - from) * along;
             arrow.AlreadyHit.Add(enemy);
+            bool freePass = Kit?.PassesThrough(enemy) == true;   // Blight Arrows: poisoned already, so it costs no pierce
             Strike(arrow, enemy, at, enemies, hits);
 
             if (arrow.Rules.Fork && !arrow.Forked)
             {
                 arrow.Forked = true;
                 SpawnForks(arrow, at);
+            }
+
+            if (freePass)
+            {
+                continue;
             }
 
             if (arrow.PierceLeft > 0)
@@ -237,7 +248,8 @@ internal sealed class RangerArrows
     {
         bool untouched = enemy.Health >= enemy.MaxHealth;
         bool crit = (arrow.Rules.FirstHitCrits && untouched) || (arrow.CritChance > 0f && _random.NextDouble() < arrow.CritChance);
-        float damage = DamageAgainst(arrow, enemy) * (crit ? arrow.CritMultiplier : 1f);
+        float basis = DamageAgainst(arrow, enemy);
+        float damage = basis * (Kit?.DamageFactor(enemy) ?? 1f) * (crit ? arrow.CritMultiplier : 1f);
         bool killed = enemies.Damage(enemy, damage);
 
         if (!killed && enemy.Kind.Tier != EnemyTier.Boss && enemy.Health < enemy.MaxHealth * ExecuteBelow
@@ -245,6 +257,11 @@ internal sealed class RangerArrows
         {
             damage += enemy.Health;
             killed = enemies.Damage(enemy, enemy.Health);
+        }
+
+        if (!killed)
+        {
+            Kit?.ArrowHit(enemy, basis);   // Venom Tips: a share of the hit before any crit (damage over time never crits)
         }
 
         hits.Add(new ArrowHit(enemy, at, damage, killed, crit));

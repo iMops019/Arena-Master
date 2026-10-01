@@ -43,11 +43,17 @@ internal sealed class CleaveWave
     public bool Done => Delay <= 0f && Age >= WarriorStats.TravelTime + FadeTime;
 }
 
-/// <summary>What dealt a Warrior hit: the Cleave's waves (which build rage and leech life) or a Riposte.</summary>
+/// <summary>
+/// What dealt a Warrior hit: the Cleave's waves (which build rage and leech life) or a Riposte; with the Reaver, a thrown axe (an Axe Storm's pass too) or the battle
+/// charge (both of which leech life), or bleeding (damage over time).
+/// </summary>
 internal enum CleaveSource
 {
     Cleave,
     Riposte,
+    Throw,
+    Charge,
+    Bleed,
 }
 
 internal readonly record struct CleaveHit(Enemy Enemy, Vector3D<float> Position, float Damage, bool Killed, bool Crit, CleaveSource Source);
@@ -77,9 +83,10 @@ internal sealed class CleaveAxes
 
     /// <summary>
     /// One frame: a swing when one is due (held while <paramref name="canSwing"/> is false - a stun) towards <paramref name="facingYaw"/> from <paramref name="feet"/>,
-    /// and every wave rolling on, hitting what its front passes over. Every hit dealt goes on <paramref name="hits"/>.
+    /// and every wave rolling on, hitting what its front passes over. With no <paramref name="facingYaw"/> (nothing in reach) the axes wait, ready, and swing the
+    /// moment something comes. Every hit dealt goes on <paramref name="hits"/>.
     /// </summary>
-    public void Update(float deltaSeconds, Vector3D<float> feet, float facingYaw, WarriorStats stats, EnemyField enemies, bool canSwing, List<CleaveHit> hits)
+    public void Update(float deltaSeconds, Vector3D<float> feet, float? facingYaw, WarriorStats stats, EnemyField enemies, bool canSwing, List<CleaveHit> hits)
     {
         SwingIn -= deltaSeconds;
         if (!canSwing)
@@ -88,8 +95,15 @@ internal sealed class CleaveAxes
         }
         else if (SwingIn <= 0f)
         {
-            SwingIn = MathF.Max(0f, SwingIn + stats.SwingInterval);   // after a pause, no flurry of swings to catch up
-            Swing(feet, facingYaw, stats);
+            if (facingYaw is { } yaw)
+            {
+                SwingIn = MathF.Max(0f, SwingIn + stats.SwingInterval);   // after a pause, no flurry of swings to catch up
+                Swing(feet, yaw, stats);
+            }
+            else
+            {
+                SwingIn = 0f;   // ready, and waiting for something to swing at
+            }
         }
 
         foreach (var wave in _waves)

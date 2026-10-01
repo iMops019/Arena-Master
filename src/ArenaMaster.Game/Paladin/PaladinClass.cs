@@ -11,8 +11,9 @@ namespace ArenaMaster.Game.Paladin;
 /// <summary>
 /// The Paladin as the content runs it (see <see cref="IHeroClass"/>): a flail and a great crusader shield. The Holy Nova bursts around the Paladin on its own
 /// (<see cref="HolyLight"/>), leaving holy circles that burn enemies and heal the Paladin standing in one. The shield blocks blows outright, and the Defiance tree
-/// adds thorns and turns blocks into weapons. Here too is what answers the enemies' blows: shield bash, heal on block, Holy Bastion, Retribution, Shield of Faith
-/// and Unbroken Vow.
+/// adds thorns and turns blocks into weapons; the Crusade tree (<see cref="CrusadeLight"/>) rewards moving and paying health instead: Zeal, hammers of light, a
+/// rush that hits, Blood Oath and Avenging Wings. Here too is what answers the enemies' blows: shield bash, heal on block, Holy Bastion, Retribution, Shield of
+/// Faith and Unbroken Vow, and the Crusade's Penance and Avenging Wings.
 /// </summary>
 internal sealed class PaladinClass : IHeroClass
 {
@@ -23,6 +24,8 @@ internal sealed class PaladinClass : IHeroClass
     private readonly PaladinController _controller = new();
     private readonly HolyLight _light;
     private readonly HolyView _view = new();
+    private readonly CrusadeLight _crusade = new();
+    private readonly CrusadeView _crusadeView = new();
     private readonly HashSet<PaladinUpgrade> _banished = new();
     private readonly List<HolyHit> _hits = new();
     private List<PaladinChoice> _choices = new();
@@ -36,10 +39,19 @@ internal sealed class PaladinClass : IHeroClass
     /// <summary>Unbroken Vow's last stand, not yet used this run. Any other last stand (an item's) is the content's to answer.</summary>
     private int _vowLeft;
 
+    /// <summary>The health's running total of what blows took off, as of the last look (Penance pays back what it has grown by).</summary>
+    private double _lostSeen;
+
     /// <summary>How long after the last attack frame the body still holds its fighting stance (a run's attacks come after the body in each frame).</summary>
     private const float AttackingHold = 0.25f;
 
+    /// <summary>The body turns to the nearest enemy within this many metres (the nova goes off all round, so this is only which way it stands).</summary>
+    private const float FaceRange = 15f;
+
     private float _attackingLeft;
+
+    /// <summary>The flat way to the nearest enemy as of the last attack frame, or null with none near.</summary>
+    private Vector3D<float>? _aim;
 
     public PaladinClass(Random random) => _light = new HolyLight(random);
 
@@ -48,14 +60,21 @@ internal sealed class PaladinClass : IHeroClass
     /// <summary>The novas and circles, for the tests.</summary>
     internal HolyLight Light => _light;
 
+    /// <summary>Zeal, the hammers and the wings, for the tests.</summary>
+    internal CrusadeLight Crusade => _crusade;
+
     public string Id => DefianceTree.ClassId;
 
     public string Name => "Paladin";
 
     public string Summary =>
-        "A flail and a great crusader shield. Holy Nova bursts around you on its own and leaves holy ground that burns enemies and heals you. Slow, tough, and made to stand in the crowd.";
+        "A flail and a great crusader shield. Holy Nova bursts around you on its own and leaves holy ground that burns enemies and heals you. Slow and tough: Defiance stands its ground in the crowd, the Crusade keeps marching and pays for its power in blood.";
 
-    public TreeDefinition Tree => DefianceTree.Tree;
+    public IReadOnlyList<TreeDefinition> Trees { get; } = new[] { DefianceTree.Tree, CrusadeTree.Tree };
+
+    public TreeDefinition Tree { get; private set; } = DefianceTree.Tree;
+
+    public void ChooseTree(string treeId) => Tree = Trees.FirstOrDefault(t => t.Id == treeId) ?? Trees[0];
 
     public float MaxHealth => Stats.MaxHealth;
 
@@ -77,14 +96,25 @@ internal sealed class PaladinClass : IHeroClass
     public Vector3D<float> DashVelocity => _controller.RushVelocity;
 
     public string? Status =>
-        _vowShown > 0f ? "UNBROKEN VOW" : _blockedShown > 0f ? "BLOCKED" : FaithReady ? "SHIELD OF FAITH" : null;
+        _vowShown > 0f ? "UNBROKEN VOW" : _crusade.Winged ? "AVENGING WINGS" : _blockedShown > 0f ? "BLOCKED" : FaithReady ? "SHIELD OF FAITH" : null;
+
+    /// <summary>Zeal, on a run while the Crusade builds it.</summary>
+    public (string Label, float Fill)? Meter =>
+        _health is not null && Stats.BuildsZeal ? ($"ZEAL {(int)(_crusade.Zeal + 0.001f)} / {PaladinStats.MaxZeal:0}", _crusade.Zeal / PaladinStats.MaxZeal) : null;
 
     /// <summary>Whether the Paladin stands in a holy circle this frame.</summary>
     public bool InCircle => _circlesAround > 0;
 
     private bool FaithReady => Stats.Tree.ShieldOfFaith && _faithIn <= 0f;
 
-    public void UseTree(IReadOnlyDictionary<string, int> ranks) => Stats.Tree = DefianceBonuses.From(ranks);
+    /// <summary>The active tree's bonuses from <paramref name="ranks"/>; the other tree's are left empty, so nothing of it counts.</summary>
+    public void UseTree(IReadOnlyDictionary<string, int> ranks)
+    {
+        bool crusade = Tree.Id == CrusadeTree.TreeId;
+        Stats.CrusadeActive = crusade;
+        Stats.Tree = crusade ? new DefianceBonuses() : DefianceBonuses.From(ranks);
+        Stats.Crusade = crusade ? CrusadeBonuses.From(ranks) : new CrusadeBonuses();
+    }
 
     public void BeginRun(ItemBonuses items, PlayerHealth health)
     {
@@ -96,6 +126,8 @@ internal sealed class PaladinClass : IHeroClass
         health.LastStands = _vowLeft;
         _banished.Clear();
         _light.Reset();
+        _crusade.Reset();
+        _lostSeen = health.HealthLost;
         _circlesAround = 0;
         _faithIn = 0f;
         _blockedShown = 0f;
@@ -113,7 +145,8 @@ internal sealed class PaladinClass : IHeroClass
     public void Move(EngineWindow window, float deltaSeconds, bool stunned)
     {
         _attackingLeft = MathF.Max(0f, _attackingLeft - deltaSeconds);
-        _controller.Update(window, deltaSeconds, Stats, stunned, _attackingLeft > 0f ? AttackTime() : null);
+        bool fighting = _attackingLeft > 0f;
+        _controller.Update(window, deltaSeconds, Stats, stunned, fighting ? AttackTime() : null, fighting ? _aim : null);
     }
 
     /// <summary>
@@ -145,18 +178,24 @@ internal sealed class PaladinClass : IHeroClass
     public void Attack(RunFrame frame)
     {
         _attackingLeft = AttackingHold;
-        Fight(frame.DeltaSeconds, frame.Window.PlayerFeet, Ground(frame), frame.StandingStill, frame.Condition.IsStunned, frame.Enemies, frame.Health, frame.Numbers);
+        var feet = frame.Window.PlayerFeet;
+        _aim = frame.Enemies.Nearest(feet, FaceRange) is { } nearest ? Geometry.FlatDirection(feet, nearest.Position, out _) : null;
+        Fight(frame.DeltaSeconds, frame.Window.PlayerFeet, Ground(frame), frame.StandingStill, frame.Condition.IsStunned, frame.Enemies, frame.Health, frame.Numbers,
+            rushing: _controller.RushVelocity != Vector3D<float>.Zero);
         _view.Sync(frame.Window, _light);
+        var facing = _controller.Facing;
+        _crusadeView.Sync(frame.Window, _crusade, feet, MathF.Atan2(facing.X, facing.Z), frame.DeltaSeconds);
     }
 
     public void Answer(RunFrame frame) => AnswerStrikes(frame.Enemies.Strikes, Ground(frame), frame.Enemies, frame.Health, frame.Numbers);
 
     /// <summary>
-    /// The attacks for one frame, before the enemies move: the novas, circles and thorns (held by a stun), and the healing from standing in holy ground - once, or
-    /// once per circle with Consecrated Ground. <paramref name="ground"/> is the ground under <paramref name="feet"/>.
+    /// The attacks for one frame, before the enemies move: the novas, circles and thorns (held by a stun), the Crusade's Zeal, hammers, rush, trail, Blood Oath and
+    /// wings, and the healing from standing in holy ground - once, or once per circle with Consecrated Ground. <paramref name="ground"/> is the ground under
+    /// <paramref name="feet"/>; <paramref name="rushing"/> is whether the shield rush is carrying the Paladin this frame.
     /// </summary>
     internal void Fight(float deltaSeconds, Vector3D<float> feet, Vector3D<float> ground, bool standingStill, bool stunned, EnemyField enemies, PlayerHealth health,
-        DamageNumbers numbers)
+        DamageNumbers numbers, bool rushing = false)
     {
         _still = standingStill;
         _faithIn = MathF.Max(0f, _faithIn - deltaSeconds);
@@ -164,7 +203,10 @@ internal sealed class PaladinClass : IHeroClass
         _vowShown = MathF.Max(0f, _vowShown - deltaSeconds);
 
         _hits.Clear();
+        _crusade.Prepare(deltaSeconds, moving: !standingStill, Stats, health);
+        int novas = _light.Novas;
         _light.Update(deltaSeconds, ground, Stats, enemies, canCast: !stunned, _hits);
+        _crusade.Update(deltaSeconds, ground, moving: !standingStill, rushing, _light.Novas - novas, _light, Stats, enemies, health, _hits);
 
         _circlesAround = _light.CirclesAround(feet);
         int healing = Stats.Tree.ConsecratedGround ? _circlesAround : Math.Min(1, _circlesAround);
@@ -174,7 +216,8 @@ internal sealed class PaladinClass : IHeroClass
 
     /// <summary>
     /// The enemies' blows this frame, answered: a block bashes the attacker, heals, spends Shield of Faith and (Holy Bastion) bursts; Retribution pays every blow
-    /// back; a last stand (Unbroken Vow) heals.
+    /// back; a last stand (Unbroken Vow) heals. The Crusade's answers: Penance stores what the blows took off for the next nova, and Avenging Wings take flight once
+    /// health is low.
     /// </summary>
     internal void AnswerStrikes(IReadOnlyList<Strike> strikes, Vector3D<float> ground, EnemyField enemies, PlayerHealth health, DamageNumbers numbers)
     {
@@ -210,17 +253,25 @@ internal sealed class PaladinClass : IHeroClass
             _vowShown = VowShown;
         }
 
+        if (Stats.Crusade.Penance && health.HealthLost > _lostSeen)
+        {
+            _light.Penance += (float)(health.HealthLost - _lostSeen) * PaladinStats.PenanceShare;
+        }
+
+        _lostSeen = health.HealthLost;
+        _crusade.CheckWings(Stats, health);
         Report(numbers, health);
     }
 
-    public void OnKill(Enemy killed, float runSeconds)
-    {
-    }
+    /// <summary>A kill heals with Blood Oath, Lifeblood and Blood Tithe.</summary>
+    public void OnKill(Enemy killed, float runSeconds) => _health?.Heal(Stats.KillHeal);
 
     public void Clear(EngineWindow window)
     {
         _light.Reset();
+        _crusade.Reset();
         _view.Clear(window);
+        _crusadeView.Clear(window);
         _circlesAround = 0;
     }
 

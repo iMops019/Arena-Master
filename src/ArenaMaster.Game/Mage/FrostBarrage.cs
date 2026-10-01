@@ -3,7 +3,10 @@ using Silk.NET.Maths;
 
 namespace ArenaMaster.Game.Mage;
 
-/// <summary>A bolt of ice from the Frost Barrage: it flies out from the staff, curves onto its target, and melts when its flight is spent.</summary>
+/// <summary>
+/// A bolt from the barrage - ice from the Frost Barrage, fire from the Fire Barrage: it flies out from the staff, curves onto its target, and melts (or gutters out)
+/// when its flight is spent.
+/// </summary>
 internal sealed class FrostBolt
 {
     public Vector3D<float> Position { get; set; }
@@ -47,20 +50,30 @@ internal sealed class FrostBurst
     public float Age { get; set; }
 }
 
+/// <summary>What dealt a hit: a bolt, or one of the frost's or the fire's own attacks. The Blizzard, burns, fire on the ground and the Inferno are damage over time.</summary>
 internal enum FrostSource
 {
     Bolt,
     Blast,
     Blizzard,
     Ward,
+    Burn,
+    Combustion,
+    Fireball,
+    Meteor,
+    Ground,
+    Inferno,
 }
 
+/// <summary>A hit from the Mage's barrage or anything it sets off, frost or fire.</summary>
 internal readonly record struct FrostHit(Enemy Enemy, Vector3D<float> Position, float Damage, bool Killed, bool Crit, FrostSource Source);
 
 /// <summary>
-/// The Mage's attacks: the Frost Barrage - every so often, while an enemy is in range, a volley of bolts leaves the staff one after another, fans out, and curves
-/// onto enemies (no more at one than it takes to kill it, then on to the next) - and what the Frost tree adds to it: Frost Blast, Deep Freeze, Shatter, Splitting Ice, the Comet and
-/// the Blizzard. Every frost hit chills. Pure simulation - no engine calls - so it can be tested; <see cref="FrostView"/> draws it.
+/// The Mage's attacks: the barrage - every so often, while an enemy is in range, a volley of bolts leaves the staff one after another, fans out, and curves onto
+/// enemies (no more at one than it takes to kill it, then on to the next). Its shape is the Mage's whichever tree is active; the active tree gives it its element.
+/// As the Frost Barrage every hit chills, and the Frost tree adds Frost Blast, Deep Freeze, Shatter, Splitting Ice, the Comet and the Blizzard. As the Fire Barrage
+/// (<see cref="MageStats.Fire"/>) nothing chills; every hit sets the enemy burning instead, and the Pyromancy tree's fire - burns, heat, bursts, meteors - is
+/// <see cref="Flames"/>, which this runs. Pure simulation - no engine calls - so it can be tested; <see cref="FrostView"/> and <see cref="FireView"/> draw it.
 /// </summary>
 internal sealed class FrostBarrage
 {
@@ -98,6 +111,9 @@ internal sealed class FrostBarrage
 
     public FrostBarrage(Random random) => _random = random;
 
+    /// <summary>The Fire Barrage's fire: burns, heat and the rest of the Pyromancy tree.</summary>
+    public Flames Flames { get; } = new();
+
     public IReadOnlyList<FrostBolt> Bolts => _bolts;
 
     public IReadOnlyList<FrostBurst> Bursts => _bursts;
@@ -112,13 +128,19 @@ internal sealed class FrostBarrage
     public int Queued => _launches.Count;
 
     /// <summary>
-    /// One frame: a barrage when one is due and an enemy is in range (held, bolts still to leave included, while <paramref name="canCast"/> is false - a stun), bolts
-    /// leaving the staff at <paramref name="staff"/> one by one, the bolts in flight, and the Blizzard around <paramref name="feet"/>. <paramref name="aimFlat"/> is
-    /// where the camera faces: enemies in front are aimed at first. Every hit dealt goes on <paramref name="hits"/>.
+    /// One frame: a barrage when one is due and an enemy is in range (held, bolts still to leave included, while <paramref name="canCast"/> is false - a stun - or
+    /// the Mage is overheated), bolts leaving the staff at <paramref name="staff"/> one by one, the bolts in flight, the Blizzard around <paramref name="feet"/>, and
+    /// the fire (with the Fire Barrage). <paramref name="aimFlat"/> is where the Mage faces (toward its nearest enemy): enemies in front are aimed at first. Every hit
+    /// dealt goes on <paramref name="hits"/>.
     /// </summary>
     public void Update(float deltaSeconds, Vector3D<float> staff, Vector3D<float> feet, Vector3D<float> aimFlat, MageStats stats, EnemyField enemies,
         Func<float, float, float?> groundAt, bool canCast, List<FrostHit> hits)
     {
+        if (stats.Fire && !Flames.CanCast)
+        {
+            canCast = false;   // overheated
+        }
+
         if (canCast)
         {
             BarrageIn -= deltaSeconds;
@@ -127,6 +149,10 @@ internal sealed class FrostBarrage
                 if (enemies.Within(feet, stats.TargetRange).Count > 0)
                 {
                     BeginBarrage(stats);
+                    if (stats.Fire)
+                    {
+                        Flames.Cast(feet, Barrages, stats, enemies);
+                    }
                 }
                 else
                 {
@@ -157,6 +183,10 @@ internal sealed class FrostBarrage
 
         _bursts.RemoveAll(b => b.Age >= BurstDuration);
         UpdateBlizzard(deltaSeconds, feet, stats, enemies, hits);
+        if (stats.Fire)
+        {
+            Flames.Update(deltaSeconds, feet, stats, enemies, hits);
+        }
     }
 
     /// <summary>Lines up a barrage: its bolts a moment apart, and on every 4th (with Comet) the comet last.</summary>
@@ -188,7 +218,7 @@ internal sealed class FrostBarrage
         {
             if (enemy != spare)
             {
-                Frost(enemy, damage, crit: false, source, stats, enemies, hits, out _);
+                Hurt(enemy, damage, crit: false, source, stats, enemies, hits, out _);
             }
         }
     }
@@ -202,6 +232,7 @@ internal sealed class FrostBarrage
         BarrageIn = FirstBarrage;
         Barrages = 0;
         _blizzardIn = 0f;
+        Flames.Reset();
     }
 
     /// <summary>
@@ -345,16 +376,36 @@ internal sealed class FrostBarrage
 
     /// <summary>
     /// A bolt's hit: its damage (more on a chilled enemy, more again on a frozen one with Shatter, a crit roll), the chill and a chance to freeze, the Frost Blast or
-    /// the comet's blast around it, and - if it killed - Splitting Ice's two halves.
+    /// the comet's blast around it, and - if it killed - Splitting Ice's two halves. A fire bolt's hit (more on a burning enemy with Scorch) sets the enemy burning
+    /// instead, and bursts with the Fireball.
     /// </summary>
     private void Strike(FrostBolt bolt, Enemy enemy, Vector3D<float> at, MageStats stats, EnemyField enemies, List<FrostHit> hits, List<FrostBolt> spawned)
     {
+        if (stats.Fire)
+        {
+            float fireDamage = bolt.Damage * (stats.Pyro.Scorch && Flames.IsBurning(enemy) ? 1f + MageStats.ScorchBonus : 1f);
+            bool fireCrit = _random.NextDouble() < stats.CritChance;
+            bool fireKilled = Hurt(enemy, fireCrit ? fireDamage * stats.CritMultiplier : fireDamage, fireCrit, FrostSource.Bolt, stats, enemies, hits,
+                out float fireDealt);
+            if (!fireKilled)
+            {
+                Flames.Ignite(enemy, fireDamage, stats);
+            }
+
+            if (stats.Pyro.Fireball)
+            {
+                Flames.Blast(enemy.Position, stats.FireballRadius, fireDealt * stats.FireballShare, FrostSource.Fireball, stats, enemies, hits, spare: enemy);
+            }
+
+            return;
+        }
+
         bool frozen = enemy.IsFrozen;
         float damage = bolt.Damage
             * (enemy.IsChilled || frozen ? stats.ChilledMultiplier : 1f)
             * (frozen && stats.Tree.Shatter ? 1f + MageStats.ShatterBonus : 1f);
         bool crit = _random.NextDouble() < stats.CritChance;
-        bool killed = Frost(enemy, crit ? damage * stats.CritMultiplier : damage, crit, FrostSource.Bolt, stats, enemies, hits, out float dealt);
+        bool killed = Hurt(enemy, crit ? damage * stats.CritMultiplier : damage, crit, FrostSource.Bolt, stats, enemies, hits, out float dealt);
 
         if (bolt.IsComet)
         {
@@ -396,10 +447,11 @@ internal sealed class FrostBarrage
     }
 
     /// <summary>
-    /// Frost damage to one enemy (harder on an elite or a boss): it chills, and with Deep Freeze a hit on an enemy already chilled may freeze it (never a boss, half as
-    /// long for an elite). True if it killed; <paramref name="dealt"/> is the damage done. Nothing happens to one already dead.
+    /// Damage from the barrage to one enemy (harder on an elite or a boss). Frost chills, and with Deep Freeze a hit on an enemy already chilled may freeze it (never a
+    /// boss, half as long for an elite); fire doesn't (<see cref="Flames"/> burns). True if it killed; <paramref name="dealt"/> is the damage done. Nothing happens to
+    /// one already dead.
     /// </summary>
-    private bool Frost(Enemy enemy, float amount, bool crit, FrostSource source, MageStats stats, EnemyField enemies, List<FrostHit> hits, out float dealt)
+    private bool Hurt(Enemy enemy, float amount, bool crit, FrostSource source, MageStats stats, EnemyField enemies, List<FrostHit> hits, out float dealt)
     {
         dealt = 0f;
         if (!enemy.IsAlive || amount <= 0f)
@@ -420,6 +472,11 @@ internal sealed class FrostBarrage
         if (killed)
         {
             return true;
+        }
+
+        if (stats.Fire)
+        {
+            return false;   // (an item's chill still comes, from the enemy field's hit effects)
         }
 
         enemy.Chill(stats.ChillDuration, stats.Chill);
@@ -450,7 +507,7 @@ internal sealed class FrostBarrage
         float damage = stats.BoltDamage * MageStats.BlizzardShare * BlizzardTick * stats.Items.OverTime;
         foreach (var enemy in enemies.Within(feet, MageStats.BlizzardRadius * stats.AreaScale))
         {
-            Frost(enemy, damage, crit: false, FrostSource.Blizzard, stats, enemies, hits, out _);
+            Hurt(enemy, damage, crit: false, FrostSource.Blizzard, stats, enemies, hits, out _);
         }
     }
 

@@ -104,11 +104,20 @@ public sealed partial class ArenaMasterContent
 
         if (_treeScreen.IsOpen)
         {
-            bool closed = _treeScreen.Draw(_tree, _hero.Name);
+            var trees = _hero.Trees.Select(t => t.Id == _tree.Tree.Id ? _tree : new Progression.TreeProgress(t, _profile.Tree(_hero.Id, t.Id))).ToList();
+            bool closed = _treeScreen.Draw(trees, _tree, _hero.Name);
             if (_treeScreen.Changed)
             {
                 _treeScreen.Changed = false;
                 _hero.UseTree(_tree.Save.Ranks);
+                SaveProfile();
+            }
+
+            if (_treeScreen.ChosenTree is { } chosen)
+            {
+                _treeScreen.ChosenTree = null;
+                UseTree(chosen);
+                _health.Reset(_hero.MaxHealth);
                 SaveProfile();
             }
 

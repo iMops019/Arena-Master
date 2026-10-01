@@ -85,6 +85,28 @@ internal sealed class RotPatch
     }
 }
 
+/// <summary>
+/// A bone spear (Grave Calling's Bone Spear): every few casts one leaves the wand in place of the skulls and flies straight, low over the ground, through
+/// everything in its line until it has gone its range.
+/// </summary>
+internal sealed class BoneSpear
+{
+    public Vector3D<float> Position { get; set; }
+
+    /// <summary>Which way it flies, flat (unit length).</summary>
+    public Vector3D<float> Heading { get; init; }
+
+    public float Damage { get; init; }
+
+    public float Range { get; init; }
+
+    /// <summary>How far it has flown.</summary>
+    public float Travelled { get; set; }
+
+    /// <summary>The enemies it has gone through: it never strikes one twice.</summary>
+    public HashSet<Enemy> AlreadyHit { get; } = new();
+}
+
 /// <summary>Death and Decay spewing from the Skull Shield, for the view: where from, which way, how wide and far, and how long ago.</summary>
 internal sealed class RotSpray
 {
@@ -105,6 +127,10 @@ internal enum PriestSource
     Plague,
     Rot,
     Aura,
+    Spear,
+    Servant,
+    Burst,
+    Spirit,
 }
 
 internal readonly record struct PriestHit(Enemy Enemy, Vector3D<float> Position, float Damage, bool Killed, bool Crit, PriestSource Source);
@@ -113,7 +139,9 @@ internal readonly record struct PriestHit(Enemy Enemy, Vector3D<float> Position,
 /// The Priest's attack, the Plague Skull, and everything of death and decay around it: every so often, with an enemy in range, a skull leaves the wand and
 /// hunts through the crowd, piercing one enemy after another and Plaguing each (a stack of damage over time; stacks pile up to a cap). Rot lies on the ground
 /// (Death and Decay's cone, Rotting Step's patch) and rots what stands in it. And the Unholy tree's majors: Virulent Strain, Twin Skulls, Pestilence, Grave Soil,
-/// Gnashing Skulls, Epidemic, Aura of Decay, Black Death, Legion and Necropolis. Pure - no engine calls; <see cref="PriestView"/> draws it.
+/// Gnashing Skulls, Epidemic, Aura of Decay, Black Death, Legion and Necropolis. With Grave Calling active the skulls carry no Plague (they hit harder instead:
+/// <see cref="PriestStats.SkullDamage"/>), every few casts is a <see cref="BoneSpear"/> with Bone Spear, and a cast can be raised by the souls
+/// (<see cref="Empower"/>). Pure - no engine calls; <see cref="PriestView"/> draws it.
 /// </summary>
 internal sealed class PlagueSkulls
 {
@@ -143,12 +171,19 @@ internal sealed class PlagueSkulls
     /// <summary>The first cast of a run can go this soon.</summary>
     public const float FirstCast = 0.4f;
 
+    /// <summary>How fat a bone spear is for hitting.</summary>
+    public const float SpearRadius = 0.35f;
+
+    /// <summary>In a launch, the index that means a bone spear rather than a skull.</summary>
+    private const int SpearLaunch = -1;
+
     private readonly Random _random;
     private readonly List<PlagueSkull> _skulls = new();
     private readonly Dictionary<Enemy, Infection> _infections = new();
     private readonly List<RotPatch> _patches = new();
     private readonly List<RotSpray> _sprays = new();
-    private readonly List<(float Delay, int Index, int Count)> _launches = new();
+    private readonly List<BoneSpear> _spears = new();
+    private readonly List<(float Delay, int Index, int Count, float Boost)> _launches = new();
     private float _auraIn = RotTick;
 
     public PlagueSkulls(Random random) => _random = random;
@@ -160,6 +195,14 @@ internal sealed class PlagueSkulls
     public IReadOnlyList<RotPatch> Patches => _patches;
 
     public IReadOnlyList<RotSpray> Sprays => _sprays;
+
+    public IReadOnlyList<BoneSpear> Spears => _spears;
+
+    /// <summary>
+    /// Asked once a cast, as it goes: what its damage is multiplied by and how many times over it fires its skulls. Null (or (1, 1)) for a plain cast. The
+    /// Priest sets it to its souls' (<see cref="GatheredSouls.Empower"/>: Soul Siphon's charges and Lich Form).
+    /// </summary>
+    public Func<(float Damage, int Volleys)>? Empower { get; set; }
 
     /// <summary>Seconds until the next cast may go (it waits, at 0, for an enemy in range).</summary>
     public float CastIn { get; private set; } = FirstCast;
@@ -175,7 +218,7 @@ internal sealed class PlagueSkulls
     /// <summary>
     /// One frame: a cast from <paramref name="hand"/> when one is due and an enemy is in range (held, skulls still to leave included, while
     /// <paramref name="canCast"/> is false - a stun), the skulls in flight, the Plague on every enemy, the rot on the ground, and the Aura of Decay around
-    /// <paramref name="feet"/>. <paramref name="aimFlat"/> is where the camera faces: enemies in front are aimed at first. Every hit goes on <paramref name="hits"/>.
+    /// <paramref name="feet"/>. <paramref name="aimFlat"/> is where the Priest faces (toward its nearest enemy): enemies in front are aimed at first. Every hit goes on <paramref name="hits"/>.
     /// </summary>
     public void Update(float deltaSeconds, Vector3D<float> hand, Vector3D<float> feet, Vector3D<float> aimFlat, PriestStats stats, EnemyField enemies,
         Func<float, float, float?> groundAt, bool canCast, List<PriestHit> hits)
@@ -206,11 +249,19 @@ internal sealed class PlagueSkulls
             foreach (var launch in _launches.Where(l => l.Delay <= 0f).ToList())
             {
                 _launches.Remove(launch);
-                Launch(launch.Index, launch.Count, hand, aimFlat, stats, enemies);
+                if (launch.Index == SpearLaunch)
+                {
+                    LaunchSpear(hand, aimFlat, launch.Boost, stats, enemies);
+                }
+                else
+                {
+                    Launch(launch.Index, launch.Count, launch.Boost, hand, aimFlat, stats, enemies);
+                }
             }
         }
 
         MoveSkulls(deltaSeconds, stats, enemies, groundAt, hits);
+        MoveSpears(deltaSeconds, stats, enemies, groundAt, hits);
         TickPlague(deltaSeconds, stats, enemies, hits);
         TickRot(deltaSeconds, stats, enemies, hits);
         TickAura(deltaSeconds, feet, stats, enemies, hits);
@@ -223,15 +274,25 @@ internal sealed class PlagueSkulls
         _sprays.RemoveAll(s => s.Age >= SprayTime);
     }
 
-    /// <summary>A cast: its skulls lined up a moment apart.</summary>
+    /// <summary>
+    /// A cast: its skulls lined up a moment apart (as many times over as <see cref="Empower"/> says) - or, every few casts with Bone Spear, a bone spear in their
+    /// place.
+    /// </summary>
     public void Cast(PriestStats stats)
     {
         Casts++;
         CastIn = stats.CastInterval;
-        int count = stats.Skulls;
+        var (boost, volleys) = Empower?.Invoke() ?? (1f, 1);
+        if (stats.Grave.BoneSpear && Casts % stats.SpearCadence == 0)
+        {
+            _launches.Add((0f, SpearLaunch, 1, boost));
+            return;
+        }
+
+        int count = stats.Skulls * Math.Max(1, volleys);
         for (int i = 0; i < count; i++)
         {
-            _launches.Add((i * SkullStagger, i, count));
+            _launches.Add((i * SkullStagger, i, count, boost));
         }
     }
 
@@ -308,6 +369,11 @@ internal sealed class PlagueSkulls
             amount *= PriestStats.BlackDeathDamage;   // Plagued: 15% more from everything the Priest does
         }
 
+        if (stats.GraveCalling && enemy.Health < enemy.MaxHealth * 0.5f)
+        {
+            amount *= 1f + stats.DeathKnell;   // Death Knell: more to the wounded
+        }
+
         bool killed = enemies.Damage(enemy, amount);
         hits.Add(new PriestHit(enemy, enemy.Position + new Vector3D<float>(0f, enemy.Kind.Height * 0.7f, 0f), amount, killed, crit, source));
         return killed;
@@ -320,6 +386,7 @@ internal sealed class PlagueSkulls
         _infections.Clear();
         _patches.Clear();
         _sprays.Clear();
+        _spears.Clear();
         _launches.Clear();
         CastIn = FirstCast;
         Casts = 0;
@@ -333,15 +400,13 @@ internal sealed class PlagueSkulls
             Centre = centre, Radius = radius, Yaw = yaw, HalfArc = halfArc, Lifetime = seconds, Left = seconds, DamagePerSecond = damagePerSecond, TickIn = 0f,
         });
 
-    /// <summary>Skull <paramref name="index"/> of <paramref name="count"/> leaves the wand: toward the best enemy in range (in front first, nearest first), each after the first turned a little further off it.</summary>
-    private void Launch(int index, int count, Vector3D<float> hand, Vector3D<float> aimFlat, PriestStats stats, EnemyField enemies)
+    /// <summary>
+    /// Skull <paramref name="index"/> of <paramref name="count"/> leaves the wand: toward the best enemy in range (in front first, nearest first), each after the
+    /// first turned a little further off it, its damage raised by <paramref name="boost"/>.
+    /// </summary>
+    private void Launch(int index, int count, float boost, Vector3D<float> hand, Vector3D<float> aimFlat, PriestStats stats, EnemyField enemies)
     {
-        var target = enemies.Within(hand, PriestStats.CastRange).OrderBy(e => Rank(e, hand, aimFlat)).FirstOrDefault();
-        var toward = target is null ? aimFlat : Geometry.FlatDirection(hand, target.Position, out _);
-        if (toward == Vector3D<float>.Zero)
-        {
-            toward = aimFlat == Vector3D<float>.Zero ? Vector3D<float>.UnitZ : aimFlat;
-        }
+        var (target, toward) = BestTarget(hand, aimFlat, enemies);
 
         float turn = (index + 1) / 2 * SkullSpread * (index % 2 == 1 ? 1f : -1f) * MathF.PI / 180f;
         float cos = MathF.Cos(turn), sin = MathF.Sin(turn);
@@ -351,10 +416,57 @@ internal sealed class PlagueSkulls
             Heading = new Vector3D<float>(toward.X * cos + toward.Z * sin, 0f, -toward.X * sin + toward.Z * cos),
             Speed = stats.SkullSpeed,
             Life = stats.SkullLife,
-            Damage = stats.SkullDamage,
+            Damage = stats.SkullDamage * boost,
             PierceLeft = stats.Pierce,
             Target = index == 0 ? target : null,
         });
+    }
+
+    /// <summary>A bone spear leaves the wand, straight at the best enemy in range (or the way the Priest faces), its damage raised by <paramref name="boost"/>.</summary>
+    private void LaunchSpear(Vector3D<float> hand, Vector3D<float> aimFlat, float boost, PriestStats stats, EnemyField enemies)
+    {
+        var (_, toward) = BestTarget(hand, aimFlat, enemies);
+        _spears.Add(new BoneSpear { Position = hand, Heading = toward, Damage = stats.SpearDamage * boost, Range = stats.SpearRange });
+    }
+
+    /// <summary>The best enemy in range to cast at (in front first, nearest first) and the flat way to it; with none, the way the Priest faces.</summary>
+    private static (Enemy? Target, Vector3D<float> Toward) BestTarget(Vector3D<float> hand, Vector3D<float> aimFlat, EnemyField enemies)
+    {
+        var target = enemies.Within(hand, PriestStats.CastRange).OrderBy(e => Rank(e, hand, aimFlat)).FirstOrDefault();
+        var toward = target is null ? aimFlat : Geometry.FlatDirection(hand, target.Position, out _);
+        if (toward == Vector3D<float>.Zero)
+        {
+            toward = aimFlat == Vector3D<float>.Zero ? Vector3D<float>.UnitZ : aimFlat;
+        }
+
+        return (target, toward);
+    }
+
+    /// <summary>The bone spears: flying straight on, low over the ground, striking everything they pass once each (a crit roll each), until they have gone their range.</summary>
+    private void MoveSpears(float deltaSeconds, PriestStats stats, EnemyField enemies, Func<float, float, float?> groundAt, List<PriestHit> hits)
+    {
+        for (int i = _spears.Count - 1; i >= 0; i--)
+        {
+            var spear = _spears[i];
+            float step = MathF.Min(PriestStats.SpearSpeed * deltaSeconds, spear.Range - spear.Travelled);
+            var from = spear.Position;
+            var to = from + spear.Heading * step;
+            float ground = groundAt(to.X, to.Z) ?? to.Y - Hover;
+            to.Y += (ground + Hover - to.Y) * MathF.Min(1f, 16f * deltaSeconds);
+            while (enemies.FirstHit(from, to, SpearRadius, out _, spear.AlreadyHit) is { } enemy)
+            {
+                spear.AlreadyHit.Add(enemy);
+                bool crit = _random.NextDouble() < stats.CritChance;
+                Hurt(enemy, crit ? spear.Damage * stats.CritMultiplier : spear.Damage, crit, PriestSource.Spear, stats, enemies, hits);
+            }
+
+            spear.Position = to;
+            spear.Travelled += step;
+            if (spear.Travelled >= spear.Range - 1e-3f)
+            {
+                _spears.RemoveAt(i);
+            }
+        }
     }
 
     /// <summary>How good a target an enemy is: nearer is better, and one behind the Priest counts as half again as far.</summary>
@@ -451,14 +563,18 @@ internal sealed class PlagueSkulls
     }
 
     /// <summary>
-    /// A skull's hit: its damage (a crit roll), the Plague it leaves (and with Epidemic, on those around too), and with Gnashing Skulls a kill feeds it: one more
-    /// pierce and more damage.
+    /// A skull's hit: its damage (a crit roll), the Plague it leaves with Unholy active (and with Epidemic, on those around too), and with Gnashing Skulls a kill
+    /// feeds it: one more pierce and more damage.
     /// </summary>
     private void Strike(PlagueSkull skull, Enemy enemy, PriestStats stats, EnemyField enemies, List<PriestHit> hits)
     {
         bool crit = _random.NextDouble() < stats.CritChance;
         bool killed = Hurt(enemy, crit ? skull.Damage * stats.CritMultiplier : skull.Damage, crit, PriestSource.Skull, stats, enemies, hits);
-        Infect(enemy, stats);
+        if (!stats.GraveCalling)
+        {
+            Infect(enemy, stats);   // (Grave Calling's skulls carry no Plague)
+        }
+
         if (stats.Tree.Epidemic)
         {
             foreach (var near in enemies.Within(enemy.Position, PriestStats.EpidemicRadius))

@@ -5,10 +5,10 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Ranger;
 
 /// <summary>
-/// The Ranger's basic attack: a bow that fires on its own, over and over, at whatever the crosshair is on (Megabonk-style - the player aims with the camera, never clicks).
-/// Arrows leave from the Ranger's bow and converge on the crosshair's target, so what is under the crosshair is what gets hit. The passive tree's timed majors fire from
-/// here too: a focused shot after standing still (Sniper's Focus), a ring of arrows every tenth shot (Endless Quiver), and arrows raining on the crosshair's spot
-/// every few seconds (Rain of Arrows).
+/// The Ranger's basic attack: a bow that aims and fires on its own, over and over, at the nearest enemy it can see (<see cref="BowSight"/>) - the player only moves,
+/// and looks round with the mouse. Arrows leave from the Ranger's bow and are led to where the target will be. The passive tree's timed majors fire from here too:
+/// a focused shot after standing still (Sniper's Focus), a ring of arrows every tenth shot (Endless Quiver), and arrows raining on the target every few seconds
+/// (Rain of Arrows).
 /// </summary>
 internal sealed class RangerBow
 {
@@ -23,9 +23,6 @@ internal sealed class RangerBow
     private const float RainSpeed = 40f;
     private const float RainSpread = 0.6f;
 
-    /// <summary>Where Rain of Arrows lands when the crosshair is on the sky: this far ahead of the Ranger.</summary>
-    private const float RainFallback = 15f;
-
     /// <summary>How big the focused arrow is drawn.</summary>
     private const float FocusScale = 1.4f;
 
@@ -33,13 +30,15 @@ internal sealed class RangerBow
     private readonly Random _random;
     private readonly List<CrowdInstance> _copies = new();
     private readonly BowCadence _cadence = new();
+    private readonly BowSight _sight = new();
     private readonly List<(float Delay, Vector3D<float> Origin, Vector3D<float> Direction)> _rain = new();
     private float _cooldown;
 
-    public RangerBow(Random random)
+    /// <summary>A bow whose arrows answer to <paramref name="kit"/> (the Trapper tree's venom and marks) on every hit, if given.</summary>
+    public RangerBow(Random random, TrapperKit? kit = null)
     {
         _random = random;
-        _arrows = new RangerArrows(random);
+        _arrows = new RangerArrows(random) { Kit = kit };
     }
 
     /// <summary>How far the bow is through drawing its next shot: 0 as an arrow leaves, 1 as the next is about to (the body's draw keeps time with it).</summary>
@@ -48,36 +47,54 @@ internal sealed class RangerBow
     /// <summary>Whether the next shot is focused (Sniper's Focus), for the HUD.</summary>
     public bool FocusReady(RangerStats stats) => _cadence.FocusReady(stats);
 
+    /// <summary>What the bow is shooting at, or null with nothing in range and sight (the body turns to it, the HUD marks it).</summary>
+    public Enemy? Target => _sight.Target;
+
+    /// <summary>The flat way to the target, or null with none.</summary>
+    public Vector3D<float>? AimFlat(Vector3D<float> feet) => _sight.Target is { } target ? Flat(target.Position - feet) : null;
+
     /// <summary>
-    /// Fires when it's time (unless <paramref name="canFire"/> is false - a stun holds the bow), then moves the arrows already in the air. <paramref name="standingStill"/>
-    /// feeds Sniper's Focus. Returns this frame's hits, for anything that answers to them (healing on a crit, say).
+    /// Picks the nearest enemy in sight and fires at it when it's time (unless <paramref name="canFire"/> is false - a stun holds the bow), then moves the arrows
+    /// already in the air. With nothing to shoot the bow waits, drawn, and looses the moment something comes in range. <paramref name="standingStill"/> feeds
+    /// Sniper's Focus. Returns this frame's hits, for anything that answers to them (healing on a crit, say).
     /// </summary>
     public List<ArrowHit> Update(EngineWindow window, float deltaSeconds, RangerStats stats, EnemyField enemies, DamageNumbers numbers, Func<float, float, float?> groundAt,
         bool canFire = true, bool standingStill = false)
     {
         _cadence.Update(deltaSeconds, standingStill);
         _cooldown = canFire ? _cooldown - deltaSeconds : MathF.Max(_cooldown, 0.15f);
-        if (window.Camera is { } camera && window.Terrain is { } terrain)
+        if (window.Terrain is { } terrain)
         {
-            var aimFlat = Flat(camera.Front);
-            var origin = window.PlayerFeet + new Vector3D<float>(0f, ReleaseHeight, 0f) + aimFlat * ReleaseForward;
-            var (target, onSomething) = CrosshairTarget(camera, terrain, enemies, stats.Range);
+            var feet = window.PlayerFeet;
+            var bow = feet + new Vector3D<float>(0f, ReleaseHeight, 0f);
+            _sight.Update(enemies.Enemies, bow, stats.Range, deltaSeconds, (from, to) => ClearLine(terrain, from, to));
 
-            if (_cooldown <= 0f)
+            if (_sight.AimPoint(bow, stats.ArrowSpeed) is { } aimPoint)
             {
-                _cooldown += stats.FireInterval;
-                if (_cooldown < 0f)
+                var aimFlat = Flat(aimPoint - feet);
+                var origin = bow + aimFlat * ReleaseForward;
+                if (_cooldown <= 0f)
                 {
-                    _cooldown = 0f;   // after a pause, don't fire a burst to catch up
+                    _cooldown += stats.FireInterval;
+                    if (_cooldown < 0f)
+                    {
+                        _cooldown = 0f;   // after a pause, don't fire a burst to catch up
+                    }
+
+                    var toward = aimPoint - origin;
+                    Shoot(stats, origin, toward.LengthSquared > 1e-6f ? Vector3D.Normalize(toward) : aimFlat);
                 }
 
-                Shoot(stats, origin, AimDirection(origin, target, camera.Front, aimFlat));
+                if (canFire && _cadence.RainDue(stats))
+                {
+                    var centre = _sight.Target!.Position;
+                    QueueRain(stats, new Vector3D<float>(centre.X, groundAt(centre.X, centre.Z) ?? centre.Y, centre.Z));
+                }
             }
-
-            if (canFire && _cadence.RainDue(stats))
+            else
             {
-                var centre = onSomething ? target : window.PlayerFeet + aimFlat * RainFallback;
-                QueueRain(stats, new Vector3D<float>(centre.X, groundAt(centre.X, centre.Z) ?? centre.Y, centre.Z));
+                _cooldown = MathF.Max(_cooldown, 0f);   // nothing to shoot: the bow waits, drawn
+                _cadence.HoldRain();
             }
         }
 
@@ -108,6 +125,7 @@ internal sealed class RangerBow
         window.SetCrowd(ArrowModel, ReadOnlySpan<CrowdInstance>.Empty);
         _rain.Clear();
         _cadence.Reset();
+        _sight.Clear();
     }
 
     /// <summary>
@@ -200,23 +218,6 @@ internal sealed class RangerBow
     }
 
     /// <summary>
-    /// The way to shoot from <paramref name="origin"/> so the arrow reaches <paramref name="target"/> (what the crosshair is on). Falls back to the camera's own direction when the
-    /// target is too close, or not in front of the Ranger (the crosshair on the ground at the Ranger's feet, say), where aiming at it would shoot sideways or backwards.
-    /// </summary>
-    public static Vector3D<float> AimDirection(Vector3D<float> origin, Vector3D<float> target, Vector3D<float> cameraFront, Vector3D<float> aimFlat)
-    {
-        var toTarget = target - origin;
-        float distance = toTarget.Length;
-        if (distance < 2f)
-        {
-            return cameraFront;
-        }
-
-        var direction = toTarget / distance;
-        return Vector3D.Dot(Flat(direction), aimFlat) < 0.5f ? cameraFront : direction;
-    }
-
-    /// <summary>
     /// <paramref name="count"/> directions fanned out evenly around <paramref name="aim"/>, turned about the vertical <paramref name="spreadDegrees"/> apart - the middle one
     /// (for an odd count) straight along the aim.
     /// </summary>
@@ -230,32 +231,12 @@ internal sealed class RangerBow
         }
     }
 
-    /// <summary>
-    /// What the crosshair is on: the nearest enemy or ground along the camera's line of sight - or, with <c>OnSomething</c> false, a point far along it if there is
-    /// neither (the crosshair on the sky).
-    /// </summary>
-    private static (Vector3D<float> Point, bool OnSomething) CrosshairTarget(Camera camera, Terrain terrain, EnemyField enemies, float range)
+    /// <summary>Whether the ground leaves the line from <paramref name="from"/> to <paramref name="to"/> open (a hill or a cave's rock would take the arrow).</summary>
+    private static bool ClearLine(Terrain terrain, Vector3D<float> from, Vector3D<float> to)
     {
-        float reach = range + 10f;
-        var far = camera.Position + camera.Front * reach;
-        var target = far;
-        float best = reach;
-        bool onSomething = false;
-
-        if (terrain.TryRaycast(camera.Position, camera.Front, reach, out var ground))
-        {
-            best = Vector3D.Distance(camera.Position, ground);
-            target = ground;
-            onSomething = true;
-        }
-
-        if (enemies.FirstHit(camera.Position, far, 0.05f, out float along) is not null && along * reach < best)
-        {
-            target = camera.Position + camera.Front * (along * reach);
-            onSomething = true;
-        }
-
-        return (target, onSomething);
+        var line = to - from;
+        float length = line.Length;
+        return length < 1e-3f || !terrain.TryRaycast(from, line / length, MathF.Max(0f, length - 0.3f), out _);
     }
 
     private static Vector3D<float> Flat(Vector3D<float> v)

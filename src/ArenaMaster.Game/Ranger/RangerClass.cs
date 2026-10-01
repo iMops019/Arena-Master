@@ -10,7 +10,8 @@ namespace ArenaMaster.Game.Ranger;
 
 /// <summary>
 /// The Ranger as the content runs it (see <see cref="IHeroClass"/>): the stats, the controller, the bow and the level-up pool, plus what only the Ranger reacts
-/// to - Momentum's recent kills and Headhunter's heal on an elite crit.
+/// to - Momentum's recent kills and Headhunter's heal on an elite crit - and, with the Trapper tree active, its traps, venom and hawk (<see cref="TrapperKit"/>):
+/// a snare where each dash began, poison on the arrows' hits, the hawk's dives.
 /// </summary>
 internal sealed class RangerClass : IHeroClass
 {
@@ -22,12 +23,23 @@ internal sealed class RangerClass : IHeroClass
 
     private readonly RangerController _controller = new();
     private readonly RangerBow _bow;
+    private readonly TrapperKit _kit;
+    private readonly TrapperView _view = new();
+    private readonly List<TrapperHit> _trapperHits = new();
     private readonly Queue<float> _recentKills = new();
     private readonly HashSet<RangerUpgrade> _banished = new();
     private List<UpgradeChoice> _choices = new();
     private float _shootingLeft;
+    private Vector3D<float>? _snareDue;
 
-    public RangerClass(Random random) => _bow = new RangerBow(random);
+    public RangerClass(Random random)
+    {
+        _kit = new TrapperKit(random, Stats);
+        _bow = new RangerBow(random, _kit);
+    }
+
+    /// <summary>The Trapper tree's snares, poison and hawk (idle unless that tree is active and its majors are taken).</summary>
+    public TrapperKit Kit => _kit;
 
     public RangerStats Stats { get; } = new();
 
@@ -35,9 +47,14 @@ internal sealed class RangerClass : IHeroClass
 
     public string Name => "Ranger";
 
-    public string Summary => "A bow that fires on its own at whatever the crosshair is on. Fast, fragile, and all about aim: crits, pierce and chains.";
+    public string Summary =>
+        "A bow that aims and fires on its own at the nearest enemy. Fast and fragile: keep moving, and let crits and chains, or traps, venom and a hawk, do the work.";
 
-    public TreeDefinition Tree => SharpshooterTree.Tree;
+    public IReadOnlyList<TreeDefinition> Trees { get; } = new[] { SharpshooterTree.Tree, TrapperTree.Tree };
+
+    public TreeDefinition Tree { get; private set; } = SharpshooterTree.Tree;
+
+    public void ChooseTree(string treeId) => Tree = Trees.FirstOrDefault(t => t.Id == treeId) ?? Trees[0];
 
     public float MaxHealth => Stats.MaxHealth;
 
@@ -59,7 +76,15 @@ internal sealed class RangerClass : IHeroClass
 
     public string? Status => _bow.FocusReady(Stats) ? "FOCUSED" : null;   // Sniper's Focus: the next shot is the big one
 
-    public void UseTree(IReadOnlyDictionary<string, int> ranks) => Stats.Tree = SharpshooterBonuses.From(ranks);
+    public Enemy? AimTarget => _bow.Target;
+
+    /// <summary>The active tree's ranks become its bonuses; the other tree's are emptied, so nothing of it counts.</summary>
+    public void UseTree(IReadOnlyDictionary<string, int> ranks)
+    {
+        Stats.TrapperActive = Tree.Id == TrapperTree.TreeId;
+        Stats.Tree = Stats.TrapperActive ? new SharpshooterBonuses() : SharpshooterBonuses.From(ranks);
+        Stats.Trapper = Stats.TrapperActive ? TrapperBonuses.From(ranks) : new TrapperBonuses();
+    }
 
     public void BeginRun(ItemBonuses items, PlayerHealth health)
     {
@@ -68,6 +93,8 @@ internal sealed class RangerClass : IHeroClass
         health.Reset(Stats.MaxHealth);
         _recentKills.Clear();
         _banished.Clear();
+        _kit.Reset();
+        _snareDue = null;
     }
 
     public void ReturnToCamp() => Stats.Reset();
@@ -75,7 +102,12 @@ internal sealed class RangerClass : IHeroClass
     public void Move(EngineWindow window, float deltaSeconds, bool stunned)
     {
         _shootingLeft = MathF.Max(0f, _shootingLeft - deltaSeconds);
-        _controller.Update(window, deltaSeconds, Stats, stunned, _shootingLeft > 0f ? _bow.DrawProgress(Stats) : null);
+        bool shooting = _shootingLeft > 0f;
+        _controller.Update(window, deltaSeconds, Stats, stunned, shooting ? _bow.DrawProgress(Stats) : null, shooting ? _bow.AimFlat(window.PlayerFeet) : null);
+        if (_controller.DashedFrom is { } from)
+        {
+            _snareDue = from;   // set on the run's next attack (never at camp, where there is none)
+        }
     }
 
     public void Hide(EngineWindow window) => _controller.Hide(window);
@@ -98,6 +130,28 @@ internal sealed class RangerClass : IHeroClass
                 frame.Health.Heal(Stats.Tree.EliteCritHeal);   // Headhunter
             }
         }
+
+        if (_snareDue is { } dashedFrom)
+        {
+            _kit.LaySnare(dashedFrom);
+            _snareDue = null;
+        }
+
+        _trapperHits.Clear();
+        _kit.Update(frame.DeltaSeconds, frame.Window.PlayerFeet, frame.Enemies, canAct: !frame.Condition.IsStunned, _trapperHits);
+        foreach (var hit in _trapperHits)
+        {
+            if (hit.Source is TrapperSource.Poison or TrapperSource.Caltrops)
+            {
+                frame.Numbers.AddOverTime(hit.Enemy, hit.Position, hit.Damage, hit.Killed);   // too often to number one by one
+            }
+            else
+            {
+                frame.Numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
+            }
+        }
+
+        _view.Sync(frame.Window, _kit, frame.DeltaSeconds, frame.GroundAt);
     }
 
     public void Answer(RunFrame frame)
@@ -106,7 +160,13 @@ internal sealed class RangerClass : IHeroClass
 
     public void OnKill(Enemy killed, float runSeconds) => _recentKills.Enqueue(runSeconds);
 
-    public void Clear(EngineWindow window) => _bow.Clear(window);
+    public void Clear(EngineWindow window)
+    {
+        _bow.Clear(window);
+        _kit.Reset();
+        _view.Clear(window);
+        _snareDue = null;
+    }
 
     public IReadOnlyList<LevelUpCard> RollLevelUp(Random random)
     {

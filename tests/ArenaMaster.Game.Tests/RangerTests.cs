@@ -71,30 +71,137 @@ public class RangerArrowTests
     }
 }
 
-public class RangerAimTests
+public class BowSightTests
 {
-    private static readonly Vector3D<float> Origin = new(0f, 1.3f, 0f);
-    private static readonly Vector3D<float> Ahead = new(0f, 0f, 1f);
+    private static readonly Vector3D<float> Bow = new(0f, 1.3f, 0f);
+    private const float Range = 60f;
+    private const float Frame = 1f / 60f;
+
+    private static EnemyField QuietField() => new(new Random(1)) { TargetCount = 0 };
 
     [Fact]
-    public void Aim_ConvergesOnTheCrosshairTarget()
+    public void Sight_PicksTheNearestEnemy_InAnyDirection()
     {
-        var target = new Vector3D<float>(3f, 0.5f, 30f);
+        var enemies = QuietField();
+        enemies.Spawn(new Vector3D<float>(0f, 0f, 20f));
+        var behind = enemies.Spawn(new Vector3D<float>(-3f, 0f, -8f));   // behind the Ranger: the camera doesn't matter
+        enemies.Spawn(new Vector3D<float>(15f, 0f, 0f));
 
-        var direction = RangerBow.AimDirection(Origin, target, cameraFront: Vector3D.Normalize(new Vector3D<float>(0.1f, -0.1f, 1f)), aimFlat: Ahead);
+        var sight = new BowSight();
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
 
-        var expected = Vector3D.Normalize(target - Origin);
-        Assert.Equal(expected.X, direction.X, 4);
-        Assert.Equal(expected.Y, direction.Y, 4);
-        Assert.Equal(expected.Z, direction.Z, 4);
+        Assert.Same(behind, sight.Target);
     }
 
     [Fact]
-    public void Aim_FallsBackToTheCameraDirection_WhenTheTargetIsBehindOrUnderfoot()
+    public void Sight_HasNoTarget_WithNothingInRange()
     {
-        var cameraFront = Vector3D.Normalize(new Vector3D<float>(0f, -0.6f, 1f));
+        var enemies = QuietField();
+        enemies.Spawn(new Vector3D<float>(0f, 0f, Range + 5f));
 
-        Assert.Equal(cameraFront, RangerBow.AimDirection(Origin, new Vector3D<float>(0f, 0f, -4f), cameraFront, Ahead));   // behind the Ranger
-        Assert.Equal(cameraFront, RangerBow.AimDirection(Origin, new Vector3D<float>(0f, 0f, 0.5f), cameraFront, Ahead));  // at its feet
+        var sight = new BowSight();
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
+
+        Assert.Null(sight.Target);
+        Assert.Null(sight.AimPoint(Bow, 50f));
+    }
+
+    [Fact]
+    public void Sight_PassesOverAnEnemyItCannotSee()
+    {
+        var enemies = QuietField();
+        var hidden = enemies.Spawn(new Vector3D<float>(0f, 0f, 6f));
+        var seen = enemies.Spawn(new Vector3D<float>(0f, 0f, -12f));
+
+        var sight = new BowSight();
+        sight.Update(enemies.Enemies, Bow, Range, Frame, clear: (_, to) => to.Z < 0f);   // a wall in front
+
+        Assert.Same(seen, sight.Target);
+        Assert.NotSame(hidden, sight.Target);
+    }
+
+    [Fact]
+    public void Sight_ShootsCratesOnlyWhenThereIsNothingToFight()
+    {
+        var enemies = QuietField();
+        var crate = enemies.Spawn(new Vector3D<float>(0f, 0f, 4f), EnemyKind.Crate);
+        var sight = new BowSight();
+
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
+        Assert.Same(crate, sight.Target);
+
+        var ghoul = enemies.Spawn(new Vector3D<float>(0f, 0f, 30f));
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
+        Assert.Same(ghoul, sight.Target);
+    }
+
+    [Fact]
+    public void Sight_KeepsItsTarget_UntilAnotherIsMuchNearer()
+    {
+        var enemies = QuietField();
+        var first = enemies.Spawn(new Vector3D<float>(0f, 0f, 20f));
+        var sight = new BowSight();
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
+
+        var slightlyNearer = enemies.Spawn(new Vector3D<float>(0f, 0f, -18f));
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
+        Assert.Same(first, sight.Target);   // no flicking between two at much the same distance
+
+        var muchNearer = enemies.Spawn(new Vector3D<float>(5f, 0f, 0f));
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
+        Assert.Same(muchNearer, sight.Target);
+        Assert.NotSame(slightlyNearer, sight.Target);
+    }
+
+    [Fact]
+    public void Sight_MovesOn_WhenItsTargetDies()
+    {
+        var enemies = QuietField();
+        var first = enemies.Spawn(new Vector3D<float>(0f, 0f, 10f));
+        var next = enemies.Spawn(new Vector3D<float>(0f, 0f, 25f));
+        var sight = new BowSight();
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
+
+        first.Health = 0f;
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
+
+        Assert.Same(next, sight.Target);
+    }
+
+    [Fact]
+    public void AimPoint_IsTheMiddleOfAStandingTarget()
+    {
+        var enemies = QuietField();
+        var ghoul = enemies.Spawn(new Vector3D<float>(4f, 0f, 20f));
+        var sight = new BowSight();
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
+        sight.Update(enemies.Enemies, Bow, Range, Frame);
+
+        var aim = sight.AimPoint(Bow, 50f)!.Value;
+
+        Assert.Equal(BowSight.Middle(ghoul), aim);
+        Assert.True(aim.Y > ghoul.Position.Y, "aimed at its feet");
+    }
+
+    [Fact]
+    public void AimPoint_LeadsAMovingTarget_SoTheArrowMeetsIt()
+    {
+        var enemies = QuietField();
+        var ghoul = enemies.Spawn(new Vector3D<float>(0f, 0f, 25f));
+        var sight = new BowSight();
+        const float Speed = 5f;   // walking across the line of fire
+        for (int i = 0; i < 60; i++)
+        {
+            ghoul.Position += new Vector3D<float>(Speed * Frame, 0f, 0f);
+            sight.Update(enemies.Enemies, Bow, Range, Frame);
+        }
+
+        const float ArrowSpeed = 50f;
+        var aim = sight.AimPoint(Bow, ArrowSpeed)!.Value;
+        float flight = Vector3D.Distance(Bow, aim) / ArrowSpeed;
+        var there = BowSight.Middle(ghoul) + new Vector3D<float>(Speed * flight, 0f, 0f);
+
+        Assert.True(aim.X > BowSight.Middle(ghoul).X + 1f, "the shot isn't led");
+        Assert.True(Vector3D.Distance(aim, there) < 0.2f, $"aimed {Vector3D.Distance(aim, there):0.00} m from where it will be");
     }
 }

@@ -88,7 +88,7 @@ internal static class SharpshooterTree
         // Tier 5 (level 15)
         Minor("executioner", "Executioner", 5, 160, P, 3, new[] { "patient", Deadeye }, "{Execute chance}% chance for a hit to finish off a non-boss enemy left below 20% health.", (ExecuteChance, 3)),
         Minor("headhunter", "Headhunter", 5, 300, P, 3, new[] { Deadeye }, "Critical hits on elites and bosses heal {Heal on elite crit} health.", (EliteCritHeal, 2)),
-        Major(RainOfArrows, "Rain of Arrows", 5, 440, V, new[] { "weight", "momentum" }, "Every 6 s, 12 arrows rain down on the ground under the crosshair."),
+        Major(RainOfArrows, "Rain of Arrows", 5, 440, V, new[] { "weight", "momentum" }, "Every 6 s, 12 arrows rain down on the enemy you're shooting at."),
         Minor("quiver", "Quiver Mastery", 5, 575, V, 3, new[] { "momentum" }, "+{Damage per extra arrow}% damage for each extra arrow you fire per shot.", (DamagePerExtraArrow, 5)),
         Minor("reach", "Chain Reach", 5, 700, T, 2, new[] { "seeker" }, "Arrows chain {Extra chains} extra times.", (ExtraChains, 1)),
         Minor("windrunner", "Wind Runner", 5, 840, T, 3, new[] { "recovery", "seeker" }, "+{Move speed}% move speed and +{Dash distance}% dash distance.", (MoveSpeed, 5), (DashDistance, 10)),

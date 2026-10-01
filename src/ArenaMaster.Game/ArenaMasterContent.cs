@@ -303,17 +303,29 @@ public sealed partial class ArenaMasterContent : IGameContent
     private IHeroClass ClassFor(string id) => _classes.FirstOrDefault(c => c.Id == id) ?? _classes[0];
 
     /// <summary>
-    /// Makes <paramref name="hero"/> the class played: it goes in the profile, its tree's progress becomes the active tree, and it takes that tree's bonuses. The
-    /// caller takes the old class's body out of the world.
+    /// Makes <paramref name="hero"/> the class played: it goes in the profile, and the tree the profile has active for it (its first, if none) becomes the active
+    /// tree. The caller takes the old class's body out of the world.
     /// </summary>
     [MemberNotNull(nameof(_hero), nameof(_tree))]
     private void UseClass(IHeroClass hero)
     {
         _hero = hero;
         _profile.ActiveClass = hero.Id;
-        _profile.ActiveTree = hero.Tree.Id;
-        _tree = new TreeProgress(hero.Tree, _profile.Tree(hero.Id, hero.Tree.Id));
-        hero.UseTree(_tree.Save.Ranks);
+        UseTree(_profile.ActiveTreeOf(hero.Id) ?? hero.Trees[0].Id);
+    }
+
+    /// <summary>
+    /// Makes the class's tree <paramref name="treeId"/> its active one (the first, if it has none by that id): saved in the profile, its progress the one a run levels,
+    /// and its bonuses taken.
+    /// </summary>
+    [MemberNotNull(nameof(_tree))]
+    private void UseTree(string treeId)
+    {
+        _hero.ChooseTree(treeId);
+        _profile.ActiveTrees[_hero.Id] = _hero.Tree.Id;
+        _profile.ActiveTree = _hero.Tree.Id;
+        _tree = new TreeProgress(_hero.Tree, _profile.Tree(_hero.Id, _hero.Tree.Id));
+        _hero.UseTree(_tree.Save.Ranks);
     }
 
     /// <summary>Writes the profile. A failure is shown on the HUD rather than stopping the game.</summary>

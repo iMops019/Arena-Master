@@ -18,6 +18,11 @@ internal enum PaladinUpgrade
     ZealotsEye,
     Steadfast,
     BrambleMail,
+    Fervour,
+    Hammerfall,
+    BloodTithe,
+    Onslaught,
+    BatteringCharge,
 }
 
 /// <summary>One upgrade's name, how many times it stacks, and what the next level of it does.</summary>
@@ -28,7 +33,10 @@ internal sealed record PaladinChoice(PaladinUpgrade? Upgrade, string Name, strin
 
 /// <summary>
 /// The Paladin's level-up pool: the upgrades, their numbers (kept in <see cref="PaladinStats"/>), and rolling three to choose from. Paladin-only, like everything
-/// under Paladin/. Barbed Plating and Bramble Mail only turn up once the tree has unlocked thorns, since they do nothing without them.
+/// under Paladin/. The nova's, the circles' and the body's cards come up whichever tree is active. Shield Slam and Steadfast (blocking, standing your ground) come
+/// up only with Defiance, and Barbed Plating and Bramble Mail only once Defiance has unlocked thorns. Onslaught comes up only with the Crusade, and the other
+/// Crusade cards only once the major they build on is taken: Fervour with Zeal (or Endless Crusade), Hammerfall with the hammers, Blood Tithe with Blood Oath,
+/// Battering Charge with Crusader's Rush.
 /// </summary>
 internal static class PaladinUpgrades
 {
@@ -52,13 +60,27 @@ internal static class PaladinUpgrades
         new PaladinUpgradeInfo(PaladinUpgrade.ZealotsEye, "Zealot's Eye", 4, "+20% increased critical chance, +15% critical damage"),
         new PaladinUpgradeInfo(PaladinUpgrade.Steadfast, "Steadfast", 3, "+5% block chance while standing still"),
         new PaladinUpgradeInfo(PaladinUpgrade.BrambleMail, "Bramble Mail", 3, "Thorns strike 20% more often"),
+        new PaladinUpgradeInfo(PaladinUpgrade.Fervour, "Fervour", 3, "Zeal builds 25% faster and drains 25% slower"),
+        new PaladinUpgradeInfo(PaladinUpgrade.Hammerfall, "Hammerfall", 4, "+30% hammer damage"),
+        new PaladinUpgradeInfo(PaladinUpgrade.BloodTithe, "Blood Tithe", 3, "Every kill heals 0.5 more health"),
+        new PaladinUpgradeInfo(PaladinUpgrade.Onslaught, "Onslaught", 3, "The shield rush recharges 15% faster"),
+        new PaladinUpgradeInfo(PaladinUpgrade.BatteringCharge, "Battering Charge", 3, "+30% shield rush damage"),
     };
 
     public static PaladinUpgradeInfo Info(PaladinUpgrade upgrade) => All.First(u => u.Upgrade == upgrade);
 
-    /// <summary>Whether <paramref name="upgrade"/> can come up at all for this build (thorns upgrades need thorns).</summary>
-    public static bool Offered(PaladinUpgrade upgrade, PaladinStats stats) =>
-        upgrade is not (PaladinUpgrade.BarbedPlating or PaladinUpgrade.BrambleMail) || stats.Tree.CrownOfThorns;
+    /// <summary>Whether <paramref name="upgrade"/> can come up at all for this build: the active tree's own cards, and those that build on a major only once it is taken.</summary>
+    public static bool Offered(PaladinUpgrade upgrade, PaladinStats stats) => upgrade switch
+    {
+        PaladinUpgrade.BarbedPlating or PaladinUpgrade.BrambleMail => !stats.CrusadeActive && stats.Tree.CrownOfThorns,
+        PaladinUpgrade.ShieldSlam or PaladinUpgrade.Steadfast => !stats.CrusadeActive,
+        PaladinUpgrade.Onslaught => stats.CrusadeActive,
+        PaladinUpgrade.Fervour => stats.CrusadeActive && stats.BuildsZeal,
+        PaladinUpgrade.Hammerfall => stats.CrusadeActive && stats.DropsHammers,
+        PaladinUpgrade.BloodTithe => stats.CrusadeActive && stats.Crusade.BloodOath,
+        PaladinUpgrade.BatteringCharge => stats.CrusadeActive && stats.Crusade.CrusadersRush,
+        _ => true,
+    };
 
     /// <summary>
     /// Up to <paramref name="count"/> different upgrades that can be offered, aren't maxed and aren't in <paramref name="excluded"/> (banished this run), picked at

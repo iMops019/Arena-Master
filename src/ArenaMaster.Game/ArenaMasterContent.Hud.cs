@@ -80,6 +80,7 @@ public sealed partial class ArenaMasterContent
         {
             DrawRarityTags(hud, camera);
             DrawPounceWarnings(hud, camera);
+            DrawAimMark(hud, camera);
             _numbers.Draw(hud, camera);
         }
 
@@ -235,6 +236,39 @@ public sealed partial class ArenaMasterContent
         }
     }
 
+    /// <summary>Four corner marks round the enemy the hero's attack has picked on its own (the Ranger's auto-aim), so the player can see what it is shooting at.</summary>
+    private void DrawAimMark(IHud hud, CEngine.Core.Camera camera)
+    {
+        var screen = hud.ScreenSize;
+        if (_hero.AimTarget is not { IsAlive: true } target || screen.X <= 0 || screen.Y <= 0)
+        {
+            return;
+        }
+
+        var viewProjection = camera.GetView() * camera.GetProjection((float)screen.X / screen.Y);
+        float height = target.Kind.Height * target.Rarity.Size;
+        var middle = Vector4D.Transform(new Vector4D<float>(target.Position + new Vector3D<float>(0f, height * 0.5f, 0f), 1f), viewProjection);
+        var top = Vector4D.Transform(new Vector4D<float>(target.Position + new Vector3D<float>(0f, height, 0f), 1f), viewProjection);
+        if (middle.W <= 0.1f || top.W <= 0.1f)
+        {
+            return;   // behind the camera
+        }
+
+        float x = (middle.X / middle.W * 0.5f + 0.5f) * screen.X;
+        float y = (1f - (middle.Y / middle.W * 0.5f + 0.5f)) * screen.Y;
+        float topY = (1f - (top.Y / top.W * 0.5f + 0.5f)) * screen.Y;
+        float half = Math.Clamp(y - topY, 10f, 90f) + 4f;   // the box grows with how big the enemy looks
+        float arm = MathF.Max(5f, half * 0.35f);
+        const float Thick = 2f;
+        var colour = new Vector4D<float>(1f, 0.9f, 0.35f, 0.85f);
+        foreach (var (sx, sy) in new[] { (-1f, -1f), (1f, -1f), (-1f, 1f), (1f, 1f) })
+        {
+            float cx = x + sx * half, cy = y + sy * half;
+            hud.Rect(HudAnchor.TopLeft, new Vector2D<float>(sx < 0 ? cx : cx - arm, cy - Thick / 2f), new Vector2D<float>(arm, Thick), colour);
+            hud.Rect(HudAnchor.TopLeft, new Vector2D<float>(cx - Thick / 2f, sy < 0 ? cy : cy - arm), new Vector2D<float>(Thick, arm), colour);
+        }
+    }
+
     /// <summary>
     /// A red warning round the crosshair, on the side a stalker is winding up a pounce from - most often behind, where the player can't see it - so there is
     /// a moment to turn and face it or get out of the way.
@@ -286,6 +320,15 @@ public sealed partial class ArenaMasterContent
         var fill = ready >= 1f ? new Vector4D<float>(0.55f, 0.85f, 0.45f, 0.95f) : new Vector4D<float>(0.45f, 0.55f, 0.45f, 0.8f);
         hud.Bar(HudAnchor.BottomCenter, new Vector2D<float>(0f, -40f), new Vector2D<float>(160f, 8f), ready, fill, Shade);
         hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -54f), $"{_hero.DashLabel}  [Shift]", new Vector4D<float>(1f, 1f, 1f, ready >= 1f ? 0.85f : 0.45f), 0.7f);
+
+        // The class's own gauge (heat, zeal, souls...), over the dash.
+        if (_hero.Meter is var (label, meter))
+        {
+            float full = Math.Clamp(meter, 0f, 1f);
+            var colour = full >= 1f ? new Vector4D<float>(1f, 0.78f, 0.35f, 0.95f) : new Vector4D<float>(0.9f, 0.62f, 0.3f, 0.85f);
+            hud.Bar(HudAnchor.BottomCenter, new Vector2D<float>(0f, -78f), new Vector2D<float>(220f, 8f), full, colour, Shade);
+            hud.Text(HudAnchor.BottomCenter, new Vector2D<float>(0f, -92f), label, new Vector4D<float>(1f, 1f, 1f, 0.85f), 0.7f);
+        }
     }
 
     private static Vector4D<float> RarityColor(ItemRarity rarity, float alpha) => rarity switch

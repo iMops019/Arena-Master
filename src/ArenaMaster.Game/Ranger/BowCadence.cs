@@ -56,6 +56,9 @@ internal sealed class BowCadence
         return true;
     }
 
+    /// <summary>With nothing to shoot, a due Rain of Arrows waits for a target rather than piling up (so two don't come at once when one turns up).</summary>
+    public void HoldRain() => RainIn = MathF.Max(RainIn, 0f);
+
     public void Reset()
     {
         StillFor = 0f;

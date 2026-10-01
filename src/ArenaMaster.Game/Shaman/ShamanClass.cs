@@ -9,9 +9,11 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Shaman;
 
 /// <summary>
-/// The Shaman as the content runs it (see <see cref="IHeroClass"/>): Rolling Lightning (<see cref="RollingLightning"/>) lobbed at whatever the crosshair is on,
-/// bouncing and forking off enemies, trees and rocks - the engine's obstacles, through <see cref="EngineWindow.TouchesObstacle"/>. Here too is what answers the
-/// enemies' blows (Static Skin's shock, Lightning Reflexes' free surge) and Surge Strike's ball.
+/// The Shaman as the content runs it (see <see cref="IHeroClass"/>): a throw on its own at the nearest enemy (<see cref="LobSight"/>), whose element follows the
+/// active tree. With Lightning Alignment it is Rolling Lightning (<see cref="RollingLightning"/>), bouncing and forking off enemies, trees and rocks - the
+/// engine's obstacles, through <see cref="EngineWindow.TouchesObstacle"/>; with Earth Alignment a stone (<see cref="RollingStone"/>), bouncing off the ground and
+/// enemies in quakes. Here too is what answers the enemies' blows (Static Skin's shock, Lightning Reflexes' free surge, Upheaval), Surge Strike's ball, the
+/// Earthen Totem, and Stoneskin's cut to the damage taken.
 /// </summary>
 internal sealed class ShamanClass : IHeroClass
 {
@@ -19,14 +21,15 @@ internal sealed class ShamanClass : IHeroClass
     private const float HandHeight = 1.6f;
     private const float HandForward = 0.4f;
 
-    /// <summary>Where the ball goes with the crosshair on the sky: this far ahead.</summary>
-    private const float SkyThrow = 14f;
-
     private readonly ShamanController _controller = new();
     private readonly RollingLightning _storm;
+    private readonly RollingStone _stones;
     private readonly StormView _view = new();
+    private readonly EarthView _earthView = new();
+    private readonly LobSight _sight = new();
     private readonly HashSet<ShamanUpgrade> _banished = new();
     private readonly List<StormHit> _hits = new();
+    private readonly List<EarthHit> _earthHits = new();
     private List<ShamanChoice> _choices = new();
     private float _reflexesIn;
 
@@ -35,21 +38,36 @@ internal sealed class ShamanClass : IHeroClass
 
     private float _attackingLeft;
 
-    public ShamanClass(Random random) => _storm = new RollingLightning(random);
+    /// <summary>The flat way to the enemy it fights, as of the last attack frame, or null with none: the body faces it.</summary>
+    private Vector3D<float>? _aim;
+
+    public ShamanClass(Random random)
+    {
+        _storm = new RollingLightning(random);
+        _stones = new RollingStone(random);
+    }
 
     public ShamanStats Stats { get; } = new();
 
     /// <summary>The balls, arcs and rods, for the tests.</summary>
     internal RollingLightning Storm => _storm;
 
+    /// <summary>The stones, quakes, cracks and totems, for the tests.</summary>
+    internal RollingStone Stones => _stones;
+
     public string Id => AlignmentTree.ClassId;
 
     public string Name => "Shaman";
 
     public string Summary =>
-        "A caller of storms. Rolling Lightning lobs a ball of lightning that bounces along the ground and forks off enemies, trees and rocks before it fades.";
+        "A caller of storms and stone. It throws at the nearest enemy, and what it throws follows its tree: with Lightning Alignment a ball of lightning that bounces "
+        + "along the ground and forks off enemies, trees and rocks; with Earth Alignment a heavy stone that knocks enemies back and shakes the ground each time it bounces.";
 
-    public TreeDefinition Tree => AlignmentTree.Tree;
+    public IReadOnlyList<TreeDefinition> Trees { get; } = new[] { AlignmentTree.Tree, EarthTree.Tree };
+
+    public TreeDefinition Tree { get; private set; } = AlignmentTree.Tree;
+
+    public void ChooseTree(string treeId) => Tree = Trees.FirstOrDefault(t => t.Id == treeId) ?? Trees[0];
 
     public float MaxHealth => Stats.MaxHealth;
 
@@ -57,7 +75,8 @@ internal sealed class ShamanClass : IHeroClass
 
     public float Regeneration => Stats.Regeneration;
 
-    public float DamageTaken => Stats.DamageTaken;
+    /// <summary>What every hit's damage is multiplied by: the stats', less Stoneskin's cut.</summary>
+    public float DamageTaken => Stats.DamageTaken * (1f - _stones.Stoneskin);
 
     public float BlockChance => Stats.BlockChance;
 
@@ -71,7 +90,28 @@ internal sealed class ShamanClass : IHeroClass
 
     public string? Status => null;
 
-    public void UseTree(IReadOnlyDictionary<string, int> ranks) => Stats.Tree = AlignmentBonuses.From(ranks);
+    public Enemy? AimTarget => _attackingLeft > 0f ? _sight.Target : null;
+
+    /// <summary>Stoneskin's cut, while Earth Alignment has it.</summary>
+    public (string Label, float Fill)? Meter =>
+        Stats.Stone && Stats.HasStoneskin ? ($"STONESKIN {MathF.Round(_stones.Stoneskin * 100f):0}%", _stones.Stoneskin / Stats.StoneskinMax) : null;
+
+    /// <summary>The active tree's ranks: its bonuses, and what the Shaman throws. The other tree's bonuses are emptied, so nothing of it counts.</summary>
+    public void UseTree(IReadOnlyDictionary<string, int> ranks)
+    {
+        if (Tree.Id == EarthTree.TreeId)
+        {
+            Stats.Earth = EarthBonuses.From(ranks);
+            Stats.Tree = new AlignmentBonuses();
+            Stats.Element = ShamanElement.Stone;
+        }
+        else
+        {
+            Stats.Tree = AlignmentBonuses.From(ranks);
+            Stats.Earth = new EarthBonuses();
+            Stats.Element = ShamanElement.Lightning;
+        }
+    }
 
     public void BeginRun(ItemBonuses items, PlayerHealth health)
     {
@@ -80,6 +120,8 @@ internal sealed class ShamanClass : IHeroClass
         health.Reset(Stats.MaxHealth);
         _banished.Clear();
         _storm.Reset();
+        _stones.Reset();
+        _sight.Clear();
         _reflexesIn = 0f;
     }
 
@@ -88,7 +130,8 @@ internal sealed class ShamanClass : IHeroClass
     public void Move(EngineWindow window, float deltaSeconds, bool stunned)
     {
         _attackingLeft = MathF.Max(0f, _attackingLeft - deltaSeconds);
-        _controller.Update(window, deltaSeconds, Stats, stunned, _attackingLeft > 0f ? AttackTime() : null);
+        bool fighting = _attackingLeft > 0f;
+        _controller.Update(window, deltaSeconds, Stats, stunned, fighting ? AttackTime() : null, fighting ? _aim : null);
     }
 
     /// <summary>
@@ -98,7 +141,7 @@ internal sealed class ShamanClass : IHeroClass
     private float AttackTime()
     {
         float interval = Stats.CastInterval;
-        float until = _storm.CastIn;
+        float until = Stats.Stone ? _stones.CastIn : _storm.CastIn;
         float since = interval - until;
         float follow = MathF.Min(0.45f, 0.5f * interval);
         float windup = MathF.Min(0.4f, 0.45f * interval);
@@ -122,41 +165,68 @@ internal sealed class ShamanClass : IHeroClass
         _attackingLeft = AttackingHold;
         var window = frame.Window;
         var feet = window.PlayerFeet;
-        var aim = ShamanController.Facing(window);
-        var hand = feet + new Vector3D<float>(0f, HandHeight, 0f) + aim * HandForward;
-        var target = Crosshair(window, frame.Enemies, frame.GroundAt, feet, aim);
+        var hand = feet + new Vector3D<float>(0f, HandHeight, 0f) + _controller.Facing * HandForward;
+        _sight.Update(frame.Enemies, feet, Stats.ThrowRange, frame.DeltaSeconds);
+        var target = _sight.AimPoint(hand, Stats);
+        _aim = _sight.Target is { } foe && Geometry.FlatDirection(feet, foe.Position, out _) is var toward && toward != Vector3D<float>.Zero ? toward : null;
 
         if (Stats.Tree.SurgeStrike && _controller.SurgeBegun is { } way && !frame.Condition.IsStunned)
         {
             _storm.Roll(feet, way, Stats);
         }
 
+        if (Stats.Stone && Stats.Earth.EarthenTotem && _controller.SurgeBegun is not null && !frame.Condition.IsStunned)
+        {
+            _stones.PlantTotem(feet, Stats, frame.Enemies);   // where it surged from: the surge's push comes after this frame's attacks
+        }
+
         ObstacleProbe obstacles = (Vector3D<float> centre, float radius, out Vector3D<float> pushOut, out float depth) =>
             window.TouchesObstacle(centre, radius, out pushOut, out depth);
-        Fight(frame.DeltaSeconds, hand, feet, target, !frame.StandingStill, frame.Condition.IsStunned, frame.Enemies, frame.GroundAt, obstacles, frame.Health, frame.Numbers,
-            AimLift(window));
-        _view.Sync(window, _storm, frame.DeltaSeconds, frame.GroundAt);
+        Fight(frame.DeltaSeconds, hand, feet, target, !frame.StandingStill, frame.Condition.IsStunned, frame.Enemies, frame.GroundAt, obstacles, frame.Health, frame.Numbers);
+        if (Stats.Stone)
+        {
+            _earthView.Sync(window, _stones, frame.DeltaSeconds, frame.GroundAt);
+        }
+        else
+        {
+            _view.Sync(window, _storm, frame.DeltaSeconds, frame.GroundAt);
+        }
     }
 
     public void Answer(RunFrame frame) => AnswerStrikes(frame.Enemies.Strikes, frame.Window.PlayerFeet, frame.Enemies, frame.Health, frame.Numbers);
 
     /// <summary>
-    /// The attacks for one frame, before the enemies move: a cast from <paramref name="hand"/> at <paramref name="target"/> when one is due (held by a stun), the balls,
-    /// rods, the Eye of the Storm while <paramref name="moving"/>, and Call Lightning. Each lightning kill heals with Galvanic Recovery.
+    /// The attacks for one frame, before the enemies move: a cast from <paramref name="hand"/> at <paramref name="target"/> when one is due (held by a stun, and
+    /// waiting with no target: null). With Lightning Alignment the balls, rods, the Eye of the Storm while <paramref name="moving"/>, and Call Lightning (each
+    /// lightning kill heals with Galvanic Recovery); with Earth Alignment the stones, their cracks and rifts, and Stoneskin (built while not
+    /// <paramref name="moving"/>).
     /// </summary>
-    internal void Fight(float deltaSeconds, Vector3D<float> hand, Vector3D<float> feet, Vector3D<float> target, bool moving, bool stunned, EnemyField enemies,
-        Func<float, float, float?> groundAt, ObstacleProbe obstacles, PlayerHealth health, DamageNumbers numbers, float aimLift = 0f)
+    internal void Fight(float deltaSeconds, Vector3D<float> hand, Vector3D<float> feet, Vector3D<float>? target, bool moving, bool stunned, EnemyField enemies,
+        Func<float, float, float?> groundAt, ObstacleProbe obstacles, PlayerHealth health, DamageNumbers numbers)
     {
         _reflexesIn = MathF.Max(0f, _reflexesIn - deltaSeconds);
         _hits.Clear();
-        _storm.Update(deltaSeconds, hand, feet, target, moving, Stats, enemies, groundAt, obstacles, canCast: !stunned, _hits, aimLift);
+        _earthHits.Clear();
+        if (Stats.Stone)
+        {
+            _stones.Update(deltaSeconds, hand, target, moving, Stats, enemies, groundAt, obstacles, canCast: !stunned, _earthHits);
+        }
+        else
+        {
+            _storm.Update(deltaSeconds, hand, feet, target, moving, Stats, enemies, groundAt, obstacles, canCast: !stunned, _hits);
+        }
+
         Report(numbers, health);
     }
 
-    /// <summary>The enemies' blows this frame, answered: Static Skin shocks each attacker; a blow that landed recharges the surge, with Lightning Reflexes.</summary>
+    /// <summary>
+    /// The enemies' blows this frame, answered: Static Skin shocks each attacker; a blow that landed recharges the surge, with Lightning Reflexes, or heaves the
+    /// ground, with Upheaval.
+    /// </summary>
     internal void AnswerStrikes(IReadOnlyList<Strike> strikes, Vector3D<float> feet, EnemyField enemies, PlayerHealth health, DamageNumbers numbers)
     {
         _hits.Clear();
+        _earthHits.Clear();
         foreach (var strike in strikes)
         {
             if (Stats.Tree.ShockOnStruck > 0f && strike.Attacker.IsAlive)
@@ -170,6 +240,11 @@ internal sealed class ShamanClass : IHeroClass
                 _controller.Recharge();
                 _reflexesIn = ShamanStats.ReflexesCooldown;
             }
+
+            if (!strike.Blocked)
+            {
+                _stones.Upheave(feet, Stats, enemies, _earthHits);   // (only with Upheaval, at most once a second)
+            }
         }
 
         Report(numbers, health);
@@ -182,7 +257,10 @@ internal sealed class ShamanClass : IHeroClass
     public void Clear(EngineWindow window)
     {
         _storm.Reset();
+        _stones.Reset();
+        _sight.Clear();
         _view.Clear(window);
+        _earthView.Clear(window);
     }
 
     public IReadOnlyList<LevelUpCard> RollLevelUp(Random random)
@@ -221,10 +299,22 @@ internal sealed class ShamanClass : IHeroClass
 
     /// <summary>
     /// The hits just dealt, on screen, and Galvanic Recovery's heal for each kill. The zaps' and rods' steady crackle, and the Eye's, are added up for each enemy and
-    /// shown as damage over time, so they don't bury the ball's and the forks'.
+    /// shown as damage over time, so they don't bury the ball's and the forks'; so are the rifts' bites.
     /// </summary>
     private void Report(DamageNumbers numbers, PlayerHealth health)
     {
+        foreach (var hit in _earthHits)
+        {
+            if (hit.Source == EarthSource.Rift)
+            {
+                numbers.AddOverTime(hit.Enemy, hit.Position, hit.Damage, hit.Killed);
+            }
+            else
+            {
+                numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
+            }
+        }
+
         foreach (var hit in _hits)
         {
             if (hit.Source is not (StormSource.Zap or StormSource.Rod or StormSource.Eye))
@@ -241,46 +331,6 @@ internal sealed class ShamanClass : IHeroClass
                 health.Heal(Stats.Tree.HealOnKill);
             }
         }
-    }
-
-    /// <summary>
-    /// What the crosshair is on - the nearest enemy or ground along the camera's line of sight, within throwing range - or, with it on the sky, a spot on the ground
-    /// a way ahead.
-    /// </summary>
-    /// <summary>How far up the camera is pitched, for a higher lob: 0 looking a little down at the ground or lower, 1 pitched well up.</summary>
-    private static float AimLift(EngineWindow window) =>
-        window.Camera is { } camera ? Math.Clamp((camera.Front.Y + 0.1f) / ShamanStats.AimLiftPitch, 0f, 1f) : 0f;
-
-    private Vector3D<float> Crosshair(EngineWindow window, EnemyField enemies, Func<float, float, float?> groundAt, Vector3D<float> feet, Vector3D<float> aim)
-    {
-        if (window.Camera is not { } camera || window.Terrain is not { } terrain)
-        {
-            return feet + aim * SkyThrow;
-        }
-
-        float reach = Stats.ThrowRange + 10f;
-        var far = camera.Position + camera.Front * reach;
-        float best = float.MaxValue;
-        Vector3D<float>? target = null;
-
-        if (terrain.TryRaycast(camera.Position, camera.Front, reach, out var ground))
-        {
-            best = Vector3D.Distance(camera.Position, ground);
-            target = ground;
-        }
-
-        if (enemies.FirstHit(camera.Position, far, 0.05f, out float along) is { } enemy && along * reach < best)
-        {
-            target = enemy.Position;
-        }
-
-        if (target is { } spot)
-        {
-            return spot;
-        }
-
-        var ahead = feet + aim * SkyThrow;
-        return new Vector3D<float>(ahead.X, groundAt(ahead.X, ahead.Z) ?? feet.Y, ahead.Z);
     }
 
     private List<LevelUpCard> Cards() =>

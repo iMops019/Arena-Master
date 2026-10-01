@@ -2,10 +2,18 @@ using ArenaMaster.Game.Items;
 
 namespace ArenaMaster.Game.Mage;
 
+/// <summary>What the Mage's barrage is made of: set by the active tree (Frost chills, Pyromancy burns).</summary>
+internal enum MageElement
+{
+    Frost,
+    Fire,
+}
+
 /// <summary>
 /// The Mage's numbers for the current run: the base values, the run's upgrades (see <see cref="MageUpgrades"/>), the items carried (<see cref="Items"/>) and the
-/// Frost tree (<see cref="Tree"/>). Upgrade, item and tree bonuses add together; item multipliers then multiply the lot. Items speak in general terms, and here
-/// "damage" means cold damage, "attack speed" cast speed, and "critical" a bolt's crit.
+/// active tree - the Frost tree (<see cref="Tree"/>) or the Pyromancy tree (<see cref="Pyro"/>), the other one left empty. Upgrade, item and tree bonuses add
+/// together; item multipliers then multiply the lot. Items speak in general terms, and here "damage" means the barrage's cold or fire damage, "attack speed" cast
+/// speed, and "critical" a bolt's crit.
 /// </summary>
 internal sealed class MageStats
 {
@@ -81,6 +89,63 @@ internal sealed class MageStats
     public const float IceBlockHeal = 0.25f;
     public const float IceBlockShield = 0.5f;
 
+    /// <summary>Fire Barrage: every hit sets the enemy burning for this share of the hit's damage over the base burn time, ticking this often.</summary>
+    public const float BaseBurnShare = 0.3f;
+    public const float BaseBurnDuration = 3f;
+    public const float BurnTick = 0.25f;
+
+    /// <summary>Heat: the most there is, what each cast builds, how much cools each second, the damage each point gives, and how long an overheat stops the casting.</summary>
+    public const float MaxHeat = 100f;
+    public const float HeatPerCast = 10f;
+    public const float BaseHeatCooling = 5f;
+    public const float HeatDamagePerPoint = 0.005f;
+    public const float OverheatSeconds = 1.5f;
+
+    /// <summary>Combustion: a burning enemy's death bursts this far, for this many bolts' damage.</summary>
+    public const float BaseCombustionRadius = 2.5f;
+    public const float CombustionShare = 1f;
+
+    /// <summary>Wildfire: how far a burn spreads, and how often.</summary>
+    public const float WildfireRange = 4f;
+    public const float WildfireEvery = 1f;
+
+    /// <summary>Fire on the ground (Fire Walk's line, a meteor's crater): bolt damages a second to what stands in it, and how often it bites.</summary>
+    public const float GroundFireShare = 1f;
+    public const float GroundTick = 0.5f;
+
+    /// <summary>Fire Walk: how long the line burns, and how far either side of it the fire reaches.</summary>
+    public const float FireWalkSeconds = 3f;
+    public const float FireWalkWidth = 1f;
+
+    /// <summary>Fireball: its radius, and its share of the bolt's hit.</summary>
+    public const float BaseFireballRadius = 2f;
+    public const float BaseFireballShare = 0.4f;
+
+    /// <summary>Flame Ward: seconds between wards, and the burn its attacker gets, as if from a hit of this many bolts.</summary>
+    public const float BaseFlameWardInterval = 10f;
+    public const float FlameWardBurn = 2f;
+
+    /// <summary>Scorch: extra bolt damage to a burning enemy.</summary>
+    public const float ScorchBonus = 0.3f;
+
+    /// <summary>Cauterise: heat vented for each point of health healed.</summary>
+    public const float CauteriseHeatPerHealth = 4f;
+
+    /// <summary>Living Flame: a burn's ticks grow this much for each second it has burned, counting no more than this many seconds.</summary>
+    public const float LivingFlameGrowth = 0.25f;
+    public const float LivingFlameMaxSeconds = 8f;
+
+    /// <summary>Meteor: every this-many-th barrage, this many bolts' damage within this radius, after this long falling, and the ground left burning this long.</summary>
+    public const int MeteorEvery = 4;
+    public const float MeteorDamage = 5f;
+    public const float MeteorRadius = 4f;
+    public const float MeteorFall = 0.8f;
+    public const float MeteorGroundSeconds = 3f;
+
+    /// <summary>Inferno: the firestorm's reach, and how often it bites (a bolt's damage each time).</summary>
+    public const float InfernoRadius = 5f;
+    public const float InfernoTick = 0.5f;
+
     /// <summary>The blink on Shift: a very short, very fast push.</summary>
     public const float BlinkDuration = 0.12f;
     public const float BlinkSpeed = 38f;
@@ -91,8 +156,20 @@ internal sealed class MageStats
     /// <summary>What the items carried this run add up to.</summary>
     public ItemBonuses Items { get; set; } = new();
 
-    /// <summary>What the Frost tree's ranks add up to.</summary>
+    /// <summary>What the Frost tree's ranks add up to (empty while Pyromancy is active).</summary>
     public FrostBonuses Tree { get; set; } = new();
+
+    /// <summary>What the Pyromancy tree's ranks add up to (empty while Frost is active).</summary>
+    public PyromancyBonuses Pyro { get; set; } = new();
+
+    /// <summary>What the barrage is made of: Frost unless Pyromancy is the active tree.</summary>
+    public MageElement Element { get; set; } = MageElement.Frost;
+
+    /// <summary>Whether the barrage is the Fire Barrage (Pyromancy active): its hits burn rather than chill.</summary>
+    public bool Fire => Element == MageElement.Fire;
+
+    /// <summary>The heat right now (0 to <see cref="MaxHeat"/>), set by the fire every frame (see <see cref="Flames"/>); always 0 without the Heat major.</summary>
+    public float Heat { get; set; }
 
     public int LevelOf(MageUpgrade upgrade) => _levels.GetValueOrDefault(upgrade);
 
@@ -111,31 +188,36 @@ internal sealed class MageStats
     {
         _levels.Clear();
         Items = new ItemBonuses();
+        Heat = 0f;
     }
 
-    public int Projectiles => BaseProjectiles + LevelOf(MageUpgrade.SplinterBolt) + Tree.Projectiles + Items.Projectiles;
+    public int Projectiles => BaseProjectiles + LevelOf(MageUpgrade.SplinterBolt) + Tree.Projectiles + Pyro.Projectiles + Items.Projectiles;
 
     public float BoltDamage =>
-        BaseBoltDamage * (1f + 0.20f * LevelOf(MageUpgrade.IceShards) + Items.Damage + Tree.ColdDamage) * Items.DamageMultiplier * Items.ProjectileDamage;
+        BaseBoltDamage * (1f + 0.20f * LevelOf(MageUpgrade.IceShards) + Items.Damage + Tree.ColdDamage + Pyro.FireDamage + HeatBonus) * Items.DamageMultiplier
+        * Items.ProjectileDamage;
+
+    /// <summary>What the heat adds to damage right now (Heat: +0.5% a point).</summary>
+    public float HeatBonus => Pyro.Heat ? Heat * (HeatDamagePerPoint + Pyro.HeatDamage) : 0f;
 
     public float BarrageInterval =>
         BaseBarrageInterval
-        / (MathF.Max(0.2f, 1f + 0.12f * LevelOf(MageUpgrade.QuickenedCasting) + Items.AttackSpeedNow + Tree.CastSpeed) * Items.AttackSpeedMultiplier);
+        / (MathF.Max(0.2f, 1f + 0.12f * LevelOf(MageUpgrade.QuickenedCasting) + Items.AttackSpeedNow + Tree.CastSpeed + Pyro.CastSpeed) * Items.AttackSpeedMultiplier);
 
-    public float BoltSpeed => BaseBoltSpeed * (1f + 0.20f * LevelOf(MageUpgrade.WinterWind) + Tree.ProjectileSpeed + Items.ProjectileSpeed);
+    public float BoltSpeed => BaseBoltSpeed * (1f + 0.20f * LevelOf(MageUpgrade.WinterWind) + Tree.ProjectileSpeed + Pyro.ProjectileSpeed + Items.ProjectileSpeed);
 
-    public float Range => BaseRange * (1f + 0.15f * LevelOf(MageUpgrade.WinterWind) + Tree.Range + Items.Range);
+    public float Range => BaseRange * (1f + 0.15f * LevelOf(MageUpgrade.WinterWind) + Tree.Range + Pyro.Range + Items.Range);
 
     /// <summary>How far away the barrage finds enemies to aim at: grows with range.</summary>
-    public float TargetRange => BaseTargetRange * (1f + 0.15f * LevelOf(MageUpgrade.WinterWind) + Tree.Range + Items.Range);
+    public float TargetRange => BaseTargetRange * (1f + 0.15f * LevelOf(MageUpgrade.WinterWind) + Tree.Range + Pyro.Range + Items.Range);
 
     /// <summary>How many enemies a bolt passes through: an item's chains count as pierce for the Mage.</summary>
-    public int Pierce => LevelOf(MageUpgrade.PiercingIce) + Tree.Pierce + Items.Chains;
+    public int Pierce => LevelOf(MageUpgrade.PiercingIce) + Tree.Pierce + Pyro.Pierce + Items.Chains;
 
-    public float CritChance => BaseCritChance * MathF.Max(0f, 1f + 0.20f * LevelOf(MageUpgrade.FrozenPrecision) + Items.CritChance + Tree.CritChance);
+    public float CritChance => BaseCritChance * MathF.Max(0f, 1f + 0.20f * LevelOf(MageUpgrade.FrozenPrecision) + Items.CritChance + Tree.CritChance + Pyro.CritChance);
 
     /// <summary>How many times normal damage a critical bolt does.</summary>
-    public float CritMultiplier => BaseCritMultiplier + 0.15f * LevelOf(MageUpgrade.FrozenPrecision) + Items.CritDamage + Tree.CritDamage;
+    public float CritMultiplier => BaseCritMultiplier + 0.15f * LevelOf(MageUpgrade.FrozenPrecision) + Items.CritDamage + Tree.CritDamage + Pyro.CritDamage;
 
     /// <summary>How much a chill slows an enemy's walk (0 to 1), capped at <see cref="MaxChill"/>.</summary>
     public float Chill => MathF.Min(MaxChill, BaseChill + 0.08f * LevelOf(MageUpgrade.NumbingCold) + Tree.Chill + Items.ChillOnHit);
@@ -149,7 +231,7 @@ internal sealed class MageStats
 
     public float FreezeDuration => BaseFreezeDuration + Tree.FreezeDuration + 0.3f * LevelOf(MageUpgrade.DeepChill);
 
-    public float EliteMultiplier => 1f + Tree.EliteDamage + 0.15f * LevelOf(MageUpgrade.Shatterpoint);
+    public float EliteMultiplier => 1f + Tree.EliteDamage + Pyro.EliteDamage + 0.15f * LevelOf(MageUpgrade.Shatterpoint);
 
     public float BlastRadius => BaseBlastRadius * (1f + 0.25f * LevelOf(MageUpgrade.ConcussiveFrost) + Tree.BlastRadius + Items.Area) * Items.AreaMultiplier;
 
@@ -171,13 +253,42 @@ internal sealed class MageStats
     /// <summary>Seconds for the Frost Shield to form again after the last one ended.</summary>
     public float ShieldInterval => BaseShieldInterval / (1f + Tree.ShieldRecharge + (Tree.GlacialFortress ? FortressRecharge : 0f));
 
-    public float MaxHealth => (BaseMaxHealth + 15f * LevelOf(MageUpgrade.ArcaneVigor) + Items.MaxHealth + Tree.MaxHealth) * Items.MaxHealthMultiplier;
+    public float MaxHealth =>
+        (BaseMaxHealth + 15f * LevelOf(MageUpgrade.ArcaneVigor) + Items.MaxHealth + Tree.MaxHealth + Pyro.MaxHealth) * Items.MaxHealthMultiplier;
 
-    public float Regeneration => Items.Regeneration + Tree.Regeneration;
+    public float Regeneration => Items.Regeneration + Tree.Regeneration + Pyro.Regeneration;
 
-    public float DamageTaken => Items.DamageTaken * Tree.DamageTaken * MathF.Pow(0.94f, LevelOf(MageUpgrade.IceArmor));
+    public float DamageTaken => Items.DamageTaken * Tree.DamageTaken * Pyro.DamageTaken * MathF.Pow(0.94f, LevelOf(MageUpgrade.IceArmor));
 
     public float MoveSpeed => BaseMoveSpeed * (1f + 0.08f * LevelOf(MageUpgrade.FleetStep) + Items.MoveSpeed);
 
     public float PickupRadius => BasePickupRadius * (1f + 0.35f * LevelOf(MageUpgrade.Attunement) + Items.Pickup);
+
+    /// <summary>
+    /// A burn's share of the hit that lit it (30%, more with burn damage), before damage over time from items: the burn does that much over
+    /// <see cref="BaseBurnDuration"/>, and keeps burning at the same rate for as long as it lasts.
+    /// </summary>
+    public float BurnShare => BaseBurnShare * (1f + Pyro.BurnDamage + 0.20f * LevelOf(MageUpgrade.FanTheFlames));
+
+    /// <summary>How long a burn lasts.</summary>
+    public float BurnDuration => BaseBurnDuration + Pyro.BurnDuration + 0.5f * LevelOf(MageUpgrade.LastingEmbers) + Items.Duration;
+
+    /// <summary>Heat lost each second.</summary>
+    public float HeatCooling => BaseHeatCooling + Pyro.HeatCooling + 1.5f * LevelOf(MageUpgrade.CoolingBreath);
+
+    /// <summary>Combustion's burst: its damage and its reach.</summary>
+    public float CombustionDamage => BoltDamage * CombustionShare * (1f + Pyro.CombustionDamage + 0.25f * LevelOf(MageUpgrade.BlastingAsh));
+
+    public float CombustionRadius => BaseCombustionRadius * (1f + Pyro.CombustionRadius + 0.10f * LevelOf(MageUpgrade.BlastingAsh)) * AreaScale;
+
+    /// <summary>Fireball: how far a bolt's burst reaches, and its share of the hit.</summary>
+    public float FireballRadius => BaseFireballRadius * (1f + Pyro.FireballRadius + Items.Area) * Items.AreaMultiplier;
+
+    public float FireballShare => BaseFireballShare * (1f + Pyro.FireballDamage);
+
+    /// <summary>What fire on the ground does each second to what stands in it (damage over time).</summary>
+    public float GroundFireDamage => BoltDamage * GroundFireShare * Items.OverTime;
+
+    /// <summary>Seconds from one Flame Ward to the next.</summary>
+    public float FlameWardInterval => BaseFlameWardInterval - 1.5f * LevelOf(MageUpgrade.RekindledWard);
 }

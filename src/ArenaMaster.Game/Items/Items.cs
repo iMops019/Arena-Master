@@ -196,8 +196,9 @@ internal sealed class ItemBonuses
     // Only the Priest reads these: they speak of Plague, rot and the Skull Shield.
 
     /// <summary>
-    /// More damage over time, and what it is multiplied by: the Priest's Plague, rot and Aura, the Paladin's holy circles, the Mage's Blizzard, and the Shaman's zaps,
-    /// rods and Eye. The Ranger and the Warrior have none, so it does nothing for them (the user's call: no stand-in for a stat a class can't use).
+    /// More damage over time, and what it is multiplied by: the Priest's Plague, rot and Aura, the Paladin's holy circles, the Mage's Blizzard and burns, the Shaman's
+    /// zaps, rods, Eye and rifts, the Trapper's poison and caltrops, and the Reaver's bleeding. The Sharpshooter and the Berserker have none, so it does nothing for them
+    /// (the user's call: no stand-in for a stat a class can't use).
     /// </summary>
     public float DotDamage;
     public float DotMultiplier = 1f;

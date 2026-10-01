@@ -141,6 +141,36 @@ public class RollingLightningTests
         Assert.True(ball.Velocity.Y > 0f);   // on its way back up
     }
 
+    [Theory]
+    [InlineData(3f)]
+    [InlineData(12f)]
+    [InlineData(24f)]
+    public void TheThrow_IsLowAndQuick_AndLandsWhereItWasAimed(float distance)
+    {
+        var storm = new RollingLightning(new Random(1));
+        var stats = new ShamanStats();
+        var aim = new Vector3D<float>(distance, 0f, 0f);
+        var ball = storm.Lob(ShamanTesting.Hand, aim, stats);
+        var field = ShamanTesting.QuietField();
+
+        float top = ball.Position.Y, time = 0f;
+        while (ball.BouncesLeft == stats.Bounces && time < 3f)
+        {
+            storm.Update(ShamanTesting.Step, ShamanTesting.Hand, Vector3D<float>.Zero, null, false, stats, field, ShamanTesting.FlatGround, ShamanTesting.NoObstacles,
+                canCast: false, new List<StormHit>());
+            top = MathF.Max(top, ball.Position.Y);
+            time += ShamanTesting.Step;
+        }
+
+        Assert.True(top <= ShamanTesting.Hand.Y + 1.7f, $"a {distance} m throw went {top - ShamanTesting.Hand.Y:0.00} m above the hand");
+        Assert.True(time <= 1f, $"a {distance} m throw took {time:0.00} s to land");
+        Assert.InRange(ball.Position.X, distance - 0.6f, distance + 0.6f);
+        if (distance <= 3f)
+        {
+            Assert.Equal(ShamanTesting.Hand.Y, top, 2);   // a near throw goes straight down at the ground, never up
+        }
+    }
+
     [Fact]
     public void TheBall_BouncesAlong_ThenFades()
     {

@@ -74,7 +74,7 @@ public class DamageOverTimeStatTests
     }
 
     [Fact]
-    public void TheRangerAndWarrior_WhoHaveNone_GetNothingFromIt()
+    public void TheBowAndTheCleave_WhichHaveNone_GetNothingFromIt()
     {
         Assert.Equal(new RangerStats().Damage, new RangerStats { Items = Dot(0.5f) }.Damage, 3);
         Assert.Equal(new WarriorStats().CleaveDamage, new WarriorStats { Items = Dot(0.5f) }.CleaveDamage, 3);

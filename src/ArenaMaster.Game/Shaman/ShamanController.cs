@@ -20,7 +20,7 @@ internal sealed class ShamanController
     /// <summary>How quickly the upper body takes up its attack when a run's fighting starts, and lets it go after (fraction per second).</summary>
     private const float AttackFade = 5f;
 
-    /// <summary>How quickly the body turns toward the camera's facing.</summary>
+    /// <summary>How quickly the body turns toward its enemy or its walk.</summary>
     private const float TurnRate = 14f;
 
     private readonly HeroBody _body = new(BodyModel);
@@ -42,13 +42,13 @@ internal sealed class ShamanController
     /// <summary>The way a surge that began this frame goes, or null if none did.</summary>
     public Vector3D<float>? SurgeBegun { get; private set; }
 
-    /// <summary>A stunned Shaman can't walk, jump or surge (the body still turns with the camera). <paramref name=\"attack\"/> is where the upper body's attack clip is (0 to 1), or null when it isn't fighting (at camp).</summary>
-    public void Update(EngineWindow window, float deltaSeconds, ShamanStats stats, bool stunned, float? attack = null)
+    /// <summary>A stunned Shaman can't walk, jump or surge (the body still turns to <paramref name="aim"/>). <paramref name="attack"/> is where the upper body's attack clip is (0 to 1), or null when it isn't fighting (at camp). <paramref name="aim"/> is the flat way to the enemy it fights, or null with none: the body faces it, or else the way it walks, so the mouse is free to look round.</summary>
+    public void Update(EngineWindow window, float deltaSeconds, ShamanStats stats, bool stunned, float? attack = null, Vector3D<float>? aim = null)
     {
         window.WalkSpeed = stunned ? 0f : stats.MoveSpeed;
         window.PlayerCanJump = !stunned;
         UpdateSurge(window, deltaSeconds, stats, stunned);
-        UpdateBody(window, deltaSeconds, attack);
+        UpdateBody(window, deltaSeconds, attack, aim);
     }
 
     /// <summary>The surge is ready again at once (Lightning Reflexes).</summary>
@@ -57,8 +57,11 @@ internal sealed class ShamanController
     /// <summary>Takes the body out of the world (another class was chosen). The next <see cref="Update"/> puts it back.</summary>
     public void Hide(EngineWindow window) => _body.Hide(window);
 
-    /// <summary>Where the camera looks, flattened onto the ground.</summary>
-    public static Vector3D<float> Facing(EngineWindow window)
+    /// <summary>The flat way the body faces now.</summary>
+    public Vector3D<float> Facing => new(MathF.Sin(_yaw), 0f, MathF.Cos(_yaw));
+
+    /// <summary>Where the camera looks, flattened onto the ground: which way the Shift move goes with no keys held.</summary>
+    private static Vector3D<float> Looking(EngineWindow window)
     {
         var front = window.Camera?.Front ?? Vector3D<float>.UnitZ;
         var flat = new Vector3D<float>(front.X, 0f, front.Z);
@@ -78,7 +81,7 @@ internal sealed class ShamanController
         if (pressed && !stunned && _cooldownLeft <= 0f && _surgeTimeLeft <= 0f)
         {
             // Surge the way the keys point, or straight ahead with none held.
-            _surgeDirection = window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : Facing(window);
+            _surgeDirection = window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : Looking(window);
             _surgeTimeLeft = ShamanStats.SurgeDuration;
             _cooldownLength = stats.SurgeCooldown;
             _cooldownLeft = _cooldownLength;
@@ -89,12 +92,15 @@ internal sealed class ShamanController
         SurgeVelocity = _surgeTimeLeft > 0f ? _surgeDirection * ShamanStats.SurgeSpeed : Vector3D<float>.Zero;
     }
 
-    private void UpdateBody(EngineWindow window, float deltaSeconds, float? attack)
+    private void UpdateBody(EngineWindow window, float deltaSeconds, float? attack, Vector3D<float>? aim)
     {
-        var facing = Facing(window);
-        float target = MathF.Atan2(facing.X, facing.Z);   // models face +Z; yaw 0 faces +Z
-        float turn = MathF.IEEERemainder(target - _yaw, MathF.Tau);
-        _yaw += turn * (1f - MathF.Exp(-TurnRate * deltaSeconds));
+        var facing = aim ?? (window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : (Vector3D<float>?)null);
+        if (facing is { } face && face != Vector3D<float>.Zero)
+        {
+            float target = MathF.Atan2(face.X, face.Z);   // models face +Z; yaw 0 faces +Z
+            float turn = MathF.IEEERemainder(target - _yaw, MathF.Tau);
+            _yaw += turn * (1f - MathF.Exp(-TurnRate * deltaSeconds));
+        }
 
         _attacking = attack is null ? MathF.Max(0f, _attacking - AttackFade * deltaSeconds) : MathF.Min(1f, _attacking + AttackFade * deltaSeconds);
         _layer[0] = new ClipWeight(AttackClip, (attack ?? 0f) * _body.ClipLength(AttackClip), _attacking);

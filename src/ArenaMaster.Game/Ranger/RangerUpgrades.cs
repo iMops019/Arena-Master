@@ -12,6 +12,14 @@ internal enum RangerUpgrade
     FleetFoot,
     Vitality,
     Scavenger,
+
+    // The Trapper tree's, offered only with it active.
+    TrapSetter,
+    HeavySnares,
+    StrongVenom,
+    SlowPoison,
+    SharpTalons,
+    HawkTraining,
 }
 
 /// <summary>One upgrade's name, how many times it stacks, and what the next level of it does.</summary>
@@ -22,7 +30,8 @@ internal sealed record UpgradeChoice(RangerUpgrade? Upgrade, string Name, string
 
 /// <summary>
 /// The Ranger's level-up pool: the upgrades, their numbers (kept in <see cref="RangerStats"/>), and rolling three to choose from. Ranger-only, like everything
-/// under Ranger/ - another class gets a pool of its own.
+/// under Ranger/ - another class gets a pool of its own. The first nine are about the bow and the body, and are offered whichever tree is active; the rest are the
+/// Trapper's, offered only with it active, and most only once the major they build on is taken.
 /// </summary>
 internal static class RangerUpgrades
 {
@@ -40,17 +49,36 @@ internal static class RangerUpgrades
         new RangerUpgradeInfo(RangerUpgrade.FleetFoot, "Fleet Foot", 5, "+8% move speed"),
         new RangerUpgradeInfo(RangerUpgrade.Vitality, "Vitality", 5, "+20 max health, and heal 20"),
         new RangerUpgradeInfo(RangerUpgrade.Scavenger, "Scavenger", 4, "+35% pickup range"),
+        new RangerUpgradeInfo(RangerUpgrade.TrapSetter, "Trap Setter", 3, "Your dash recharges 10% faster"),
+        new RangerUpgradeInfo(RangerUpgrade.HeavySnares, "Heavy Snares", 4, "+25% trap damage"),
+        new RangerUpgradeInfo(RangerUpgrade.StrongVenom, "Strong Venom", 5, "+20% poison damage"),
+        new RangerUpgradeInfo(RangerUpgrade.SlowPoison, "Slow Poison", 3, "Poison lasts 0.5 s longer"),
+        new RangerUpgradeInfo(RangerUpgrade.SharpTalons, "Sharp Talons", 4, "+20% hawk damage"),
+        new RangerUpgradeInfo(RangerUpgrade.HawkTraining, "Hawk Training", 3, "The hawk dives 10% more often"),
     };
 
     public static RangerUpgradeInfo Info(RangerUpgrade upgrade) => All.First(u => u.Upgrade == upgrade);
 
     /// <summary>
-    /// Up to <paramref name="count"/> different upgrades that aren't maxed yet and aren't in <paramref name="excluded"/> (banished this run), picked at random - or a
-    /// heal, if none is left.
+    /// Whether <paramref name="upgrade"/> can be offered now: the bow's and the body's always; the Trapper's only with that tree active, and those that build on a
+    /// major only once it is taken.
+    /// </summary>
+    public static bool Offered(RangerUpgrade upgrade, RangerStats stats) => upgrade switch
+    {
+        RangerUpgrade.TrapSetter => stats.TrapperActive,
+        RangerUpgrade.HeavySnares => stats.TrapperActive && stats.Trapper.SnareLine,
+        RangerUpgrade.StrongVenom or RangerUpgrade.SlowPoison => stats.TrapperActive && stats.Trapper.VenomTips,
+        RangerUpgrade.SharpTalons or RangerUpgrade.HawkTraining => stats.TrapperActive && stats.Trapper.HawkCompanion,
+        _ => true,
+    };
+
+    /// <summary>
+    /// Up to <paramref name="count"/> different upgrades that can be offered (<see cref="Offered"/>), aren't maxed yet and aren't in <paramref name="excluded"/>
+    /// (banished this run), picked at random - or a heal, if none is left.
     /// </summary>
     public static List<UpgradeChoice> Roll(RangerStats stats, Random random, int count = 3, IReadOnlySet<RangerUpgrade>? excluded = null)
     {
-        var open = All.Where(u => stats.LevelOf(u.Upgrade) < u.MaxLevel && excluded?.Contains(u.Upgrade) != true).ToList();
+        var open = All.Where(u => Offered(u.Upgrade, stats) && stats.LevelOf(u.Upgrade) < u.MaxLevel && excluded?.Contains(u.Upgrade) != true).ToList();
         if (open.Count == 0)
         {
             return new List<UpgradeChoice> { new(null, "Second Wind", $"Heal {SecondWindHeal:0} health", 0, 0) };

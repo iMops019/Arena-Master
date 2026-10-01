@@ -8,7 +8,8 @@ namespace ArenaMaster.Game.Mage;
 /// <summary>
 /// The Mage's body and movement on top of the engine's third-person walker: a walk at the stats' speed, a blink on Shift (a very short, very fast push), and a body
 /// that turns to face where the camera looks. The engine does the walking, jumping and collision; this sets the speed, works out the blink's push, and draws the
-/// body at the player's feet. The Mage's own, like everything under Mage/: it shares no code with the other classes' controllers.
+/// body at the player's feet. It counts the blinks, so the class knows when one begins (the Pyromancy tree vents heat and lays fire along it). The Mage's own,
+/// like everything under Mage/: it shares no code with the other classes' controllers.
 /// </summary>
 internal sealed class MageController
 {
@@ -20,7 +21,7 @@ internal sealed class MageController
     /// <summary>How quickly the upper body takes up its attack when a run's fighting starts, and lets it go after (fraction per second).</summary>
     private const float AttackFade = 5f;
 
-    /// <summary>How quickly the body turns toward the camera's facing.</summary>
+    /// <summary>How quickly the body turns toward its enemy or its walk.</summary>
     private const float TurnRate = 14f;
 
     private readonly HeroBody _body = new(BodyModel);
@@ -39,17 +40,26 @@ internal sealed class MageController
     /// <summary>The blink's push this frame (metres per second, flat), zero when not blinking.</summary>
     public Vector3D<float> BlinkVelocity { get; private set; }
 
-    /// <summary>A stunned Mage can't walk, jump or blink (the body still turns with the camera). <paramref name=\"attack\"/> is where the upper body's attack clip is (0 to 1), or null when it isn't fighting (at camp).</summary>
-    public void Update(EngineWindow window, float deltaSeconds, MageStats stats, bool stunned, float? attack = null)
+    /// <summary>Blinks begun so far (at camp too): a count that goes up by one as each begins.</summary>
+    public int Blinks { get; private set; }
+
+    /// <summary>Whether a blink is under way.</summary>
+    public bool Blinking => _blinkTimeLeft > 0f;
+
+    /// <summary>A stunned Mage can't walk, jump or blink (the body still turns to <paramref name="aim"/>). <paramref name="attack"/> is where the upper body's attack clip is (0 to 1), or null when it isn't fighting (at camp). <paramref name="aim"/> is the flat way to the enemy it fights, or null with none: the body faces it, or else the way it walks, so the mouse is free to look round.</summary>
+    public void Update(EngineWindow window, float deltaSeconds, MageStats stats, bool stunned, float? attack = null, Vector3D<float>? aim = null)
     {
         window.WalkSpeed = stunned ? 0f : stats.MoveSpeed;
         window.PlayerCanJump = !stunned;
         UpdateBlink(window, deltaSeconds, stats, stunned);
-        UpdateBody(window, deltaSeconds, attack);
+        UpdateBody(window, deltaSeconds, attack, aim);
     }
 
     /// <summary>Takes the body out of the world (another class was chosen). The next <see cref="Update"/> puts it back.</summary>
     public void Hide(EngineWindow window) => _body.Hide(window);
+
+    /// <summary>The flat way the body faces now.</summary>
+    public Vector3D<float> Facing => new(MathF.Sin(_yaw), 0f, MathF.Cos(_yaw));
 
     private void UpdateBlink(EngineWindow window, float deltaSeconds, MageStats stats, bool stunned)
     {
@@ -63,30 +73,34 @@ internal sealed class MageController
         if (pressed && !stunned && _cooldownLeft <= 0f && _blinkTimeLeft <= 0f)
         {
             // Blink the way the keys point, or straight ahead with none held.
-            _blinkDirection = window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : Facing(window);
+            _blinkDirection = window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : Looking(window);
             _blinkTimeLeft = MageStats.BlinkDuration;
             _cooldownLength = stats.BlinkRecharge;
             _cooldownLeft = _cooldownLength;
+            Blinks++;
         }
 
         _blinkTimeLeft -= deltaSeconds;
         BlinkVelocity = _blinkTimeLeft > 0f ? _blinkDirection * MageStats.BlinkSpeed : Vector3D<float>.Zero;
     }
 
-    private void UpdateBody(EngineWindow window, float deltaSeconds, float? attack)
+    private void UpdateBody(EngineWindow window, float deltaSeconds, float? attack, Vector3D<float>? aim)
     {
-        var facing = Facing(window);
-        float target = MathF.Atan2(facing.X, facing.Z);   // models face +Z; yaw 0 faces +Z
-        float turn = MathF.IEEERemainder(target - _yaw, MathF.Tau);
-        _yaw += turn * (1f - MathF.Exp(-TurnRate * deltaSeconds));
+        var facing = aim ?? (window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : (Vector3D<float>?)null);
+        if (facing is { } face && face != Vector3D<float>.Zero)
+        {
+            float target = MathF.Atan2(face.X, face.Z);   // models face +Z; yaw 0 faces +Z
+            float turn = MathF.IEEERemainder(target - _yaw, MathF.Tau);
+            _yaw += turn * (1f - MathF.Exp(-TurnRate * deltaSeconds));
+        }
 
         _attacking = attack is null ? MathF.Max(0f, _attacking - AttackFade * deltaSeconds) : MathF.Min(1f, _attacking + AttackFade * deltaSeconds);
         _layer[0] = new ClipWeight(AttackClip, (attack ?? 0f) * _body.ClipLength(AttackClip), _attacking);
         _body.Pose(window, _yaw, deltaSeconds, _attacking > 0f ? _layer : ReadOnlySpan<ClipWeight>.Empty);
     }
 
-    /// <summary>Where the camera looks, flattened onto the ground.</summary>
-    public static Vector3D<float> Facing(EngineWindow window)
+    /// <summary>Where the camera looks, flattened onto the ground: which way the Shift move goes with no keys held.</summary>
+    private static Vector3D<float> Looking(EngineWindow window)
     {
         var front = window.Camera?.Front ?? Vector3D<float>.UnitZ;
         var flat = new Vector3D<float>(front.X, 0f, front.Z);

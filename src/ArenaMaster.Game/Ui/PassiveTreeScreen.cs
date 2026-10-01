@@ -7,6 +7,7 @@ namespace ArenaMaster.Game.Ui;
 /// <summary>
 /// The passive tree at camp: the whole tree drawn as a graph growing upward (tiers open with the tree's level, lit lines along the ranks taken), and a panel for the
 /// node picked - what it does, its ranks, take and refund - with the build's totals under it. Respec is free. Click a node to pick it; double-click takes a rank.
+/// A class with more than one tree has a tab for each across the top; any can be looked at and spent in, and a button makes the one shown the active tree.
 /// </summary>
 internal sealed class PassiveTreeScreen : GameScreen
 {
@@ -20,11 +21,26 @@ internal sealed class PassiveTreeScreen : GameScreen
     private string? _selected;
     private TreeDefinition? _shown;
 
+    /// <summary>The id of the tree on show, or null for the active one.</summary>
+    private string? _viewing;
+
     /// <summary>Set whenever a rank is taken or refunded, so the caller knows to save.</summary>
     public bool Changed { get; set; }
 
-    /// <summary>Draws the tree. Returns true when the player closes it.</summary>
-    public bool Draw(TreeProgress progress, string className)
+    /// <summary>Set to a tree's id when the player makes it the active tree; the caller switches to it, saves and clears this.</summary>
+    public string? ChosenTree { get; set; }
+
+    public new void Open()
+    {
+        base.Open();
+        _viewing = null;
+    }
+
+    /// <summary>
+    /// Draws the tree on show, one of <paramref name="trees"/> (the class's, in order; <paramref name="active"/> is the active one's). Returns true when the player
+    /// closes it.
+    /// </summary>
+    public bool Draw(IReadOnlyList<TreeProgress> trees, TreeProgress active, string className)
     {
         if (!IsOpen)
         {
@@ -32,6 +48,8 @@ internal sealed class PassiveTreeScreen : GameScreen
         }
 
         MarkDrawn();
+        var progress = trees.FirstOrDefault(t => t.Tree.Id == _viewing) ?? active;
+        bool isActive = progress.Tree.Id == active.Tree.Id;
         var tree = progress.Tree;
         if (_shown != tree)
         {
@@ -43,8 +61,14 @@ internal sealed class PassiveTreeScreen : GameScreen
 
         UiTheme.BeginScreen("##passivetree", 0.92f, 0.9f);
         string points = progress.FreePoints == 1 ? "1 point to spend" : $"{progress.FreePoints} points to spend";
-        UiTheme.Header($"Camp · {className} · Passive tree", tree.Name, $"Tree level {progress.Level}  ·  {points}");
-        DrawExperience(progress);
+        UiTheme.Header($"Camp · {className} · Passive tree" + (trees.Count > 1 ? (isActive ? " · Active" : " · Not active") : ""), tree.Name,
+            $"Tree level {progress.Level}  ·  {points}");
+        if (trees.Count > 1)
+        {
+            DrawTabs(trees, progress, active);
+        }
+
+        DrawExperience(progress, isActive);
 
         var origin = ImGui.GetCursorScreenPos();
         var avail = ImGui.GetContentRegionAvail();
@@ -54,7 +78,7 @@ internal sealed class PassiveTreeScreen : GameScreen
         var canvasMax = origin + new Vector2(avail.X - sideWidth - gap, avail.Y);
 
         DrawCanvas(progress, canvasMin, canvasMax);
-        bool close = DrawSide(progress, new Vector2(canvasMax.X + gap, origin.Y), new Vector2(origin.X + avail.X, origin.Y + avail.Y));
+        bool close = DrawSide(progress, isActive, new Vector2(canvasMax.X + gap, origin.Y), new Vector2(origin.X + avail.X, origin.Y + avail.Y));
 
         UiTheme.EndScreen();
         if (close || ClosedByKey(ImGuiKey.E))
@@ -66,7 +90,35 @@ internal sealed class PassiveTreeScreen : GameScreen
         return false;
     }
 
-    private static void DrawExperience(TreeProgress progress)
+    /// <summary>A tab for each of the class's trees, the one on show lit and the active one marked. Clicking one shows it.</summary>
+    private void DrawTabs(IReadOnlyList<TreeProgress> trees, TreeProgress shown, TreeProgress active)
+    {
+        float scale = UiTheme.Scale;
+        float height = 34f * scale;
+        float width = MathF.Min(260f * scale, (ImGui.GetContentRegionAvail().X - 10f * scale * (trees.Count - 1)) / trees.Count);
+        for (int i = 0; i < trees.Count; i++)
+        {
+            var tree = trees[i];
+            if (i > 0)
+            {
+                ImGui.SameLine(0f, 10f * scale);
+            }
+
+            bool isShown = tree.Tree.Id == shown.Tree.Id;
+            string label = $"{tree.Tree.Name}  ·  Lv {tree.Level}" + (tree.Tree.Id == active.Tree.Id ? "  ·  ACTIVE" : "");
+            ImGui.PushID(i);
+            if (UiTheme.Button(label, new Vector2(width, height), primary: isShown) && !isShown)
+            {
+                _viewing = tree.Tree.Id;
+            }
+
+            ImGui.PopID();
+        }
+
+        ImGui.Dummy(new Vector2(1f, 6f * scale));
+    }
+
+    private static void DrawExperience(TreeProgress progress, bool isActive)
     {
         float scale = UiTheme.Scale;
         var at = ImGui.GetCursorScreenPos();
@@ -76,7 +128,9 @@ internal sealed class PassiveTreeScreen : GameScreen
         float fraction = capped ? 1f : (float)progress.IntoLevel / TreeProgress.RequiredFor(progress.Level);
         draw.AddRectFilled(at, at + new Vector2(width, 6f * scale), UiTheme.U32(UiTheme.Line), 3f * scale);
         draw.AddRectFilled(at, at + new Vector2(width * fraction, 6f * scale), UiTheme.U32(UiTheme.Teal), 3f * scale);
-        string text = capped ? "The tree is at its cap." : $"{progress.IntoLevel:N0} / {TreeProgress.RequiredFor(progress.Level):N0} experience to level {progress.Level + 1}. The active tree earns experience in every run.";
+        string text = capped ? "The tree is at its cap."
+            : $"{progress.IntoLevel:N0} / {TreeProgress.RequiredFor(progress.Level):N0} experience to level {progress.Level + 1}. "
+              + (isActive ? "The active tree earns experience in every run." : "Only the active tree earns experience, and only its ranks count in a run.");
         UiTheme.Text(at + new Vector2(0f, 10f * scale), text, UiTheme.Muted, 0.72f);
         ImGui.Dummy(new Vector2(width, 34f * scale));
     }
@@ -198,7 +252,7 @@ internal sealed class PassiveTreeScreen : GameScreen
     }
 
     /// <summary>The picked node's panel, then the build's totals. Returns true if Close was clicked.</summary>
-    private bool DrawSide(TreeProgress progress, Vector2 min, Vector2 max)
+    private bool DrawSide(TreeProgress progress, bool isActive, Vector2 min, Vector2 max)
     {
         float scale = UiTheme.Scale;
         float pad = 16f * scale;
@@ -281,6 +335,15 @@ internal sealed class PassiveTreeScreen : GameScreen
         {
             y += 4f * scale;
             UiTheme.Text(new Vector2(min.X + pad, y), "Majors: " + string.Join(", ", majors), UiTheme.BrassHi, 0.7f, width);
+        }
+
+        if (!isActive)
+        {
+            ImGui.SetCursorScreenPos(new Vector2(min.X + pad, max.Y - pad - 2f * buttonHeight - 8f * scale));
+            if (UiTheme.Button($"Make {progress.Tree.Name} the active tree", new Vector2(width, buttonHeight), primary: true))
+            {
+                ChosenTree = progress.Tree.Id;
+            }
         }
 
         ImGui.SetCursorScreenPos(new Vector2(min.X + pad, max.Y - pad - buttonHeight));

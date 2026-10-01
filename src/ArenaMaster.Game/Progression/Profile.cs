@@ -28,7 +28,11 @@ internal sealed class Profile
 
     public string ActiveClass { get; set; } = "ranger";
 
+    /// <summary>The active class's active tree, as saves before a class could have more than one wrote it; <see cref="ActiveTrees"/> holds every class's.</summary>
     public string ActiveTree { get; set; } = "sharpshooter";
+
+    /// <summary>Class id -> the id of its active tree. A class not in it plays its first tree.</summary>
+    public Dictionary<string, string> ActiveTrees { get; set; } = new();
 
     /// <summary>"class/tree" -> that tree's progress.</summary>
     public Dictionary<string, TreeSave> Trees { get; set; } = new();
@@ -64,6 +68,9 @@ internal sealed class Profile
     public bool HasBounty(string bountyId) => Bounties.Contains(bountyId);
 
     public void AddToStash(string itemId, int count = 1) => Stash[itemId] = CountOf(itemId) + count;
+
+    /// <summary>The id of <paramref name="classId"/>'s active tree, or null if one was never chosen (it plays its first).</summary>
+    public string? ActiveTreeOf(string classId) => ActiveTrees.GetValueOrDefault(classId);
 
     /// <summary>The progress of <paramref name="classId"/>'s tree <paramref name="treeId"/>, made empty the first time it is asked for.</summary>
     public TreeSave Tree(string classId, string treeId)

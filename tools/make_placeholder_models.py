@@ -96,6 +96,10 @@ from pathlib import Path
 
 MODELS = Path(__file__).resolve().parent.parent / "assets" / "models"
 
+# The modules with the second passive trees' models: the Ranger's Trapper, the Paladin's Crusade, the Mage's Pyromancy, the Shaman's Earth Alignment, the
+# Warrior's Reaver and the Priest's Grave Calling.
+TREE_MODEL_MODULES = ("trapper_models", "crusade_models", "pyromancy_models", "earth_models", "reaver_models", "gravecalling_models")
+
 SWATCH = 8  # pixels per colour, so filtering never blends neighbours
 PALETTE = {
     "tunic": (58, 112, 60),
@@ -181,6 +185,16 @@ PALETTE = {
     "fungus": (40, 200, 190),
     "fungus_light": (150, 255, 235),
     "bat": (78, 62, 70),
+    "venom": (120, 196, 40),
+    "venom_light": (206, 250, 120),
+    "blood": (132, 12, 20),
+    "blood_light": (222, 52, 52),
+    "earth": (110, 84, 58),
+    "earth_light": (170, 140, 98),
+    "soul": (110, 200, 255),
+    "soul_light": (214, 244, 255),
+    "feather": (122, 88, 56),
+    "ember": (255, 150, 50),
 }
 COLOURS = list(PALETTE)
 
@@ -1640,6 +1654,11 @@ if __name__ == "__main__":
         mesh = build()
         write_glb(mesh, MODELS / name)
         print(f"Wrote {MODELS / name} ({len(mesh.positions)} vertices, {len(mesh.indices) // 3} triangles)")
+
+    # The second passive trees' own models, each tree's in its own file (tools/<tree>_models.py), each writing its own with write_all.
+    import importlib
+    for tree in TREE_MODEL_MODULES:
+        importlib.import_module(tree).write_all(MODELS)
 
     import enemy_models
     for enemy in enemy_models.ENEMIES.values():

@@ -112,6 +112,18 @@ internal sealed class PlayerHealth
         _hurt = MathF.Max(0f, _hurt - deltaSeconds);
     }
 
+    /// <summary>
+    /// Health paid on purpose (a class's blood price): <paramref name="amount"/> comes straight off, never taking the player below 1, with no grace, no flash, and
+    /// not counted in <see cref="HealthLost"/>.
+    /// </summary>
+    public void Spend(float amount)
+    {
+        if (!IsDead && amount > 0f)
+        {
+            Current = MathF.Max(MathF.Min(Current, 1f), Current - amount);
+        }
+    }
+
     /// <summary>Raises the maximum by <paramref name="amount"/> and heals the same amount.</summary>
     public void RaiseMax(float amount)
     {

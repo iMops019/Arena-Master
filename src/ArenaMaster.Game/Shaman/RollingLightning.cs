@@ -138,12 +138,12 @@ internal sealed class RollingLightning
     public int Casts { get; private set; }
 
     /// <summary>
-    /// One frame: a cast from <paramref name="hand"/> at <paramref name="target"/> when one is due (held while <paramref name="canCast"/> is false - a stun), the balls
-    /// in flight, the charged trees, the Eye of the Storm around <paramref name="feet"/> while <paramref name="moving"/>, and Call Lightning. Every hit goes on
-    /// <paramref name="hits"/>.
+    /// One frame: a cast from <paramref name="hand"/> at <paramref name="target"/> when one is due (held while <paramref name="canCast"/> is false - a stun; with no
+    /// target, it waits, ready, and throws the moment there is one), the balls in flight, the charged trees, the Eye of the Storm around <paramref name="feet"/> while
+    /// <paramref name="moving"/>, and Call Lightning. Every hit goes on <paramref name="hits"/>.
     /// </summary>
-    public void Update(float deltaSeconds, Vector3D<float> hand, Vector3D<float> feet, Vector3D<float> target, bool moving, ShamanStats stats, EnemyField enemies,
-        Func<float, float, float?> groundAt, ObstacleProbe obstacles, bool canCast, List<StormHit> hits, float aimLift = 0f)
+    public void Update(float deltaSeconds, Vector3D<float> hand, Vector3D<float> feet, Vector3D<float>? target, bool moving, ShamanStats stats, EnemyField enemies,
+        Func<float, float, float?> groundAt, ObstacleProbe obstacles, bool canCast, List<StormHit> hits)
     {
         CastIn -= deltaSeconds;
         if (!canCast)
@@ -152,8 +152,15 @@ internal sealed class RollingLightning
         }
         else if (CastIn <= 0f)
         {
-            CastIn = MathF.Max(0f, CastIn + stats.CastInterval);   // after a pause, no burst of casts to catch up
-            Cast(hand, target, stats, aimLift);
+            if (target is { } spot)
+            {
+                CastIn = MathF.Max(0f, CastIn + stats.CastInterval);   // after a pause, no burst of casts to catch up
+                Cast(hand, spot, stats);
+            }
+            else
+            {
+                CastIn = 0f;   // ready, and waiting for something to throw at
+            }
         }
 
         for (int i = _balls.Count - 1; i >= 0; i--)
@@ -182,8 +189,8 @@ internal sealed class RollingLightning
         _zaps.RemoveAll(z => z.Age >= ZapSeconds);
     }
 
-    /// <summary>A cast: its balls lobbed at <paramref name="target"/> (extra ones fanned around it), the first a supercell on every 5th cast with the major.</summary>
-    public void Cast(Vector3D<float> hand, Vector3D<float> target, ShamanStats stats, float aimLift = 0f)
+    /// <summary>A cast: its balls thrown at <paramref name="target"/> (extra ones fanned around it), the first a supercell on every 5th cast with the major.</summary>
+    public void Cast(Vector3D<float> hand, Vector3D<float> target, ShamanStats stats)
     {
         Casts++;
         bool supercell = stats.Tree.Supercell && Casts % ShamanStats.SupercellEvery == 0;
@@ -194,16 +201,29 @@ internal sealed class RollingLightning
             var offset = target - hand;
             float cos = MathF.Cos(angle), sin = MathF.Sin(angle);
             var turned = hand + new Vector3D<float>(offset.X * cos + offset.Z * sin, offset.Y, -offset.X * sin + offset.Z * cos);
-            Lob(hand, turned, stats, supercell && i == 0, aimLift);
+            Lob(hand, turned, stats, supercell && i == 0);
         }
     }
 
     /// <summary>
-    /// Lobs one ball from <paramref name="from"/> in an arc that comes down at <paramref name="to"/> (kept between the nearest and furthest it can throw). The arc
-    /// tops out at <see cref="ShamanStats.LobHeight"/> above the higher end - a little higher the further it goes, and higher with <paramref name="aimLift"/>
-    /// (0 to 1, the camera pitched up) - and the ball's speed across the ground is whatever gets it there along that arc.
+    /// Throws one ball from <paramref name="from"/> so it comes down at <paramref name="to"/> (kept between the nearest and furthest it can throw): quick and flat,
+    /// at <see cref="ShamanStats.ThrowSpeedAt"/> across the ground, with just the rise that gets it there under gravity - flung down at the ground for a near
+    /// throw, a low arc for a far one.
     /// </summary>
-    public LightningBall Lob(Vector3D<float> from, Vector3D<float> to, ShamanStats stats, bool supercell = false, float aimLift = 0f)
+    public LightningBall Lob(Vector3D<float> from, Vector3D<float> to, ShamanStats stats, bool supercell = false)
+    {
+        var (flat, distance, rise, time) = Arc(from, to, stats, stats.BallRadius);
+        return Launch(from, flat * (distance / time) + new Vector3D<float>(0f, rise, 0f), stats, supercell);
+    }
+
+    /// <summary>How long a ball thrown from <paramref name="from"/> to <paramref name="to"/> is in the air before it comes down (the Shaman leads its throws by it).</summary>
+    public static float FlightTime(Vector3D<float> from, Vector3D<float> to, ShamanStats stats) => Arc(from, to, stats, stats.BallRadius).Time;
+
+    /// <summary>
+    /// A throw of something of <paramref name="radius"/> (the ball, or Earth Alignment's stone, which is thrown the same way): the flat way it goes, how far (kept
+    /// between the nearest and furthest throw), how fast it leaves upward (downward if negative), and how long it flies.
+    /// </summary>
+    internal static (Vector3D<float> Flat, float Distance, float Rise, float Time) Arc(Vector3D<float> from, Vector3D<float> to, ShamanStats stats, float radius)
     {
         var flat = Geometry.FlatDirection(from, to, out float distance);
         if (flat == Vector3D<float>.Zero)
@@ -212,11 +232,10 @@ internal sealed class RollingLightning
         }
 
         distance = Math.Clamp(distance, ShamanStats.MinThrow, stats.ThrowRange);
-        float g = ShamanStats.Gravity;
-        float apex = MathF.Max(from.Y, to.Y) + stats.LobHeight(distance, aimLift);
-        float rise = MathF.Sqrt(2f * g * (apex - from.Y));
-        float time = rise / g + MathF.Sqrt(2f * (apex - to.Y) / g);
-        return Launch(from, flat * (distance / time) + new Vector3D<float>(0f, rise, 0f), stats, supercell);
+        float time = distance / stats.ThrowSpeedAt(distance);
+        float landing = to.Y + radius;   // it touches down when its underside meets the ground
+        float rise = (landing - from.Y) / time + 0.5f * ShamanStats.Gravity * time;
+        return (flat, distance, rise, time);
     }
 
     /// <summary>A ball dropped at <paramref name="feet"/>, rolling low along <paramref name="direction"/> (Surge Strike).</summary>

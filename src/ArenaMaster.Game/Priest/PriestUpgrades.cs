@@ -18,6 +18,11 @@ internal enum PriestUpgrade
     Deathbringer,
     SpreadingRot,
     DeepDecay,
+    DeathKnell,
+    RestlessDead,
+    HardenedBones,
+    SoulLure,
+    SharpenedBone,
 }
 
 /// <summary>One upgrade's name, how many times it stacks, and what the next level of it does.</summary>
@@ -28,7 +33,8 @@ internal sealed record PriestChoice(PriestUpgrade? Upgrade, string Name, string 
 
 /// <summary>
 /// The Priest's level-up pool: the upgrades, their numbers (kept in <see cref="PriestStats"/>), and rolling three to choose from. Priest-only, like everything under
-/// Priest/. Spreading Rot and Deep Decay only turn up once the tree has Death and Decay.
+/// Priest/. The skull's, the shield's and the body's come up whichever tree is active; the Plague and rot ones only with Unholy (Spreading Rot and Deep Decay once
+/// it has Death and Decay), and the dead's only with Grave Calling (most of them once the major they build on is taken).
 /// </summary>
 internal static class PriestUpgrades
 {
@@ -52,13 +58,29 @@ internal static class PriestUpgrades
         new PriestUpgradeInfo(PriestUpgrade.Deathbringer, "Deathbringer", 4, "+15% damage to elites and bosses"),
         new PriestUpgradeInfo(PriestUpgrade.SpreadingRot, "Spreading Rot", 3, "+5% Death and Decay chance"),
         new PriestUpgradeInfo(PriestUpgrade.DeepDecay, "Deep Decay", 3, "+20% rot damage"),
+        new PriestUpgradeInfo(PriestUpgrade.DeathKnell, "Death Knell", 4, "+15% damage to enemies under half health"),
+        new PriestUpgradeInfo(PriestUpgrade.RestlessDead, "Restless Dead", 5, "+20% servant damage"),
+        new PriestUpgradeInfo(PriestUpgrade.HardenedBones, "Hardened Bones", 3, "+25% servant health, and servants last 3 s longer"),
+        new PriestUpgradeInfo(PriestUpgrade.SoulLure, "Soul Lure", 3, "Souls are gathered from 0.75 m further and last 2 s longer"),
+        new PriestUpgradeInfo(PriestUpgrade.SharpenedBone, "Sharpened Bone", 4, "+25% bone spear damage"),
     };
 
     public static PriestUpgradeInfo Info(PriestUpgrade upgrade) => All.First(u => u.Upgrade == upgrade);
 
-    /// <summary>Whether <paramref name="upgrade"/> can come up at all for this build (the rot upgrades need Death and Decay).</summary>
-    public static bool Offered(PriestUpgrade upgrade, PriestStats stats) =>
-        upgrade is not (PriestUpgrade.SpreadingRot or PriestUpgrade.DeepDecay) || stats.Tree.DeathAndDecay;
+    /// <summary>
+    /// Whether <paramref name="upgrade"/> can come up at all for this build: the Plague and rot ones only with Unholy active (the rot ones once it has Death and
+    /// Decay), the dead's only with Grave Calling (the servants' once it has Raise Dead, the souls' Soul Siphon, the spear's Bone Spear).
+    /// </summary>
+    public static bool Offered(PriestUpgrade upgrade, PriestStats stats) => upgrade switch
+    {
+        PriestUpgrade.Virulence or PriestUpgrade.LongFever or PriestUpgrade.CreepingDeath => !stats.GraveCalling,
+        PriestUpgrade.SpreadingRot or PriestUpgrade.DeepDecay => !stats.GraveCalling && stats.Tree.DeathAndDecay,
+        PriestUpgrade.DeathKnell => stats.GraveCalling,
+        PriestUpgrade.RestlessDead or PriestUpgrade.HardenedBones => stats.GraveCalling && stats.Grave.RaiseDead,
+        PriestUpgrade.SoulLure => stats.GraveCalling && stats.Grave.SoulSiphon,
+        PriestUpgrade.SharpenedBone => stats.GraveCalling && stats.Grave.BoneSpear,
+        _ => true,
+    };
 
     /// <summary>
     /// Up to <paramref name="count"/> different upgrades that can be offered, aren't maxed and aren't in <paramref name="excluded"/> (banished this run), picked at

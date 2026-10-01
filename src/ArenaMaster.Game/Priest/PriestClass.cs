@@ -9,9 +9,10 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Priest;
 
 /// <summary>
-/// The Priest as the content runs it (see <see cref="IHeroClass"/>): a skull wand and a Skull Shield. The wand fires Plague Skulls that hunt through the crowd,
-/// piercing and Plaguing what they pass (<see cref="PlagueSkulls"/>). Here too is what answers the enemies' blows - the Skull Shield's block, and with the tree,
-/// Death and Decay spewing from it and Bone Armour - and Rotting Step's rot, Soul Harvest and the Leech Jar's healing.
+/// The Priest as the content runs it (see <see cref="IHeroClass"/>): a skull wand and a Skull Shield. The wand fires skulls that hunt through the crowd, piercing
+/// what they pass (<see cref="PlagueSkulls"/>), and Plaguing it with Unholy active. Here too is what answers the enemies' blows - the Skull Shield's block, and
+/// with Unholy, Death and Decay spewing from it and Bone Armour; with Grave Calling, the Bone Cage - and Rotting Step's rot, Soul Harvest and the Leech Jar's
+/// healing. With Grave Calling active, the raised dead (<see cref="RaisedDead"/>) and the souls (<see cref="GatheredSouls"/>) are run here too.
 /// </summary>
 internal sealed class PriestClass : IHeroClass
 {
@@ -30,6 +31,12 @@ internal sealed class PriestClass : IHeroClass
     private readonly PriestController _controller = new();
     private readonly PlagueSkulls _skulls;
     private readonly PriestView _view = new();
+    private readonly RaisedDead _servants = new();
+    private readonly GatheredSouls _souls = new();
+    private readonly GraveView _graveView = new();
+
+    /// <summary>The enemies held in a Bone Cage (drawn with one over them while they stay held).</summary>
+    private readonly HashSet<Enemy> _caged = new();
     private readonly Random _random;
     private readonly HashSet<PriestUpgrade> _banished = new();
     private readonly List<PriestHit> _hits = new();
@@ -37,6 +44,9 @@ internal sealed class PriestClass : IHeroClass
     private float _blockedShown;
     private float _decayShown;
     private float _attackingLeft;
+
+    /// <summary>The flat way to the enemy it fights, as of the last attack frame, or null with none: the body faces it.</summary>
+    private Vector3D<float>? _aim;
     private bool _inRun;
     private bool _wasStepping;
     private Vector3D<float>? _rotDue;
@@ -45,6 +55,7 @@ internal sealed class PriestClass : IHeroClass
     {
         _random = random;
         _skulls = new PlagueSkulls(random);
+        _skulls.Empower = () => _souls.Empower(Stats);
     }
 
     public PriestStats Stats { get; } = new();
@@ -52,14 +63,25 @@ internal sealed class PriestClass : IHeroClass
     /// <summary>The skulls, the Plague and the rot, for the tests.</summary>
     internal PlagueSkulls Skulls => _skulls;
 
+    /// <summary>The raised dead, the souls and the caged, for the tests.</summary>
+    internal RaisedDead Servants => _servants;
+
+    internal GatheredSouls Souls => _souls;
+
+    internal IReadOnlySet<Enemy> Caged => _caged;
+
     public string Id => UnholyTree.ClassId;
 
     public string Name => "Priest";
 
     public string Summary =>
-        "A skull wand and a Skull Shield. The wand fires Plague Skulls that hunt through the crowd, piercing one enemy after another and leaving each Plagued, rotting from within. The Unholy tree spreads the rot.";
+        "A skull wand and a Skull Shield. The wand fires skulls that hunt through the crowd, piercing one enemy after another. With the Unholy tree each skull leaves them Plagued, rotting from within, and the rot spreads; with Grave Calling the skulls hit harder, and the dead get back up to fight for you.";
 
-    public TreeDefinition Tree => UnholyTree.Tree;
+    public IReadOnlyList<TreeDefinition> Trees { get; } = new[] { UnholyTree.Tree, GraveCallingTree.Tree };
+
+    public TreeDefinition Tree { get; private set; } = UnholyTree.Tree;
+
+    public void ChooseTree(string treeId) => Tree = Trees.FirstOrDefault(t => t.Id == treeId) ?? Trees[0];
 
     public float MaxHealth => Stats.MaxHealth;
 
@@ -79,12 +101,22 @@ internal sealed class PriestClass : IHeroClass
 
     public Vector3D<float> DashVelocity => _controller.StepVelocity;
 
+    /// <summary>Soul Siphon's charges (or the Lich's time), on a run.</summary>
+    public (string Label, float Fill)? Meter => _inRun ? _souls.Meter(Stats) : null;
+
     public string? Status =>
         _decayShown > 0f ? "DEATH AND DECAY"
         : _blockedShown > 0f ? "BLOCKED"
         : null;
 
-    public void UseTree(IReadOnlyDictionary<string, int> ranks) => Stats.Tree = UnholyBonuses.From(ranks);
+    /// <summary>The active tree's ranks: its bonuses taken, the other tree's left empty, and the skulls told which tree they fight for.</summary>
+    public void UseTree(IReadOnlyDictionary<string, int> ranks)
+    {
+        bool grave = Tree.Id == GraveCallingTree.TreeId;
+        Stats.GraveCalling = grave;
+        Stats.Tree = grave ? new UnholyBonuses() : UnholyBonuses.From(ranks);
+        Stats.Grave = grave ? GraveCallingBonuses.From(ranks) : new GraveCallingBonuses();
+    }
 
     public void BeginRun(ItemBonuses items, PlayerHealth health)
     {
@@ -93,6 +125,9 @@ internal sealed class PriestClass : IHeroClass
         health.Reset(Stats.MaxHealth);
         _banished.Clear();
         _skulls.Reset();
+        _servants.Reset();
+        _souls.Reset();
+        _caged.Clear();
         _blockedShown = 0f;
         _decayShown = 0f;
         _rotDue = null;
@@ -103,13 +138,17 @@ internal sealed class PriestClass : IHeroClass
     {
         Stats.Reset();
         _skulls.Reset();
+        _servants.Reset();
+        _souls.Reset();
+        _caged.Clear();
         _inRun = false;
     }
 
     public void Move(EngineWindow window, float deltaSeconds, bool stunned)
     {
         _attackingLeft = MathF.Max(0f, _attackingLeft - deltaSeconds);
-        _controller.Update(window, deltaSeconds, Stats, stunned, _attackingLeft > 0f ? AttackTime() : null);
+        bool fighting = _attackingLeft > 0f;
+        _controller.Update(window, deltaSeconds, Stats, stunned, fighting ? AttackTime() : null, fighting ? _aim : null);
 
         // Rotting Step: a puff of rot where the Priest vanished (and rot left there, on a run), and another where it comes back.
         if (_controller.StepBegunAt is { } vanished)
@@ -129,7 +168,7 @@ internal sealed class PriestClass : IHeroClass
         _wasStepping = _controller.Stepping;
         if (!_inRun)
         {
-            _view.Sync(window, _skulls, deltaSeconds, (_, _) => null, window.PlayerFeet, PriestController.Facing(window), fighting: false);
+            _view.Sync(window, _skulls, deltaSeconds, (_, _) => null, window.PlayerFeet, _controller.Facing, fighting: false);
         }
     }
 
@@ -162,6 +201,7 @@ internal sealed class PriestClass : IHeroClass
     {
         _controller.Hide(window);
         _view.Clear(window);
+        _graveView.Clear(window);
     }
 
     public void Attack(RunFrame frame)
@@ -169,7 +209,8 @@ internal sealed class PriestClass : IHeroClass
         _attackingLeft = AttackingHold;
         var window = frame.Window;
         var feet = window.PlayerFeet;
-        var facing = PriestController.Facing(window);
+        _aim = frame.Enemies.Nearest(feet, PriestStats.CastRange) is { } nearest ? Geometry.FlatDirection(feet, nearest.Position, out _) : null;
+        var facing = _controller.Facing;
         var right = new Vector3D<float>(facing.Z, 0f, -facing.X);
         var hand = feet + new Vector3D<float>(0f, WandUp, 0f) + facing * WandAhead + right * WandRight;
         if (_rotDue is { } rot)
@@ -180,19 +221,21 @@ internal sealed class PriestClass : IHeroClass
 
         Fight(frame.DeltaSeconds, hand, feet, facing, frame.Condition.IsStunned, frame.Enemies, frame.GroundAt, frame.Health, frame.Numbers);
         _view.Sync(window, _skulls, frame.DeltaSeconds, frame.GroundAt, feet, facing);
+        _graveView.Sync(window, _servants, _souls, _skulls, _caged, frame.DeltaSeconds, frame.GroundAt, feet);
     }
 
     public void Answer(RunFrame frame)
     {
         var feet = frame.Window.PlayerFeet;
-        var facing = PriestController.Facing(frame.Window);
+        var facing = _controller.Facing;
         AnswerStrikes(frame.Enemies.Strikes, new Vector3D<float>(feet.X, frame.GroundAt(feet.X, feet.Z) ?? feet.Y, feet.Z), MathF.Atan2(facing.X, facing.Z),
             frame.Enemies, frame.Health, frame.Numbers);
     }
 
     /// <summary>
-    /// The attacks for one frame, before the enemies move: the wand casting at the best target toward <paramref name="facing"/> (held by a stun), the skulls, the
-    /// Plague and the rot; then Soul Harvest and the Leech Jar heal for every Plagued enemy that died.
+    /// The attacks for one frame, before the enemies move: the souls gathered at <paramref name="feet"/> (their charges ready for the cast), the wand casting at the
+    /// best target toward <paramref name="facing"/> (held by a stun), the skulls, the bone spears, the Plague and the rot, and the raised dead; then Soul Harvest
+    /// and the Leech Jar heal for every Plagued enemy that died.
     /// </summary>
     internal void Fight(float deltaSeconds, Vector3D<float> hand, Vector3D<float> feet, Vector3D<float> facing, bool stunned, EnemyField enemies,
         Func<float, float, float?> groundAt, PlayerHealth health, DamageNumbers numbers)
@@ -200,7 +243,10 @@ internal sealed class PriestClass : IHeroClass
         _blockedShown = MathF.Max(0f, _blockedShown - deltaSeconds);
         _decayShown = MathF.Max(0f, _decayShown - deltaSeconds);
         _hits.Clear();
+        _caged.RemoveWhere(e => !e.IsAlive || !e.IsFrozen);
+        _souls.Update(deltaSeconds, feet, Stats, health, enemies, _skulls, _hits);
         _skulls.Update(deltaSeconds, hand, feet, facing, Stats, enemies, groundAt, canCast: !stunned, _hits);
+        _servants.Update(deltaSeconds, feet, Stats, enemies, groundAt, _skulls, _hits);
 
         int plaguedDeaths = _skulls.PlaguedDeaths;
         if (plaguedDeaths > 0)
@@ -213,7 +259,7 @@ internal sealed class PriestClass : IHeroClass
 
     /// <summary>
     /// The enemies' blows this frame, answered: a block with the Skull Shield heals (the tree's), may spew Death and Decay toward <paramref name="facingYaw"/>
-    /// from <paramref name="feet"/>, and raises a bone barrier with Bone Armour (and the Bonebound Aegis).
+    /// from <paramref name="feet"/>, raises a bone barrier with Bone Armour (and the Bonebound Aegis), and with Bone Cage holds the attacker in a cage of bones.
     /// </summary>
     internal void AnswerStrikes(IReadOnlyList<Strike> strikes, Vector3D<float> feet, float facingYaw, EnemyField enemies, PlayerHealth health, DamageNumbers numbers)
     {
@@ -226,6 +272,12 @@ internal sealed class PriestClass : IHeroClass
 
             _blockedShown = BlockedShown;
             health.Heal(Stats.Tree.BlockHeal);
+            if (Stats.Grave.BoneCage && strike.Attacker is { IsAlive: true } attacker && attacker.Kind.Tier != EnemyTier.Boss && !attacker.Kind.IsProp)
+            {
+                attacker.Freeze(Stats.CageSeconds);
+                _caged.Add(attacker);
+            }
+
             if (Stats.DecayChance > 0f && _random.NextDouble() < Stats.DecayChance)
             {
                 _skulls.SpewDecay(feet, facingYaw, Stats);
@@ -240,14 +292,26 @@ internal sealed class PriestClass : IHeroClass
         }
     }
 
+    /// <summary>A kill (from anything): with Grave Calling it counts toward Raise Dead's next servant and leaves a soul with Soul Siphon.</summary>
     public void OnKill(Enemy killed, float runSeconds)
     {
+        if (killed.Kind.IsProp)
+        {
+            return;
+        }
+
+        _servants.OnKill(killed.Position, Stats);
+        _souls.OnKill(killed.Position, Stats);
     }
 
     public void Clear(EngineWindow window)
     {
         _skulls.Reset();
+        _servants.Reset();
+        _souls.Reset();
+        _caged.Clear();
         _view.Clear(window);
+        _graveView.Clear(window);
         _rotDue = null;
         _inRun = false;
     }
@@ -286,18 +350,21 @@ internal sealed class PriestClass : IHeroClass
         }
     }
 
-    /// <summary>The skull's hits as damage numbers; Plague, rot and the Aura tick too often to number one by one, and are added up for each enemy instead.</summary>
+    /// <summary>
+    /// The hits as damage numbers (skulls, spears, servants' claws, bursts and spirits); Plague, rot and the Aura tick too often to number one by one, and are
+    /// added up for each enemy instead.
+    /// </summary>
     private void Report(DamageNumbers numbers)
     {
         foreach (var hit in _hits)
         {
-            if (hit.Source == PriestSource.Skull)
+            if (hit.Source is PriestSource.Plague or PriestSource.Rot or PriestSource.Aura)
             {
-                numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
+                numbers.AddOverTime(hit.Enemy, hit.Position, hit.Damage, hit.Killed);
             }
             else
             {
-                numbers.AddOverTime(hit.Enemy, hit.Position, hit.Damage, hit.Killed);
+                numbers.Add(hit.Position, hit.Damage, hit.Killed, hit.Crit);
             }
         }
     }

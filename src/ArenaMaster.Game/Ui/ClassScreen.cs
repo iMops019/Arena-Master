@@ -6,7 +6,7 @@ using ImGuiNET;
 namespace ArenaMaster.Game.Ui;
 
 /// <summary>
-/// The class rack at camp: a card for each class - how it fights, its passive tree and how far that tree has come - and a button to play it. The choice is saved
+/// The class rack at camp: a card for each class - how it fights, its active passive tree and how far that tree has come - and a button to play it. The choice is saved
 /// with the profile; each class keeps its own tree, and the item chest is shared.
 /// </summary>
 internal sealed class ClassScreen : GameScreen
@@ -38,7 +38,8 @@ internal sealed class ClassScreen : GameScreen
             bool playing = hero == current;
             var min = origin + new Vector2(i * (cardWidth + gap), 0f);
             var max = min + new Vector2(cardWidth, cardHeight);
-            if (DrawCard(hero, playing, new TreeProgress(hero.Tree, profile.Tree(hero.Id, hero.Tree.Id)), min, max, i))
+            var tree = hero.Trees.FirstOrDefault(t => t.Id == profile.ActiveTreeOf(hero.Id)) ?? hero.Trees[0];
+            if (DrawCard(hero, playing, new TreeProgress(tree, profile.Tree(hero.Id, tree.Id)), hero.Trees.Count, min, max, i))
             {
                 chosen = hero;
             }
@@ -61,7 +62,7 @@ internal sealed class ClassScreen : GameScreen
     }
 
     /// <summary>One class's card. True if its button was clicked.</summary>
-    private static bool DrawCard(IHeroClass hero, bool playing, TreeProgress tree, Vector2 min, Vector2 max, int index)
+    private static bool DrawCard(IHeroClass hero, bool playing, TreeProgress tree, int trees, Vector2 min, Vector2 max, int index)
     {
         float scale = UiTheme.Scale;
         float pad = 18f * scale;
@@ -78,7 +79,7 @@ internal sealed class ClassScreen : GameScreen
         y += ImGui.CalcTextSize(hero.Summary, width / 0.85f).Y * 0.85f + font * 0.8f;
 
         int free = tree.FreePoints;
-        UiTheme.Text(new Vector2(min.X + pad, y), "PASSIVE TREE", UiTheme.Muted, 0.6f);
+        UiTheme.Text(new Vector2(min.X + pad, y), trees > 1 ? $"ACTIVE TREE (OF {trees})" : "PASSIVE TREE", UiTheme.Muted, 0.6f);
         y += font * 0.85f;
         UiTheme.Text(new Vector2(min.X + pad, y), $"{tree.Tree.Name}  ·  Lv {tree.Level}" + (free > 0 ? $"  ·  {free} to spend" : ""), UiTheme.BrassHi, 0.9f);
 

@@ -130,6 +130,17 @@ internal sealed class Enemy
     /// <summary>Freezes it solid for <paramref name="seconds"/> (or keeps a longer freeze already on it).</summary>
     public void Freeze(float seconds) => FrozenFor = MathF.Max(FrozenFor, seconds);
 
+    /// <summary>
+    /// Seconds left reeling from a blow (a quake): no step, no claw, an attack under way held - like a freeze, but it isn't frozen, so nothing that works on
+    /// frozen enemies counts.
+    /// </summary>
+    public float StaggeredFor { get; set; }
+
+    public bool IsStaggered => StaggeredFor > 0f;
+
+    /// <summary>Staggers it for <paramref name="seconds"/> (or keeps a longer stagger already on it).</summary>
+    public void Stagger(float seconds) => StaggeredFor = MathF.Max(StaggeredFor, seconds);
+
     public float ContactCooldown { get; set; }
 
     /// <summary>A per-enemy offset so a crowd doesn't bob in step.</summary>
@@ -263,6 +274,18 @@ internal sealed class EnemyBomb
     public float Age { get; set; }
 }
 
+/// <summary>A spot that draws the enemies near it to it for a while (a totem): see <see cref="EnemyField.AddLure"/>.</summary>
+internal sealed class EnemyLure
+{
+    public Vector3D<float> Spot { get; init; }
+
+    /// <summary>How near it an enemy must be to be drawn to it.</summary>
+    public float Reach { get; init; }
+
+    /// <summary>Seconds until it stops drawing them.</summary>
+    public float Left { get; set; }
+}
+
 /// <summary>A splash shot bursting (a fireball, a bomb), for the view: where, how wide, how long ago, and the model it is drawn with.</summary>
 internal sealed class EnemyBlast
 {
@@ -323,6 +346,7 @@ internal sealed class EnemyField
     private readonly List<EnemyBlast> _blasts = new();
     private readonly List<EnemyBomb> _bombs = new();
     private readonly List<(Enemy Boss, BossPhase Phase)> _phaseChanges = new();
+    private readonly List<EnemyLure> _lures = new();
     private readonly List<Enemy> _legendaries = new();
     private readonly Dictionary<AttackType, int> _fodderAttacking = new();
     private readonly EnemyGrid _grid = new();
@@ -391,6 +415,46 @@ internal sealed class EnemyField
 
     /// <summary>How long a burst lasts, for the view.</summary>
     public const float BlastSeconds = 0.35f;
+
+    /// <summary>An enemy drawn to a lure stops this far from its spot.</summary>
+    public const float LureStop = 1f;
+
+    /// <summary>The lures drawing enemies now.</summary>
+    public IReadOnlyList<EnemyLure> Lures => _lures;
+
+    /// <summary>
+    /// Puts a lure at <paramref name="spot"/> for <paramref name="seconds"/>: every enemy within <paramref name="reach"/> of it (but a boss, which pays it no mind)
+    /// walks to it instead of the player, and starts no attack while it is drawn there - though it still claws a player standing in its way.
+    /// </summary>
+    public EnemyLure AddLure(Vector3D<float> spot, float reach, float seconds)
+    {
+        var lure = new EnemyLure { Spot = spot, Reach = reach, Left = seconds };
+        _lures.Add(lure);
+        return lure;
+    }
+
+    /// <summary>The nearest lure <paramref name="enemy"/> is within reach of, or null for none (and always for a boss).</summary>
+    private EnemyLure? LureFor(Enemy enemy)
+    {
+        if (_lures.Count == 0 || enemy.Kind.Tier == EnemyTier.Boss)
+        {
+            return null;
+        }
+
+        EnemyLure? best = null;
+        float bestDistance = float.MaxValue;
+        foreach (var lure in _lures)
+        {
+            Geometry.FlatDirection(enemy.Position, lure.Spot, out float distance);
+            if (distance <= lure.Reach && distance < bestDistance)
+            {
+                best = lure;
+                bestDistance = distance;
+            }
+        }
+
+        return best;
+    }
 
     /// <summary>Splash shots bursting right now.</summary>
     public IReadOnlyList<EnemyBlast> Blasts => _blasts;
@@ -470,6 +534,12 @@ internal sealed class EnemyField
     public List<Enemy> Update(float deltaSeconds, PlayerTarget player, Func<float, float, float?> groundAt)
     {
         _strikes.Clear();
+        foreach (var lure in _lures)
+        {
+            lure.Left -= deltaSeconds;
+        }
+
+        _lures.RemoveAll(l => l.Left <= 0f);
         SpawnTowardTarget(deltaSeconds, player.Feet, groundAt);
         RefreshGrid();
         CountFodderAttacks();
@@ -637,6 +707,30 @@ internal sealed class EnemyField
         return found;
     }
 
+    /// <summary>
+    /// The nearest live enemy whose body reaches into the flat circle of <paramref name="radius"/> around <paramref name="centre"/> - a crate only when no enemy
+    /// does - or null for none: what a hero turns to face.
+    /// </summary>
+    public Enemy? Nearest(Vector3D<float> centre, float radius)
+    {
+        Enemy? best = null;
+        float bestDistance = float.MaxValue;
+        foreach (var enemy in Within(centre, radius))
+        {
+            Geometry.FlatDirection(centre, enemy.Position, out float distance);
+            bool better = best is null
+                || (best.Kind.IsProp && !enemy.Kind.IsProp)
+                || (best.Kind.IsProp == enemy.Kind.IsProp && distance < bestDistance);
+            if (better)
+            {
+                best = enemy;
+                bestDistance = distance;
+            }
+        }
+
+        return best;
+    }
+
     /// <summary>Takes one away quietly - no kill, nothing dropped (a crate left far behind). It is gone after the next <see cref="Update"/>.</summary>
     public void Vanish(Enemy enemy)
     {
@@ -656,6 +750,7 @@ internal sealed class EnemyField
         _bolts.Clear();
         _bombs.Clear();
         _blasts.Clear();
+        _lures.Clear();
         _spawnTimer = 0f;
         _gridStale = true;
         return all;
@@ -770,6 +865,12 @@ internal sealed class EnemyField
             return;   // frozen solid: no step, no claw, and an attack under way waits
         }
 
+        if (enemy.StaggeredFor > 0f)
+        {
+            enemy.StaggeredFor = MathF.Max(0f, enemy.StaggeredFor - deltaSeconds);
+            return;   // reeling: the same, but not frozen
+        }
+
         enemy.ContactCooldown = MathF.Max(0f, enemy.ContactCooldown - deltaSeconds * enemy.AttackSpeed);
         enemy.AttackCooldown = MathF.Max(0f, enemy.AttackCooldown - deltaSeconds * enemy.AttackSpeed);
 
@@ -788,7 +889,17 @@ internal sealed class EnemyField
         }
 
         Vector3D<float> step;
-        if (kind.Behaviour == EnemyBehaviour.Stalk)
+        if (LureFor(enemy) is { } lure)
+        {
+            // Drawn to a lure: over to it, and no attack started.
+            var toLure = Geometry.FlatDirection(enemy.Position, lure.Spot, out float fromLure);
+            step = fromLure > LureStop ? toLure * enemy.WalkSpeed : Vector3D<float>.Zero;
+            if (fromLure > 1e-3f)
+            {
+                enemy.Yaw = MathF.Atan2(toLure.X, toLure.Z);
+            }
+        }
+        else if (kind.Behaviour == EnemyBehaviour.Stalk)
         {
             if (Stalk(enemy, deltaSeconds, toPlayer, distance, player, groundAt, out step))
             {

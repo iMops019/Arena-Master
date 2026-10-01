@@ -6,8 +6,9 @@ using Silk.NET.Maths;
 namespace ArenaMaster.Game.Ranger;
 
 /// <summary>
-/// The Ranger's body and movement on top of the engine's third-person walker: a run at the stats' speed, a dash on Shift, and a body that turns to face where the camera aims (the bow fires
-/// that way). The engine does the walking, jumping and collision; this sets the speed, works out the dash's push, and draws the body at the player's feet: its
+/// The Ranger's body and movement on top of the engine's third-person walker: a run at the stats' speed, a dash on Shift, and a body that turns to face what the bow is
+/// shooting at, or the way it runs with nothing to shoot (the camera is only for looking). The engine does the walking, jumping and collision; this sets the
+/// speed, works out the dash's push, and draws the body at the player's feet: its
 /// legs run with the ground it covers (<see cref="HeroBody"/>), and while the bow is shooting the upper body draws and looses in time with it.
 /// </summary>
 internal sealed class RangerController
@@ -22,7 +23,7 @@ internal sealed class RangerController
 
     public const float DashDuration = 0.18f;
 
-    /// <summary>How quickly the body turns toward the aim: the fraction of the remaining turn made per second, roughly (exponential smoothing).</summary>
+    /// <summary>How quickly the body turns toward its target or its run: the fraction of the remaining turn made per second, roughly (exponential smoothing).</summary>
     private const float TurnRate = 16f;
 
     private readonly HeroBody _body = new(BodyModel);
@@ -43,16 +44,20 @@ internal sealed class RangerController
     /// <summary>The dash's push this frame (metres per second, flat), zero when not dashing. The content adds it to any knock-back and hands the sum to the engine.</summary>
     public Vector3D<float> DashVelocity { get; private set; }
 
+    /// <summary>Where the feet were as a dash began, on the frame it began (null on every other frame): Snare Line sets a snare there.</summary>
+    public Vector3D<float>? DashedFrom { get; private set; }
+
     /// <summary>
-    /// A stunned Ranger can't walk, jump or dash (the body still turns with the camera). <paramref name="draw"/> is how far the bow is through its shot (0 to 1),
-    /// or null when it isn't shooting (at camp).
+    /// A stunned Ranger can't walk, jump or dash (the body still turns to its target). <paramref name="draw"/> is how far the bow is through its shot (0 to 1),
+    /// or null when it isn't shooting (at camp). <paramref name="aim"/> is the flat way to what the bow is shooting at, or null with nothing to shoot: the body
+    /// faces it, or else the way it is running, so the mouse is free to look round.
     /// </summary>
-    public void Update(EngineWindow window, float deltaSeconds, RangerStats stats, bool stunned, float? draw)
+    public void Update(EngineWindow window, float deltaSeconds, RangerStats stats, bool stunned, float? draw, Vector3D<float>? aim)
     {
         window.WalkSpeed = stunned ? 0f : stats.MoveSpeed;
         window.PlayerCanJump = !stunned;
         UpdateDash(window, deltaSeconds, stats, stunned);
-        UpdateBody(window, deltaSeconds, draw);
+        UpdateBody(window, deltaSeconds, draw, aim);
     }
 
     /// <summary>Takes the body out of the world (another class was chosen). The next <see cref="Update"/> puts it back.</summary>
@@ -61,6 +66,7 @@ internal sealed class RangerController
     private void UpdateDash(EngineWindow window, float deltaSeconds, RangerStats stats, bool stunned)
     {
         _cooldownLeft = MathF.Max(0f, _cooldownLeft - deltaSeconds);
+        DashedFrom = null;
 
         var keyboard = window.Keyboard;
         bool dashKey = keyboard is not null && (keyboard.IsKeyPressed(Key.ShiftLeft) || keyboard.IsKeyPressed(Key.ShiftRight));
@@ -75,18 +81,22 @@ internal sealed class RangerController
             _cooldownLength = stats.DashCooldown;
             _cooldownLeft = _cooldownLength;
             _dashSpeed = stats.DashSpeed;
+            DashedFrom = window.PlayerFeet;
         }
 
         _dashTimeLeft -= deltaSeconds;
         DashVelocity = _dashTimeLeft > 0f ? _dashDirection * _dashSpeed : Vector3D<float>.Zero;
     }
 
-    private void UpdateBody(EngineWindow window, float deltaSeconds, float? draw)
+    private void UpdateBody(EngineWindow window, float deltaSeconds, float? draw, Vector3D<float>? aim)
     {
-        var aim = AimFlat(window);
-        float target = MathF.Atan2(aim.X, aim.Z);   // models face +Z; yaw 0 faces +Z
-        float turn = MathF.IEEERemainder(target - _yaw, MathF.Tau);
-        _yaw += turn * (1f - MathF.Exp(-TurnRate * deltaSeconds));
+        var facing = aim ?? (window.PlayerMoveDirection != Vector3D<float>.Zero ? window.PlayerMoveDirection : (Vector3D<float>?)null);
+        if (facing is { } face && face != Vector3D<float>.Zero)
+        {
+            float target = MathF.Atan2(face.X, face.Z);   // models face +Z; yaw 0 faces +Z
+            float turn = MathF.IEEERemainder(target - _yaw, MathF.Tau);
+            _yaw += turn * (1f - MathF.Exp(-TurnRate * deltaSeconds));
+        }
 
         _shooting = draw is null ? MathF.Max(0f, _shooting - ShootFade * deltaSeconds) : MathF.Min(1f, _shooting + ShootFade * deltaSeconds);
         _layer[0] = new ClipWeight(ShootClip, (draw ?? 1f) * _body.ClipLength(ShootClip), _shooting);

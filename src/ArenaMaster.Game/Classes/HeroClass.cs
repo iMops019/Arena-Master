@@ -34,8 +34,17 @@ internal interface IHeroClass
     /// <summary>A line or two for the class picker: how it fights.</summary>
     string Summary { get; }
 
-    /// <summary>Its passive tree (one per class for now).</summary>
+    /// <summary>Every passive tree it has, its first tree first (the one a new player starts on).</summary>
+    IReadOnlyList<TreeDefinition> Trees { get; }
+
+    /// <summary>The active tree, one of <see cref="Trees"/>: the one that earns a run's experience and whose ranks <see cref="UseTree"/> takes.</summary>
     TreeDefinition Tree { get; }
+
+    /// <summary>Makes the tree with id <paramref name="treeId"/> the active one (the first tree, for an id it has none of). <see cref="UseTree"/> comes after it.</summary>
+    void ChooseTree(string treeId);
+
+    /// <summary>A gauge the class keeps (a count that builds up and is spent, or a heat that rises), for the HUD: its label and how full it is (0 to 1); null for none.</summary>
+    (string Label, float Fill)? Meter => null;
 
     float MaxHealth { get; }
 
@@ -67,7 +76,10 @@ internal interface IHeroClass
     /// <summary>A short line under the crosshair (a readied shot, a shield up), or null.</summary>
     string? Status { get; }
 
-    /// <summary>The ranks spent in its tree changed (or a run is about to start): take their bonuses.</summary>
+    /// <summary>The enemy the class's attack has picked on its own (the Ranger's auto-aim), for the HUD to mark; null for none, or a class that aims with the camera.</summary>
+    Enemy? AimTarget => null;
+
+    /// <summary>The ranks spent in its active tree changed (or a run is about to start, or another tree was made active): take their bonuses.</summary>
     void UseTree(IReadOnlyDictionary<string, int> ranks);
 
     /// <summary>A fresh run: no upgrades, <paramref name="items"/> the loadout's bonuses, and <paramref name="health"/> reset to full at the new <see cref="MaxHealth"/>.</summary>

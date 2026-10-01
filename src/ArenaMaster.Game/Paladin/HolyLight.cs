@@ -43,6 +43,8 @@ internal enum HolySource
     Thorns,
     ShieldBash,
     Retribution,
+    Rush,
+    Hammer,
 }
 
 internal readonly record struct HolyHit(Enemy Enemy, Vector3D<float> Position, float Damage, bool Killed, bool Crit, HolySource Source);
@@ -50,7 +52,8 @@ internal readonly record struct HolyHit(Enemy Enemy, Vector3D<float> Position, f
 /// <summary>
 /// The Paladin's attacks: the Holy Nova bursting around the Paladin on its own every few moments (hurting everything it reaches), the holy circle each nova leaves
 /// on the ground, thorns for whatever touches the Paladin, and the Defiance majors that add bursts - Echoing Nova, Radiant Avatar's Great Nova, Resonance's
-/// bursts from every circle. Pure simulation - no engine calls - so it can be tested; <see cref="HolyView"/> draws it.
+/// bursts from every circle - and what the Crusade adds to them: Endless Crusade's second burst at full Zeal, Penance's extra damage on the next nova, and the
+/// enemies Condemn marks to take more. Pure simulation - no engine calls - so it can be tested; <see cref="HolyView"/> draws it.
 /// </summary>
 internal sealed class HolyLight
 {
@@ -70,6 +73,7 @@ internal sealed class HolyLight
     private readonly List<HolyCircle> _circles = new();
     private readonly List<NovaFlash> _flashes = new();
     private readonly List<(float Delay, Vector3D<float> Centre, float Radius, float Damage)> _echoes = new();
+    private readonly Dictionary<Enemy, float> _condemned = new();
     private float _thornsIn;
 
     public HolyLight(Random random) => _random = random;
@@ -84,6 +88,18 @@ internal sealed class HolyLight
     /// <summary>Novas cast this run (echoes and other bursts don't count).</summary>
     public int Novas { get; private set; }
 
+    /// <summary>Penance: extra damage the next nova deals to every enemy it hits, spent by that nova.</summary>
+    public float Penance { get; set; }
+
+    /// <summary>Whether <paramref name="enemy"/> is condemned (Condemn): it takes more from every Paladin hit until its time runs out.</summary>
+    public bool IsCondemned(Enemy enemy) => _condemned.ContainsKey(enemy);
+
+    /// <summary>Condemns <paramref name="enemy"/> for <paramref name="seconds"/> (from now, however long it had left).</summary>
+    public void Condemn(Enemy enemy, float seconds) => _condemned[enemy] = seconds;
+
+    /// <summary>A roll against the nova's crit chance, for the Crusade's hits (the rush, a hammer).</summary>
+    public bool RollCrit(PaladinStats stats) => _random.NextDouble() < stats.CritChance;
+
     /// <summary>How many circles <paramref name="feet"/> stands in.</summary>
     public int CirclesAround(Vector3D<float> feet) => _circles.Count(c =>
     {
@@ -92,7 +108,8 @@ internal sealed class HolyLight
     });
 
     /// <summary>
-    /// One frame: a nova when one is due (held while <paramref name="canCast"/> is false - a stun), echoes coming due, the circles burning and fading, and thorns.
+    /// One frame: a nova when one is due (held while <paramref name="canCast"/> is false - a stun), echoes coming due, the circles burning and fading, Condemn's
+    /// clocks, and thorns.
     /// <paramref name="feet"/> is the ground under the Paladin. Every hit dealt goes on <paramref name="hits"/>.
     /// </summary>
     public void Update(float deltaSeconds, Vector3D<float> feet, PaladinStats stats, EnemyField enemies, bool canCast, List<HolyHit> hits)
@@ -144,12 +161,13 @@ internal sealed class HolyLight
         }
 
         _flashes.RemoveAll(f => f.Age >= FlashDuration);
+        UpdateCondemned(deltaSeconds);
         UpdateThorns(deltaSeconds, feet, stats, enemies, hits);
     }
 
     /// <summary>
     /// A Holy Nova at <paramref name="at"/>: with Resonance, a burst from every circle already on the ground first; then the nova itself (every 8th a Great Nova, with
-    /// Radiant Avatar); then the circle it leaves, and, with Echoing Nova, its echo lined up.
+    /// Radiant Avatar; Penance's stored damage on top); then the circle it leaves, and, with Echoing Nova or Endless Crusade at full Zeal, its echo lined up.
     /// </summary>
     public void CastNova(Vector3D<float> at, PaladinStats stats, EnemyField enemies, List<HolyHit> hits)
     {
@@ -166,11 +184,17 @@ internal sealed class HolyLight
             }
         }
 
-        Burst(at, radius, damage, stats, enemies, hits);
+        float penance = Penance;
+        Penance = 0f;
+        Burst(at, radius, damage + penance, stats, enemies, hits);
         LeaveCircle(at, stats.CircleRadius * (great ? PaladinStats.AvatarCircle : 1f), stats);
         if (stats.Tree.EchoingNova)
         {
             _echoes.Add((PaladinStats.EchoDelay, at, radius, damage * PaladinStats.EchoDamage));
+        }
+        else if (stats.Crusade.EndlessCrusade && stats.ZealFull)
+        {
+            _echoes.Add((PaladinStats.EndlessDelay, at, radius, damage * PaladinStats.EndlessDamage));
         }
     }
 
@@ -190,7 +214,7 @@ internal sealed class HolyLight
         }
     }
 
-    /// <summary>Hurts one enemy (harder if it is an elite or a boss) and notes the hit. Nothing happens to one already dead.</summary>
+    /// <summary>Hurts one enemy (harder if it is an elite or a boss, or condemned) and notes the hit. Nothing happens to one already dead.</summary>
     public void Hurt(Enemy enemy, float amount, bool crit, HolySource source, PaladinStats stats, EnemyField enemies, List<HolyHit> hits)
     {
         if (!enemy.IsAlive || amount <= 0f)
@@ -203,6 +227,11 @@ internal sealed class HolyLight
             amount *= stats.EliteMultiplier;
         }
 
+        if (_condemned.ContainsKey(enemy))
+        {
+            amount *= 1f + PaladinStats.CondemnBonus;
+        }
+
         bool killed = enemies.Damage(enemy, amount);
         hits.Add(new HolyHit(enemy, enemy.Position + new Vector3D<float>(0f, enemy.Kind.Height * 0.7f, 0f), amount, killed, crit, source));
     }
@@ -213,12 +242,15 @@ internal sealed class HolyLight
         _circles.Clear();
         _flashes.Clear();
         _echoes.Clear();
+        _condemned.Clear();
         NovaIn = FirstNova;
         Novas = 0;
+        Penance = 0f;
         _thornsIn = 0f;
     }
 
-    private void LeaveCircle(Vector3D<float> at, float radius, PaladinStats stats)
+    /// <summary>A holy circle of <paramref name="radius"/> at <paramref name="at"/>, as a nova leaves (the Crusade leaves them after a rush, a hammer and along a trail too).</summary>
+    public void LeaveCircle(Vector3D<float> at, float radius, PaladinStats stats)
     {
         if (_circles.Count >= MaxCircles)
         {
@@ -233,6 +265,28 @@ internal sealed class HolyLight
             Grows = stats.Tree.ExpandingLight,
             TickIn = CircleTick,
         });
+    }
+
+    /// <summary>Condemn's clocks: an enemy goes free when its time runs out (or it dies).</summary>
+    private void UpdateCondemned(float deltaSeconds)
+    {
+        if (_condemned.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var enemy in _condemned.Keys.ToList())
+        {
+            float left = _condemned[enemy] - deltaSeconds;
+            if (left <= 0f || !enemy.IsAlive)
+            {
+                _condemned.Remove(enemy);
+            }
+            else
+            {
+                _condemned[enemy] = left;
+            }
+        }
     }
 
     /// <summary>Thorns, once unlocked: every so often, each enemy touching the Paladin (or near, with Crown of Briars) takes the thorns damage.</summary>

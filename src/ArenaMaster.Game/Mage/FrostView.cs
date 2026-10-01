@@ -22,12 +22,17 @@ internal sealed class FrostView
     private readonly List<CrowdInstance> _shards = new();
     private float _time;
 
-    public void Sync(EngineWindow window, FrostBarrage barrage, Vector3D<float> feet, bool shieldUp, bool blizzard, float blizzardRadius, float deltaSeconds)
+    /// <summary>
+    /// The frost this frame. With the Fire Barrage (<paramref name="fire"/>) the bolts and bursts are the fire's to draw (<see cref="FireView"/>), and this draws
+    /// none.
+    /// </summary>
+    public void Sync(EngineWindow window, FrostBarrage barrage, Vector3D<float> feet, bool shieldUp, bool blizzard, float blizzardRadius, float deltaSeconds,
+        bool fire = false)
     {
         _time += deltaSeconds;
 
         _bolts.Clear();
-        foreach (var bolt in barrage.Bolts)
+        foreach (var bolt in fire ? Array.Empty<FrostBolt>() : barrage.Bolts)
         {
             var (yaw, pitch) = Geometry.YawPitch(bolt.Heading);
             _bolts.Add(new CrowdInstance(bolt.Position, yaw, bolt.Scale, pitch));
